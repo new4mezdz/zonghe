@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL数据管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #eaeaea; }
+        .header { background: rgba(255,255,255,0.05); padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .header h1 { font-size: 1.8rem; }
+        .header a { color: #e94560; text-decoration: none; margin-left: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+        .query-panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .query-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 15px; }
+        .query-row:last-child { margin-bottom: 0; }
+        .query-label { min-width: 80px; color: #aaa; }
+        .query-input { flex: 1; min-width: 200px; padding: 10px 15px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 0.95rem; }
+        .query-input:focus { outline: none; border-color: #e94560; }
+        select.query-input { cursor: pointer; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-primary:hover { background: #d63850; }
+        .btn-secondary { background: #444; color: #fff; }
+        .btn-secondary:hover { background: #555; }
+        .btn-warning { background: #ffaa00; color: #000; }
+        .stats-bar { background: rgba(0,0,0,0.3); padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .stats-text { color: #aaa; }
+        .stats-text span { color: #e94560; font-weight: bold; }
+        .results-panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { background: rgba(0,0,0,0.3); padding: 12px 10px; text-align: left; color: #aaa; font-weight: normal; position: sticky; top: 0; }
+        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        .type-url { color: #6bff6b; }
+        .type-fail { color: #ff6b6b; }
+        .type-other { color: #ffbb6b; }
+        .content-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .number-cell { font-family: Consolas, monospace; font-size: 0.85rem; color: #888; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #666; }
+        .empty-state .icon { font-size: 3rem; margin-bottom: 15px; }
+        .duplicates-info { background: rgba(255,170,0,0.1); border: 1px solid rgba(255,170,0,0.3); border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; color: #ffaa00; display: none; }
+        .duplicates-info.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 URL数据管理系统</h1>
+        <a href="/">← 返回首页</a>
+    </div>
+    <div class="container">
+        <div class="query-panel">
+            <div class="query-row">
+                <span class="query-label">日期查询:</span>
+                <select class="query-input" id="dateSelect" style="max-width: 200px;">
+                    <option value="">选择日期...</option>
+                </select>
+                <button class="btn btn-primary" onclick="queryByDate()">查询日期</button>
+                <button class="btn btn-warning" onclick="queryDuplicates()">查重复</button>
+            </div>
+            <div class="query-row">
+                <span class="query-label">编号查询:</span>
+                <input type="text" class="query-input" id="numberInput" placeholder="输入编号，如: 1-100 或 1,5,10" style="max-width: 300px;">
+                <button class="btn btn-primary" onclick="queryByNumber()">查询编号</button>
+            </div>
+            <div class="query-row">
+                <span class="query-label">内容查询:</span>
+                <input type="text" class="query-input" id="contentInput" placeholder="输入要搜索的内容...">
+                <button class="btn btn-primary" onclick="queryByContent()">模糊查询</button>
+                <button class="btn btn-secondary" onclick="queryAll()">查询全部</button>
+            </div>
+        </div>
+        <div class="stats-bar">
+            <div class="stats-text" id="statsText">就绪</div>
+            <button class="btn btn-secondary" onclick="clearResults()">清空结果</button>
+        </div>
+        <div class="duplicates-info" id="duplicatesInfo"></div>
+        <div class="results-panel">
+            <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>一号</th><th>二号</th><th>三号</th><th>四号</th><th>五号</th><th>六号</th><th>八号</th>
+                            <th>校验位</th><th>日期</th><th>类型</th><th>内容</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody">
+                        <tr><td colspan="11"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        async function loadDateList() {
+            const res = await fetch('/api/urldata/files');
+            const dates = await res.json();
+            const select = document.getElementById('dateSelect');
+            select.innerHTML = '<option value="">选择日期...</option>';
+            dates.forEach(date => {
+                const opt = document.createElement('option');
+                opt.value = date; opt.textContent = date;
+                select.appendChild(opt);
+            });
+        }
+
+        async function queryByDate() {
+            const date = document.getElementById('dateSelect').value;
+            if (!date) { alert('请选择日期'); return; }
+            await doQuery({ type: 'date', date: date });
+        }
+
+        async function queryByNumber() {
+            const number = document.getElementById('numberInput').value.trim();
+            if (!number) { alert('请输入编号'); return; }
+            await doQuery({ type: 'number', number: number });
+        }
+
+        async function queryByContent() {
+            const content = document.getElementById('contentInput').value.trim();
+            if (!content) { alert('请输入内容'); return; }
+            await doQuery({ type: 'content', content: content });
+        }
+
+        async function queryDuplicates() {
+            const date = document.getElementById('dateSelect').value;
+            if (!date) { alert('请选择日期'); return; }
+            await doQuery({ type: 'duplicates', date: date });
+        }
+
+        async function queryAll() { await doQuery({ type: 'content', content: '' }); }
+
+        async function doQuery(params) {
+            const res = await fetch('/api/urldata/query', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(params)
+            });
+            const data = await res.json();
+            displayResults(data.results);
+            updateStats(data.stats, params.type);
+        }
+
+        function displayResults(results) {
+            const tbody = document.getElementById('resultsBody');
+            if (!results || results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">🔍</div><div>没有找到匹配的数据</div></div></td></tr>';
+                return;
+            }
+            tbody.innerHTML = results.map(item => {
+                const typeClass = item.type === 'URL' ? 'type-url' : item.type === '失败' ? 'type-fail' : 'type-other';
+                return `<tr>
+                    ${item.numbers.map(n => `<td class="number-cell">${n}</td>`).join('')}
+                    <td>${item.verification || 'N/A'}</td>
+                    <td>${item.date}</td>
+                    <td class="${typeClass}">${item.type}</td>
+                    <td class="content-cell" title="${escapeHtml(item.content)}">${escapeHtml(item.content)}</td>
+                </tr>`;
+            }).join('');
+            checkDuplicates(results);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function updateStats(stats, queryType) {
+            const typeNames = { 'date': '日期查询', 'number': '编号查询', 'content': '内容查询', 'duplicates': '重复查询' };
+            document.getElementById('statsText').innerHTML = `${typeNames[queryType] || '查询'} | 总计: <span>${stats.total}</span> | URL: <span>${stats.url}</span> | 失败: <span>${stats.fail}</span> | 其他: <span>${stats.other}</span>`;
+        }
+
+        function checkDuplicates(results) {
+            const contents = results.map(r => r.content), counts = {};
+            contents.forEach(c => counts[c] = (counts[c] || 0) + 1);
+            const duplicates = Object.entries(counts).filter(([_, count]) => count > 1);
+            const info = document.getElementById('duplicatesInfo');
+            if (duplicates.length > 0) {
+                info.classList.add('show');
+                info.innerHTML = `⚠️ 发现 ${duplicates.length} 个重复内容，共 ${duplicates.reduce((sum, [_, c]) => sum + c, 0)} 条记录`;
+            } else { info.classList.remove('show'); }
+        }
+
+        function clearResults() {
+            document.getElementById('resultsBody').innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>';
+            document.getElementById('statsText').textContent = '就绪';
+            document.getElementById('duplicatesInfo').classList.remove('show');
+        }
+
+        loadDateList();
+    </script>
+</body>
+</html>

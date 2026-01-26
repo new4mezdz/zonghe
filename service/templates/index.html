@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>综合数据管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #eaeaea;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
+        header { text-align: center; margin-bottom: 60px; }
+        h1 {
+            font-size: 2.5rem; margin-bottom: 10px;
+            background: linear-gradient(90deg, #e94560, #ffae00);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: #a0a0a0; font-size: 1.1rem; }
+        .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 30px; }
+        .module-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px; padding: 30px;
+            transition: all 0.3s ease;
+            text-decoration: none; color: inherit;
+        }
+        .module-card:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.08);
+            border-color: #e94560;
+            box-shadow: 0 10px 40px rgba(233, 69, 96, 0.2);
+        }
+        .module-icon { font-size: 3rem; margin-bottom: 20px; }
+        .module-title { font-size: 1.5rem; margin-bottom: 15px; color: #fff; }
+        .module-desc { color: #a0a0a0; line-height: 1.6; }
+        .module-features { margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .feature { display: flex; align-items: center; margin: 8px 0; font-size: 0.9rem; color: #ccc; }
+        .feature::before { content: "✓"; color: #00d26a; margin-right: 10px; font-weight: bold; }
+        footer { text-align: center; margin-top: 60px; padding: 20px; color: #666; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>综合数据管理系统</h1>
+            <p class="subtitle">集成文本监控、排班管理、URL数据管理、机台统计四大功能模块</p>
+        </header>
+        <div class="modules">
+            <a href="/monitor" class="module-card">
+                <div class="module-icon">🔍</div>
+                <h2 class="module-title">文本实时监控</h2>
+                <p class="module-desc">实时监控文本文件变化，自动对比黑名单内容，及时发出安全警报。</p>
+                <div class="module-features">
+                    <div class="feature">实时内容预览</div>
+                    <div class="feature">黑名单对比检测</div>
+                    <div class="feature">自动警报提醒</div>
+                </div>
+            </a>
+            <a href="/schedule" class="module-card">
+                <div class="module-icon">📅</div>
+                <h2 class="module-title">排班管理系统</h2>
+                <p class="module-desc">可视化排班日历，支持快速填充、导入导出，轻松管理团队班次。</p>
+                <div class="module-features">
+                    <div class="feature">日历可视化排班</div>
+                    <div class="feature">快速循环填充</div>
+                    <div class="feature">导入/导出功能</div>
+                </div>
+            </a>
+            <a href="/urldata" class="module-card">
+                <div class="module-icon">📊</div>
+                <h2 class="module-title">URL数据管理</h2>
+                <p class="module-desc">强大的数据查询系统，支持按日期、编号、内容多维度检索。</p>
+                <div class="module-features">
+                    <div class="feature">多维度数据查询</div>
+                    <div class="feature">重复内容检测</div>
+                    <div class="feature">统计分析功能</div>
+                </div>
+            </a>
+            <a href="/bindui" class="module-card">
+                <div class="module-icon">📈</div>
+                <h2 class="module-title">机台离岗统计</h2>
+                <p class="module-desc">上传CSV数据文件，自动生成各机台离岗情况统计图表。</p>
+                <div class="module-features">
+                    <div class="feature">CSV文件导入</div>
+                    <div class="feature">按日期/班次筛选</div>
+                    <div class="feature">柱状图可视化</div>
+                </div>
+            </a>
+        </div>
+        <footer>
+            <p>综合数据管理系统 v1.0 | 运行于端口 5000</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机台离岗统计</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #eaeaea; }
+        .header { background: rgba(255,255,255,0.05); padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .header h1 { font-size: 1.8rem; }
+        .header a { color: #e94560; text-decoration: none; margin-left: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+        .panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .panel-title { font-size: 1.1rem; margin-bottom: 15px; color: #aaa; }
+        .control-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-primary:hover { background: #d63850; }
+        .btn-secondary { background: #444; color: #fff; }
+        .file-label { color: #aaa; margin-left: 10px; }
+        .chart-container { background: #fff; border-radius: 12px; padding: 20px; margin-top: 20px; }
+        input[type="file"] { display: none; }
+        input[type="date"] { padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 6px; color: #fff; }
+        select { padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 6px; color: #fff; }
+        .stats-info { margin-top: 15px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 6px; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 各机台离岗情况统计</h1>
+        <a href="/">← 返回首页</a>
+    </div>
+    <div class="container">
+        <div class="panel">
+            <div class="panel-title">数据文件</div>
+            <div class="control-row">
+                <input type="file" id="csvFile" accept=".csv">
+                <button class="btn btn-primary" onclick="document.getElementById('csvFile').click()">选择CSV文件</button>
+                <span class="file-label" id="fileLabel">未选择文件</span>
+            </div>
+            <div class="stats-info" id="fileInfo" style="display:none;"></div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">筛选设置</div>
+            <div class="control-row">
+                <label style="color:#aaa;">日期范围:</label>
+                <input type="date" id="startDate" value="2025-01-01">
+                <span style="color:#aaa;">至</span>
+                <input type="date" id="endDate" value="2025-12-31">
+                <label style="color:#aaa; margin-left:20px;">班次:</label>
+                <select id="shiftSelect">
+                    <option value="全天">全天</option>
+                    <option value="白班">白班</option>
+                    <option value="晚班">晚班</option>
+                </select>
+                <button class="btn btn-primary" onclick="bindui()">刷新图表</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-title">统计图表</div>
+            <div class="chart-container">
+                <canvas id="bindui"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let bindui = null;
+
+        document.getElementById('csvFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await fetch('/api/bindui/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('fileLabel').textContent = file.name;
+                document.getElementById('fileInfo').style.display = 'block';
+                document.getElementById('fileInfo').innerHTML = `已加载 <b>${data.rows}</b> 行数据，列: ${data.columns.join(', ')}`;
+                bindui();
+            }
+        });
+
+        async function bindui() {
+            const res = await fetch('/api/bindui/bindui', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    start_date: document.getElementById('startDate').value,
+                    end_date: document.getElementById('endDate').value,
+                    shift: document.getElementById('shiftSelect').value
+                })
+            });
+
+            const result = await res.json();
+            if (!result.success) {
+                alert(result.error || '查询失败');
+                return;
+            }
+
+            const labels = result.data.map(d => d.machine);
+            const values = result.data.map(d => d.count);
+
+            const ctx = document.getElementById('bindui').getContext('2d');
+
+            if (bindui) bindui.destroy();
+
+            bindui = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '事件次数',
+                        data: values,
+                        backgroundColor: '#5C6BC0',
+                        borderColor: '#3949AB',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '各机台离岗情况统计',
+                            font: { size: 18 }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

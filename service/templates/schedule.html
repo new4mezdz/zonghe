@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排班管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #eaeaea; }
+        .header { background: rgba(255,255,255,0.05); padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .header h1 { font-size: 1.8rem; }
+        .header a { color: #e94560; text-decoration: none; margin-left: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
+        .main-grid { display: grid; grid-template-columns: 1fr 350px; gap: 25px; }
+        .panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; }
+        .panel-title { font-size: 1.1rem; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .calendar { width: 100%; }
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .calendar-nav { background: transparent; border: 1px solid #e94560; color: #e94560; padding: 8px 15px; border-radius: 6px; cursor: pointer; }
+        .calendar-nav:hover { background: #e94560; color: #fff; }
+        .calendar-title { font-size: 1.3rem; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+        .calendar-weekday { text-align: center; padding: 10px; color: #888; font-size: 0.85rem; }
+        .calendar-day { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; background: rgba(255,255,255,0.03); transition: all 0.2s; font-size: 0.9rem; padding: 5px; }
+        .calendar-day:hover { background: rgba(255,255,255,0.1); }
+        .calendar-day.selected { background: #e94560; }
+        .calendar-day.other-month { opacity: 0.3; }
+        .calendar-day .date-num { font-weight: bold; }
+        .calendar-day .shift-info { font-size: 0.65rem; margin-top: 2px; color: #aaa; }
+        .calendar-day.has-schedule .shift-info { color: #00d26a; }
+        .date-display { font-size: 1.2rem; color: #e94560; margin-bottom: 20px; text-align: center; }
+        .shift-group { margin-bottom: 20px; }
+        .shift-label { margin-bottom: 10px; color: #aaa; }
+        .shift-options { display: flex; gap: 10px; flex-wrap: wrap; }
+        .shift-btn { padding: 8px 16px; border: 1px solid #555; background: transparent; color: #fff; border-radius: 6px; cursor: pointer; }
+        .shift-btn:hover { border-color: #e94560; }
+        .shift-btn.active { background: #e94560; border-color: #e94560; }
+        .divider { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 25px 0; }
+        .quick-fill { margin-top: 20px; }
+        .quick-fill label { display: block; margin-bottom: 8px; color: #aaa; font-size: 0.9rem; }
+        .quick-fill input { width: 100%; padding: 10px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 6px; color: #fff; margin-bottom: 15px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-primary:hover { background: #d63850; }
+        .btn-secondary { background: #444; color: #fff; }
+        .btn-secondary:hover { background: #555; }
+        .btn-danger { background: transparent; border: 1px solid #ff4757; color: #ff4757; }
+        .schedule-list { max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); border-radius: 6px; padding: 10px; font-size: 0.85rem; font-family: Consolas, monospace; }
+        .schedule-item { padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+        input[type="file"] { display: none; }
+        @media (max-width: 800px) { .main-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📅 排班管理系统</h1>
+        <a href="/">← 返回首页</a>
+    </div>
+    <div class="container">
+        <div class="main-grid">
+            <div class="panel">
+                <div class="panel-title">选择日期</div>
+                <div class="calendar">
+                    <div class="calendar-header">
+                        <button class="calendar-nav" onclick="changeMonth(-1)">◀ 上月</button>
+                        <span class="calendar-title" id="calendarTitle"></span>
+                        <button class="calendar-nav" onclick="changeMonth(1)">下月 ▶</button>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid"></div>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">排班设置</div>
+                <div class="date-display" id="selectedDate">请选择日期</div>
+                <div class="shift-group">
+                    <div class="shift-label">白班:</div>
+                    <div class="shift-options">
+                        <button class="shift-btn" data-shift="day" data-team="甲" onclick="setShift('day', '甲')">甲组</button>
+                        <button class="shift-btn" data-shift="day" data-team="乙" onclick="setShift('day', '乙')">乙组</button>
+                        <button class="shift-btn" data-shift="day" data-team="丙" onclick="setShift('day', '丙')">丙组</button>
+                        <button class="shift-btn" data-shift="day" data-team="" onclick="setShift('day', '')">清除</button>
+                    </div>
+                </div>
+                <div class="shift-group">
+                    <div class="shift-label">晚班:</div>
+                    <div class="shift-options">
+                        <button class="shift-btn" data-shift="night" data-team="甲" onclick="setShift('night', '甲')">甲组</button>
+                        <button class="shift-btn" data-shift="night" data-team="乙" onclick="setShift('night', '乙')">乙组</button>
+                        <button class="shift-btn" data-shift="night" data-team="丙" onclick="setShift('night', '丙')">丙组</button>
+                        <button class="shift-btn" data-shift="night" data-team="" onclick="setShift('night', '')">清除</button>
+                    </div>
+                </div>
+                <hr class="divider">
+                <div class="quick-fill">
+                    <div class="panel-title">快速填充</div>
+                    <label>循环顺序 (如: 甲乙丙)</label>
+                    <input type="text" id="cycleOrder" value="甲乙丙">
+                    <label>填充天数</label>
+                    <input type="number" id="fillDays" value="30">
+                    <button class="btn btn-primary" onclick="quickFill()">开始填充</button>
+                </div>
+                <hr class="divider">
+                <div class="panel-title">已设置的排班</div>
+                <div class="schedule-list" id="scheduleList">暂无排班数据</div>
+                <div class="btn-group">
+                    <button class="btn btn-secondary" onclick="exportSchedule()">导出</button>
+                    <input type="file" id="importFile" accept=".json">
+                    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">导入</button>
+                    <button class="btn btn-danger" onclick="clearAll()">清空</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let currentDate = new Date(), selectedDate = null, scheduleData = {}, currentDayShift = '', currentNightShift = '';
+
+        async function loadSchedule() {
+            const res = await fetch('/api/schedule/get');
+            scheduleData = await res.json();
+            renderCalendar(); updateScheduleList();
+        }
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear(), month = currentDate.getMonth();
+            document.getElementById('calendarTitle').textContent = `${year}年${month + 1}月`;
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            weekdays.forEach(day => {
+                const el = document.createElement('div');
+                el.className = 'calendar-weekday'; el.textContent = day;
+                grid.appendChild(el);
+            });
+            const firstDay = new Date(year, month, 1), lastDay = new Date(year, month + 1, 0);
+            const startDay = firstDay.getDay(), totalDays = lastDay.getDate();
+            const prevMonth = new Date(year, month, 0);
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = prevMonth.getDate() - i;
+                grid.appendChild(createDayElement(day, true, new Date(year, month - 1, day)));
+            }
+            for (let day = 1; day <= totalDays; day++) {
+                grid.appendChild(createDayElement(day, false, new Date(year, month, day)));
+            }
+            const remaining = 42 - (startDay + totalDays);
+            for (let day = 1; day <= remaining; day++) {
+                grid.appendChild(createDayElement(day, true, new Date(year, month + 1, day)));
+            }
+        }
+
+        function createDayElement(day, isOtherMonth, date) {
+            const el = document.createElement('div');
+            el.className = 'calendar-day' + (isOtherMonth ? ' other-month' : '');
+            const dateStr = formatDate(date);
+            if (selectedDate === dateStr) el.classList.add('selected');
+            let shiftInfo = '';
+            if (scheduleData[dateStr]) {
+                el.classList.add('has-schedule');
+                const s = scheduleData[dateStr];
+                if (s['白班']) shiftInfo += s['白班'];
+                if (s['晚班']) shiftInfo += '/' + s['晚班'];
+            }
+            el.innerHTML = `<span class="date-num">${day}</span><span class="shift-info">${shiftInfo}</span>`;
+            el.onclick = () => selectDate(dateStr);
+            return el;
+        }
+
+        function formatDate(date) {
+            const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function changeMonth(delta) { currentDate.setMonth(currentDate.getMonth() + delta); renderCalendar(); }
+
+        function selectDate(dateStr) {
+            selectedDate = dateStr;
+            document.getElementById('selectedDate').textContent = '日期: ' + dateStr;
+            currentDayShift = ''; currentNightShift = '';
+            if (scheduleData[dateStr]) {
+                currentDayShift = scheduleData[dateStr]['白班'] || '';
+                currentNightShift = scheduleData[dateStr]['晚班'] || '';
+            }
+            updateShiftButtons(); renderCalendar();
+        }
+
+        function updateShiftButtons() {
+            document.querySelectorAll('.shift-btn').forEach(btn => {
+                btn.classList.remove('active');
+                const shift = btn.dataset.shift, team = btn.dataset.team;
+                if (shift === 'day' && team === currentDayShift) btn.classList.add('active');
+                if (shift === 'night' && team === currentNightShift) btn.classList.add('active');
+            });
+        }
+
+        async function setShift(type, team) {
+            if (!selectedDate) { alert('请先选择日期'); return; }
+            if (type === 'day') currentDayShift = team; else currentNightShift = team;
+            await fetch('/api/schedule/set', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: selectedDate, day_shift: currentDayShift, night_shift: currentNightShift })
+            });
+            await loadSchedule(); updateShiftButtons();
+        }
+
+        async function quickFill() {
+            if (!selectedDate) { alert('请先选择起始日期'); return; }
+            const order = document.getElementById('cycleOrder').value, days = document.getElementById('fillDays').value;
+            const res = await fetch('/api/schedule/quick_fill', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ start_date: selectedDate, days: days, order: order })
+            });
+            const data = await res.json();
+            if (data.success) { alert(`已填充 ${data.filled} 天的排班`); await loadSchedule(); }
+            else alert(data.error);
+        }
+
+        function updateScheduleList() {
+            const list = document.getElementById('scheduleList'), dates = Object.keys(scheduleData).sort();
+            if (dates.length === 0) { list.innerHTML = '暂无排班数据'; return; }
+            list.innerHTML = dates.map(date => {
+                const s = scheduleData[date];
+                return `<div class="schedule-item">${date}: 白班=${s['白班'] || '-'}组 晚班=${s['晚班'] || '-'}组</div>`;
+            }).join('');
+        }
+
+        function exportSchedule() { window.location.href = '/api/schedule/export'; }
+
+        document.getElementById('importFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const formData = new FormData(); formData.append('file', file);
+            const res = await fetch('/api/schedule/import', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) { alert(`已导入 ${data.count} 条排班记录`); await loadSchedule(); }
+            else alert(data.error);
+        });
+
+        async function clearAll() {
+            if (!confirm('确定要清空所有排班吗？')) return;
+            await fetch('/api/schedule/clear', { method: 'POST' });
+            await loadSchedule();
+        }
+
+        loadSchedule();
+    </script>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本实时监控系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #2b2b2b; min-height: 100vh; color: #fff; }
+        .header { background: #383838; padding: 20px; text-align: center; border-bottom: 2px solid #ffae00; }
+        .header h1 { color: #fff; font-size: 1.8rem; }
+        .header a { color: #ffae00; text-decoration: none; margin-left: 20px; }
+        .container { max-width: 900px; margin: 0 auto; padding: 25px; }
+        .section { margin-bottom: 20px; }
+        .section-title { color: #aaa; font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
+        .section-title::before { content: "▍"; color: #ffae00; margin-right: 8px; }
+        .panel { background: #383838; border-radius: 8px; padding: 15px; }
+        .panel-row { display: flex; align-items: center; gap: 15px; }
+        .btn { background: #ffae00; color: #000; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn:hover { background: #e69d00; }
+        .btn-secondary { background: #555; color: #fff; }
+        .btn-start { background: transparent; color: #ffae00; border: 2px solid #ffae00; font-size: 1.1rem; padding: 12px 30px; }
+        .btn-start:hover { background: #ffae00; color: #000; }
+        .btn-stop { border-color: #ff4d4d; color: #ff4d4d; }
+        .file-label { color: #aaa; font-family: Consolas, monospace; }
+        .count-label { color: #ffae00; margin-left: auto; }
+        .count-danger { color: #ff4d4d; }
+        .content-box { background: #1e1e1e; border-radius: 8px; padding: 15px; font-family: Consolas; font-size: 0.9rem; height: 350px; overflow-y: auto; white-space: pre-wrap; color: #e0e0e0; }
+        .control-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 25px; padding-top: 20px; border-top: 1px solid #444; }
+        .control-left { display: flex; align-items: center; gap: 10px; }
+        .interval-input { width: 60px; background: #1e1e1e; border: none; color: #ffae00; padding: 8px; border-radius: 4px; text-align: center; }
+        .status { color: #aaa; margin-left: 20px; }
+        .status.running { color: #ffae00; }
+        .alert-box { background: #3d2020; border: 1px solid #ff4d4d; border-radius: 8px; padding: 15px; margin-top: 15px; display: none; }
+        .alert-box.show { display: block; }
+        .alert-title { color: #ff4d4d; font-weight: bold; margin-bottom: 10px; }
+        input[type="file"] { display: none; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>文本实时监控系统</h1>
+        <a href="/">← 返回首页</a>
+    </div>
+    <div class="container">
+        <div class="section">
+            <div class="section-title">监控目标</div>
+            <div class="panel">
+                <div class="panel-row">
+                    <input type="file" id="monitorFile" accept=".txt,.dat">
+                    <button class="btn" onclick="document.getElementById('monitorFile').click()">选择监控文件</button>
+                    <span class="file-label" id="monitorFileLabel">未选择文件</span>
+                    <span class="count-label" id="lineCount"></span>
+                </div>
+            </div>
+        </div>
+        <div class="section">
+            <div class="section-title">实时内容预览</div>
+            <div class="content-box" id="contentPreview">请先选择监控文件...</div>
+        </div>
+        <div class="alert-box" id="alertBox">
+            <div class="alert-title">⚠️ 安全警告 - 检测到黑名单内容</div>
+            <div class="alert-list" id="alertList"></div>
+        </div>
+        <div class="section">
+            <div class="section-title">黑名单设置</div>
+            <div class="panel">
+                <div class="panel-row">
+                    <input type="file" id="blacklistFile" accept=".txt,.dat">
+                    <button class="btn btn-secondary" onclick="document.getElementById('blacklistFile').click()">导入黑名单</button>
+                    <span class="file-label" id="blacklistFileLabel">未导入</span>
+                    <span class="count-label count-danger" id="blacklistCount"></span>
+                </div>
+            </div>
+        </div>
+        <div class="control-bar">
+            <div class="control-left">
+                <label>刷新间隔(秒)：</label>
+                <input type="text" class="interval-input" id="interval" value="0.5">
+                <span class="status" id="status">就绪</span>
+            </div>
+            <button class="btn btn-start" id="toggleBtn" onclick="toggleMonitor()">▶ 开始监控</button>
+        </div>
+    </div>
+    <script>
+        let monitoring = false, monitorInterval = null;
+        document.getElementById('monitorFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const formData = new FormData(); formData.append('file', file);
+            const res = await fetch('/api/monitor/upload', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('monitorFileLabel').textContent = file.name.length > 45 ? '...' + file.name.slice(-45) : file.name;
+                document.getElementById('lineCount').textContent = '当前行数: ' + data.line_count;
+                document.getElementById('contentPreview').textContent = data.content;
+            }
+        });
+        document.getElementById('blacklistFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const formData = new FormData(); formData.append('file', file);
+            const res = await fetch('/api/monitor/blacklist', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                document.getElementById('blacklistFileLabel').textContent = file.name.length > 45 ? '...' + file.name.slice(-45) : file.name;
+                document.getElementById('blacklistCount').textContent = '已加载 ' + data.count + ' 条规则';
+            }
+        });
+        async function checkContent() {
+            const res = await fetch('/api/monitor/check', { method: 'POST' });
+            const data = await res.json(); if (data.error) return;
+            document.getElementById('contentPreview').textContent = data.content;
+            document.getElementById('lineCount').textContent = '当前行数: ' + data.line_count;
+            if (data.alerts && data.alerts.length > 0) {
+                document.getElementById('alertBox').classList.add('show');
+                document.getElementById('alertList').textContent = data.alerts.join('\n');
+            }
+        }
+        function toggleMonitor() {
+            const btn = document.getElementById('toggleBtn'), status = document.getElementById('status');
+            if (!monitoring) {
+                monitoring = true; btn.textContent = '■ 停止监控'; btn.classList.add('btn-stop');
+                status.textContent = '正在运行...'; status.classList.add('running');
+                const interval = parseFloat(document.getElementById('interval').value) * 1000 || 500;
+                monitorInterval = setInterval(checkContent, Math.max(interval, 100));
+            } else {
+                monitoring = false; btn.textContent = '▶ 开始监控'; btn.classList.remove('btn-stop');
+                status.textContent = '已停止'; status.classList.remove('running');
+                if (monitorInterval) { clearInterval(monitorInterval); monitorInterval = null; }
+            }
+        }
+    </script>
+</body>
+</html>
