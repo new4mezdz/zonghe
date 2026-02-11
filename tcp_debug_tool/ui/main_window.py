@@ -67,6 +67,9 @@ class MainWindow(QMainWindow):
             'clt_tx': 0, 'clt_tx_bytes': 0,
         }
 
+        # 警告计数
+        self.alert_count = 0
+
         # 循环发送定时器
         self.cycle_timer = QTimer()
         self.cycle_timer.timeout.connect(self.send_data)
@@ -135,7 +138,7 @@ class MainWindow(QMainWindow):
 
     def _create_server_panel(self):
         """服务器面板"""
-        group = QGroupBox("📥 TCP服务器（接收数据）")
+        group = QGroupBox("📥 监听端口（接收发送端数据）")
         layout = QHBoxLayout(group)
 
         layout.addWidget(QLabel("IP:"))
@@ -164,7 +167,7 @@ class MainWindow(QMainWindow):
 
     def _create_client_panel(self):
         """客户端面板"""
-        group = QGroupBox("📤 TCP客户端（发送数据）")
+        group = QGroupBox("📤 目标服务器（推送给接收端）")
         layout = QHBoxLayout(group)
 
         layout.addWidget(QLabel("IP:"))
@@ -284,6 +287,17 @@ class MainWindow(QMainWindow):
         self.blacklist_info.setStyleSheet("color: #888;")
         layout.addWidget(self.blacklist_info)
 
+        # 自定义转发内容
+        layout.addWidget(QLabel("触发时转发内容:"))
+        self.forward_content = QLineEdit()
+        self.forward_content.setPlaceholderText("警告触发时发送此内容")
+        self.forward_content.setText("ALERT")
+        layout.addWidget(self.forward_content)
+
+        self.auto_forward = QCheckBox("自动转发到接收端")
+        self.auto_forward.setChecked(True)
+        layout.addWidget(self.auto_forward)
+
         return group
 
     def _create_log_panel(self):
@@ -337,6 +351,20 @@ class MainWindow(QMainWindow):
         self.alert_panel.hide()
 
         layout = QVBoxLayout(self.alert_panel)
+
+        # 顶部：计数和清空按钮
+        top_layout = QHBoxLayout()
+        self.alert_count_label = QLabel("触发次数: 0")
+        self.alert_count_label.setStyleSheet("color: #ff6666; font-weight: bold;")
+        top_layout.addWidget(self.alert_count_label)
+        top_layout.addStretch()
+
+        clear_alert_btn = QPushButton("清空")
+        clear_alert_btn.setFixedWidth(60)
+        clear_alert_btn.clicked.connect(self.clear_alerts)
+        top_layout.addWidget(clear_alert_btn)
+        layout.addLayout(top_layout)
+
         self.alert_content = QPlainTextEdit()
         self.alert_content.setReadOnly(True)
         self.alert_content.setMaximumHeight(80)
@@ -347,7 +375,7 @@ class MainWindow(QMainWindow):
 
     def _create_send_panel(self):
         """发送面板"""
-        group = QGroupBox("✏️ 数据发送")
+        group = QGroupBox("✏️ 数据发送（推送到接收端）")
         layout = QVBoxLayout(group)
 
         self.send_input = QPlainTextEdit()
@@ -357,12 +385,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.send_input)
 
         send_layout = QHBoxLayout()
-
-        self.send_channel = QComboBox()
-        self.send_channel.addItem("通过服务器发送（回复客户端）", "server")
-        self.send_channel.addItem("通过客户端发送（发给目标机器）", "client")
-        self.send_channel.setFixedWidth(280)
-        send_layout.addWidget(self.send_channel)
 
         send_btn = QPushButton("发送")
         send_btn.setProperty("class", "primary")
@@ -379,7 +401,6 @@ class MainWindow(QMainWindow):
         self.send_input.installEventFilter(self)
 
         return group
-
     def _create_shortcuts_panel(self):
         """快捷指令面板"""
         group = QGroupBox("⚡ 快捷指令")
@@ -576,6 +597,7 @@ class MainWindow(QMainWindow):
 
         self._update_stats()
 
+        # 检查黑名单
         found = self.monitor_service.check_data(data['data'])
         if found:
             self.on_blacklist_alert({'items': found, 'data': data['data']})
@@ -600,9 +622,29 @@ class MainWindow(QMainWindow):
     @pyqtSlot(dict)
     def on_blacklist_alert(self, data):
         self.alert_panel.show()
+        self.alert_count += 1
+        self.alert_count_label.setText(f"触发次数: {self.alert_count}")
+
         time_str = datetime.now().strftime('%H:%M:%S')
         for item in data['items']:
             self.alert_content.appendPlainText(f"[{time_str}] {item}")
+
+        # 自动转发自定义内容
+        if self.auto_forward.isChecked() and self.tcp_service.is_client_connected():
+            forward_msg = self.forward_content.text()
+            if forward_msg:
+                result = self.tcp_service.send_data('client', forward_msg, False, False)
+                if result['success']:
+                    self.stats['clt_tx'] += 1
+                    self.stats['clt_tx_bytes'] += result['length']
+                    self.add_log_line('CLT-TX', f"[自动转发] {forward_msg}", 'client-tx')
+                    self._update_stats()
+
+    @pyqtSlot()
+    def clear_alerts(self):
+        self.alert_content.clear()
+        self.alert_count = 0
+        self.alert_count_label.setText("触发次数: 0")
 
     def add_log_line(self, direction, data, log_type, hex_data=None):
         colors = {
@@ -654,7 +696,7 @@ class MainWindow(QMainWindow):
         if not content:
             return
 
-        channel = self.send_channel.currentData()
+        channel = 'client'  # 固定发送到接收端
         is_hex = self.tx_hex.isChecked()
         parse_escape = self.tx_parse_escape.isChecked()
         append_newline = self.tx_append_newline.isChecked()
@@ -665,15 +707,9 @@ class MainWindow(QMainWindow):
         result = self.tcp_service.send_data(channel, content, is_hex, append_newline and not is_hex)
 
         if result['success']:
-            if channel == 'server':
-                self.stats['srv_tx'] += 1
-                self.stats['srv_tx_bytes'] += result['length']
-                self.add_log_line('SRV-TX', result['data'], 'server-tx')
-            else:
-                self.stats['clt_tx'] += 1
-                self.stats['clt_tx_bytes'] += result['length']
-                self.add_log_line('CLT-TX', result['data'], 'client-tx')
-
+            self.stats['clt_tx'] += 1
+            self.stats['clt_tx_bytes'] += result['length']
+            self.add_log_line('CLT-TX', result['data'], 'client-tx')
             self._update_stats()
 
             self.history_service.add(content.rstrip('\r\n'))
@@ -776,5 +812,3 @@ class MainWindow(QMainWindow):
         self.tcp_service.stop_server()
         self.tcp_service.disconnect_client()
         event.accept()
-
-

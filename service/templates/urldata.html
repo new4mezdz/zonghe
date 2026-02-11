@@ -3,133 +3,371 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>URL数据管理系统</title>
+    <title>盒膜轨迹跟踪查询</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #eaeaea; }
         .header { background: rgba(255,255,255,0.05); padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .header h1 { font-size: 1.8rem; }
         .header a { color: #e94560; text-decoration: none; margin-left: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
-        .query-panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-        .query-row { display: flex; gap: 15px; flex-wrap: wrap; align-items: center; margin-bottom: 15px; }
-        .query-row:last-child { margin-bottom: 0; }
-        .query-label { min-width: 80px; color: #aaa; }
-        .query-input { flex: 1; min-width: 200px; padding: 10px 15px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 0.95rem; }
-        .query-input:focus { outline: none; border-color: #e94560; }
-        select.query-input { cursor: pointer; }
-        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 15px; }
+        .panel-title { font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: all 0.2s; font-size: 0.85rem; }
         .btn-primary { background: #e94560; color: #fff; }
         .btn-primary:hover { background: #d63850; }
         .btn-secondary { background: #444; color: #fff; }
         .btn-secondary:hover { background: #555; }
         .btn-warning { background: #ffaa00; color: #000; }
-        .stats-bar { background: rgba(0,0,0,0.3); padding: 15px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .stats-text { color: #aaa; }
+        .btn-warning:hover { background: #e69900; }
+        .btn-success { background: #22c55e; color: #fff; }
+        .btn-success:hover { background: #16a34a; }
+        .btn-danger { background: #ef4444; color: #fff; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-block { width: 100%; padding: 10px; }
+        .query-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+        .query-row:last-child { margin-bottom: 0; }
+        .query-label { min-width: 70px; color: #aaa; font-size: 0.9rem; }
+        .query-input { flex: 1; min-width: 150px; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 0.9rem; }
+        .query-input:focus { outline: none; border-color: #e94560; }
+        select.query-input { cursor: pointer; }
+        .stats-bar { background: rgba(0,0,0,0.3); padding: 12px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .stats-text { color: #aaa; font-size: 0.9rem; }
         .stats-text span { color: #e94560; font-weight: bold; }
         .results-panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; }
         .table-container { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-        th { background: rgba(0,0,0,0.3); padding: 12px 10px; text-align: left; color: #aaa; font-weight: normal; position: sticky; top: 0; }
-        td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        th { background: rgba(0,0,0,0.3); padding: 10px 8px; text-align: left; color: #aaa; font-weight: normal; position: sticky; top: 0; }
+        td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         tr:hover { background: rgba(255,255,255,0.03); }
         .type-url { color: #6bff6b; }
         .type-fail { color: #ff6b6b; }
         .type-other { color: #ffbb6b; }
         .content-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .number-cell { font-family: Consolas, monospace; font-size: 0.85rem; color: #888; }
+        .number-cell { font-family: Consolas, monospace; font-size: 0.8rem; color: #888; }
         .empty-state { text-align: center; padding: 60px 20px; color: #666; }
         .empty-state .icon { font-size: 3rem; margin-bottom: 15px; }
         .duplicates-info { background: rgba(255,170,0,0.1); border: 1px solid rgba(255,170,0,0.3); border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; color: #ffaa00; display: none; }
         .duplicates-info.show { display: block; }
+        .log-box { background: rgba(0,0,0,0.3); border: 1px solid #333; border-radius: 8px; padding: 10px; height: 120px; overflow-y: auto; font-family: Consolas, monospace; font-size: 0.8rem; margin-top: 10px; }
+        .log-info { color: #e0e0e0; }
+        .log-success { color: #22c55e; }
+        .log-warning { color: #f59e0b; }
+        .log-error { color: #ef4444; }
+        .scheduler-status { font-size: 0.85rem; color: #60a5fa; margin-top: 10px; text-align: center; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #1e2030; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 25px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal h3 { margin-bottom: 20px; font-size: 1.2rem; }
+        .modal-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .modal-row label { min-width: 120px; font-size: 0.9rem; color: #aaa; }
+        .modal-row input { flex: 1; padding: 8px 10px; background: rgba(0,0,0,0.3); border: 1px solid #444; border-radius: 5px; color: #fff; text-align: center; font-size: 0.9rem; }
+        .modal-row input:focus { outline: none; border-color: #e94560; }
+        .modal-btns { display: flex; gap: 10px; margin-top: 20px; justify-content: center; }
+        .modal-check { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .modal-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: #e94560; }
+        .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .time-input { min-width: auto !important; width: 140px; flex: none !important; padding: 10px 12px; font-size: 0.95rem; }
+        .date-input { min-width: auto !important; width: 170px; flex: none !important; padding: 10px 12px; font-size: 0.95rem; }
+        .query-input-lg { padding: 12px 16px; font-size: 1rem; height: 50px; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>📊 URL数据管理系统</h1>
+        <h1>📊 盒膜轨迹跟踪查询</h1>
         <a href="/">← 返回首页</a>
     </div>
     <div class="container">
-        <div class="query-panel">
+        <!-- 数据查询模块 -->
+        <div class="panel">
+            <div class="panel-title">🔍 数据查询</div>
             <div class="query-row">
-                <span class="query-label">日期查询:</span>
-                <select class="query-input" id="dateSelect" style="max-width: 200px;">
-                    <option value="">选择日期...</option>
-                </select>
-                <button class="btn btn-primary" onclick="queryByDate()">查询日期</button>
+                <span class="query-label">时间段:</span>
+                <input type="date" class="query-input date-input" id="processDate">
+                <input type="time" class="query-input time-input" id="processStartTime" value="08:00">
+                <span style="color:#aaa;">~</span>
+                <input type="time" class="query-input time-input" id="processStopTime" value="18:00">
+                <button class="btn btn-primary" onclick="queryByDate()">查询</button>
                 <button class="btn btn-warning" onclick="queryDuplicates()">查重复</button>
             </div>
-            <div class="query-row">
-                <span class="query-label">编号查询:</span>
-                <input type="text" class="query-input" id="numberInput" placeholder="输入编号，如: 1-100 或 1,5,10" style="max-width: 300px;">
-                <button class="btn btn-primary" onclick="queryByNumber()">查询编号</button>
-            </div>
-            <div class="query-row">
-                <span class="query-label">内容查询:</span>
-                <input type="text" class="query-input" id="contentInput" placeholder="输入要搜索的内容...">
-                <button class="btn btn-primary" onclick="queryByContent()">模糊查询</button>
-                <button class="btn btn-secondary" onclick="queryAll()">查询全部</button>
+            <div class="query-row" style="padding: 12px 0;">
+                <span class="query-label">二维码:</span>
+                <input type="text" class="query-input query-input-lg" id="contentInput" placeholder="搜索内容...">
+                <button class="btn btn-primary" onclick="queryByContent()">查询</button>
+                <button class="btn btn-danger" onclick="document.getElementById('contentInput').value=''">清空</button>
             </div>
         </div>
+
+        <!-- InfluxDB 调试面板 -->
+        <div class="panel" style="display: none;">
+            <div class="panel-title">🗄️ InfluxDB 调试面板</div>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px;">
+                <button class="btn btn-primary" onclick="checkInfluxStatus()">🔍 检测连接</button>
+                <button class="btn btn-success" onclick="queryInfluxSample('bucket_data')">📦 查 jbcj01 数据</button>
+                <button class="btn btn-warning" onclick="queryInfluxSample('bucket_verify')">📦 查 jbcj03 数据</button>
+                <select id="influxHours" class="query-input" style="max-width:120px;">
+                    <option value="1">最近1小时</option>
+                    <option value="6">最近6小时</option>
+                    <option value="24">最近24小时</option>
+                    <option value="168">最近7天</option>
+                </select>
+            </div>
+            <div id="influxStatus" style="margin-bottom: 10px;"></div>
+            <div class="log-box" id="influxLog" style="height: 200px; font-size: 0.8rem;"></div>
+        </div>
+
+        <!-- 统计栏 -->
         <div class="stats-bar">
             <div class="stats-text" id="statsText">就绪</div>
             <button class="btn btn-secondary" onclick="clearResults()">清空结果</button>
         </div>
         <div class="duplicates-info" id="duplicatesInfo"></div>
+
+        <!-- 查询结果 -->
         <div class="results-panel">
-            <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
-                            <th>一号</th><th>二号</th><th>三号</th><th>四号</th><th>五号</th><th>六号</th><th>八号</th>
-                            <th>校验位</th><th>日期</th><th>类型</th><th>内容</th>
+                            <th>一号</th><th>二号</th><th>三号</th><th>四号</th><th>五号</th><th>六号</th><th>七号</th><th>八号</th>
+                            <th>校验位</th><th>时间</th><th>类型</th><th>二维码</th>
                         </tr>
                     </thead>
                     <tbody id="resultsBody">
-                        <tr><td colspan="11"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>
+                        <tr><td colspan="12"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
+
+        <!-- 运行日志 -->
+        <div class="panel" style="margin-top: 15px;">
+            <div class="panel-title">📝 运行日志</div>
+            <div class="log-box" id="logBox"></div>
+        </div>
+
+        <!-- 系统设置模块 -->
+        <div class="panel" style="margin-top: 15px;">
+            <div class="panel-title">🔧 系统设置</div>
+            <div class="settings-grid">
+                <button class="btn btn-secondary btn-block" onclick="openNumberQueryModal()">🔢 编号查询</button>
+                <button class="btn btn-secondary btn-block" onclick="openSettingsModal()">⚙️ 设置上下限</button>
+                <button class="btn btn-secondary btn-block" onclick="openSchedulerModal()">⏰ 定时处理设置</button>
+                <button class="btn btn-secondary btn-block" onclick="openManualNumberModal()">🔢 手动设定编号</button>
+                <button class="btn btn-secondary btn-block" onclick="openErrorSettingsModal()">⚠️ 错误时设置</button>
+            </div>
+            <div class="scheduler-status" id="schedulerStatus">⏸️ 定时处理未启用</div>
+        </div>
     </div>
+
+    <!-- 设置上下限弹窗 -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h3>⚙️ 设置8个轮模盒的编号上下限</h3>
+            <div id="settingsRows"></div>
+            <div class="modal-btns">
+                <button class="btn btn-success" onclick="saveSettings()">💾 保存</button>
+                <button class="btn btn-secondary" onclick="closeModal('settingsModal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 定时处理设置弹窗 -->
+    <div class="modal-overlay" id="schedulerModal">
+        <div class="modal">
+            <h3>⏰ 定时处理设置</h3>
+            <div class="modal-check">
+                <input type="checkbox" id="schedulerEnabled">
+                <label>启用定时自动处理</label>
+            </div>
+            <div class="modal-row">
+                <label>执行间隔:</label>
+                <input type="number" id="schedulerHours" min="0" style="width:60px;"> <span style="color:#aaa;">小时</span>
+                <input type="number" id="schedulerMinutes" min="0" style="width:60px;"> <span style="color:#aaa;">分钟</span>
+            </div>
+            <div class="modal-check">
+                <input type="checkbox" id="schedulerRetry">
+                <label>处理失败时自动重试</label>
+            </div>
+            <div class="modal-row">
+                <label>重试间隔(分钟):</label>
+                <input type="number" id="schedulerRetryInterval" min="1" style="width:80px;">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-success" onclick="saveScheduler()">💾 保存设置</button>
+                <button class="btn btn-secondary" onclick="closeModal('schedulerModal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 手动设定编号弹窗 -->
+    <div class="modal-overlay" id="manualNumberModal">
+        <div class="modal">
+            <h3>🔢 设定各轮模盒的"最后编号"</h3>
+            <p style="color:#888; font-size:0.85rem; margin-bottom:15px;">下次处理时将从此编号+1开始</p>
+            <div id="manualNumberRows"></div>
+            <div class="modal-btns">
+                <button class="btn btn-success" onclick="saveManualNumbers()">💾 保存更改</button>
+                <button class="btn btn-danger" onclick="resetNumbers()">🗑️ 删除记录</button>
+                <button class="btn btn-secondary" onclick="closeModal('manualNumberModal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 编号查询弹窗 -->
+    <div class="modal-overlay" id="numberQueryModal">
+        <div class="modal">
+            <h3>🔢 编号查询</h3>
+            <div class="modal-row">
+                <label>选择轮模盒:</label>
+                <select class="query-input" id="boxSelect" style="flex:1;">
+                    <option value="0">一号轮模盒</option>
+                    <option value="1">二号轮模盒</option>
+                    <option value="2">三号轮模盒</option>
+                    <option value="3">四号轮模盒</option>
+                    <option value="4">五号轮模盒</option>
+                    <option value="5">六号轮模盒</option>
+                    <option value="6">七号轮模盒</option>
+                    <option value="7">八号轮模盒</option>
+                </select>
+            </div>
+            <div class="modal-row">
+                <label>编号范围:</label>
+                <input type="text" class="query-input" id="numberInput" placeholder="如: 1-100 或 1,5,10" style="flex:1;">
+            </div>
+            <div class="modal-btns">
+                <button class="btn btn-primary" onclick="queryByNumber();closeModal('numberQueryModal')">🔍 查询</button>
+                <button class="btn btn-secondary" onclick="queryAll();closeModal('numberQueryModal')">全部</button>
+                <button class="btn btn-danger" onclick="clearNumberInput()">清空</button>
+                <button class="btn btn-secondary" onclick="closeModal('numberQueryModal')">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 错误时设置弹窗 -->
+    <div class="modal-overlay" id="errorSettingsModal">
+        <div class="modal">
+            <h3>⚠️ 校验错误时处理设置</h3>
+            <div class="modal-check">
+                <input type="checkbox" id="errorVerifyEnabled">
+                <label>启用校验功能</label>
+            </div>
+            <p style="color:#aaa; font-size:0.85rem; margin-bottom:10px;">当校验出错时，各轮模盒从以下数字开始循环：</p>
+            <div id="errorSettingsRows"></div>
+            <div id="verifyFileStatus" style="margin-top:10px; font-size:0.85rem;"></div>
+            <div class="modal-btns">
+                <button class="btn btn-success" onclick="saveErrorSettings()">💾 保存设置</button>
+                <button class="btn btn-secondary" onclick="closeModal('errorSettingsModal')">取消</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        async function loadDateList() {
-            const res = await fetch('/api/urldata/files');
-            const dates = await res.json();
-            const select = document.getElementById('dateSelect');
-            select.innerHTML = '<option value="">选择日期...</option>';
-            dates.forEach(date => {
-                const opt = document.createElement('option');
-                opt.value = date; opt.textContent = date;
-                select.appendChild(opt);
-            });
+        const BOX_NAMES = ['一号轮模盒','二号轮模盒','三号轮模盒','四号轮模盒','五号轮模盒','六号轮模盒','七号轮模盒','八号轮模盒'];
+        const BOX_COUNT = 8;
+
+        function addLog(msg, level='info') {
+            const box = document.getElementById('logBox');
+            const time = new Date().toLocaleTimeString();
+            box.innerHTML += `<div class="log-${level}">[${time}] ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
         }
 
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().slice(0, 10);
+            document.getElementById('processDate').value = today;
+            loadSchedulerStatus();
+        });
+
+        // ===== 数据处理 =====
+        async function doProcess() {
+            const dateVal = document.getElementById('processDate').value;
+            const startTime = document.getElementById('processStartTime').value;
+            const stopTime = document.getElementById('processStopTime').value;
+
+            if (!dateVal) { alert('请选择日期'); return false; }
+            if (!startTime || !stopTime) { alert('请设置起止时间'); return false; }
+            if (startTime >= stopTime) { alert('开始时间必须早于结束时间'); return false; }
+
+            const startISO = `${dateVal}T${startTime}:00+08:00`;
+            const stopISO = `${dateVal}T${stopTime}:00+08:00`;
+
+            addLog(`开始处理数据: ${dateVal} ${startTime} ~ ${stopTime}`);
+            try {
+                const res = await fetch('/api/urldata/process', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ start_time: startISO, stop_time: stopISO })
+                });
+                const data = await res.json();
+                if (data.logs) data.logs.forEach(l => addLog(l.msg, l.level));
+                return data.success;
+            } catch (e) {
+                addLog('处理请求失败: ' + e.message, 'error');
+                return false;
+            }
+        }
+
+        // ===== 查询功能 =====
         async function queryByDate() {
-            const date = document.getElementById('dateSelect').value;
-            if (!date) { alert('请选择日期'); return; }
-            await doQuery({ type: 'date', date: date });
+            const dateVal = document.getElementById('processDate').value;
+            if (!dateVal) { alert('请选择日期'); return; }
+
+            // 先尝试查询已有数据
+            const res = await fetch('/api/urldata/query', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'date', date: dateVal })
+            });
+            const data = await res.json();
+
+            if (data.results && data.results.length > 0) {
+                displayResults(data.results);
+                updateStats(data.stats, 'date');
+            } else {
+                // 无数据，自动执行处理再查询
+                addLog('该日期暂无数据，自动执行处理...', 'warning');
+                const ok = await doProcess();
+                if (ok) {
+                    await doQuery({ type: 'date', date: dateVal });
+                }
+            }
         }
 
         async function queryByNumber() {
             const number = document.getElementById('numberInput').value.trim();
             if (!number) { alert('请输入编号'); return; }
-            await doQuery({ type: 'number', number: number });
+            const boxIndex = parseInt(document.getElementById('boxSelect').value);
+            await doQuery({ type: 'number', number, box_index: boxIndex });
         }
-
         async function queryByContent() {
             const content = document.getElementById('contentInput').value.trim();
             if (!content) { alert('请输入内容'); return; }
-            await doQuery({ type: 'content', content: content });
+            await doQuery({ type: 'content', content });
         }
-
         async function queryDuplicates() {
-            const date = document.getElementById('dateSelect').value;
-            if (!date) { alert('请选择日期'); return; }
-            await doQuery({ type: 'duplicates', date: date });
-        }
+            const dateVal = document.getElementById('processDate').value;
+            if (!dateVal) { alert('请选择日期'); return; }
 
+            // 同样先检查是否有数据，没有就先处理
+            const res = await fetch('/api/urldata/query', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'date', date: dateVal })
+            });
+            const data = await res.json();
+
+            if (!data.results || data.results.length === 0) {
+                addLog('该日期暂无数据，自动执行处理...', 'warning');
+                const ok = await doProcess();
+                if (!ok) return;
+            }
+            await doQuery({ type: 'duplicates', date: dateVal });
+        }
         async function queryAll() { await doQuery({ type: 'content', content: '' }); }
+
+        function clearNumberInput() {
+            document.getElementById('numberInput').value = '';
+            document.getElementById('boxSelect').selectedIndex = 0;
+        }
 
         async function doQuery(params) {
             const res = await fetch('/api/urldata/query', {
@@ -144,7 +382,7 @@
         function displayResults(results) {
             const tbody = document.getElementById('resultsBody');
             if (!results || results.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">🔍</div><div>没有找到匹配的数据</div></div></td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="icon">🔍</div><div>没有找到匹配的数据</div></div></td></tr>';
                 return;
             }
             tbody.innerHTML = results.map(item => {
@@ -162,33 +400,248 @@
 
         function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+            div.textContent = text; return div.innerHTML;
         }
 
         function updateStats(stats, queryType) {
-            const typeNames = { 'date': '日期查询', 'number': '编号查询', 'content': '内容查询', 'duplicates': '重复查询' };
-            document.getElementById('statsText').innerHTML = `${typeNames[queryType] || '查询'} | 总计: <span>${stats.total}</span> | URL: <span>${stats.url}</span> | 失败: <span>${stats.fail}</span> | 其他: <span>${stats.other}</span>`;
+            const names = { date:'日期查询', number:'编号查询', content:'内容查询', duplicates:'重复查询' };
+            document.getElementById('statsText').innerHTML = `${names[queryType]||'查询'} | 总计: <span>${stats.total}</span> | URL: <span>${stats.url}</span> | 失败: <span>${stats.fail}</span> | 其他: <span>${stats.other}</span>`;
         }
 
         function checkDuplicates(results) {
-            const contents = results.map(r => r.content), counts = {};
-            contents.forEach(c => counts[c] = (counts[c] || 0) + 1);
-            const duplicates = Object.entries(counts).filter(([_, count]) => count > 1);
+            const counts = {};
+            results.forEach(r => counts[r.content] = (counts[r.content]||0) + 1);
+            const dups = Object.entries(counts).filter(([_,c]) => c > 1);
             const info = document.getElementById('duplicatesInfo');
-            if (duplicates.length > 0) {
+            if (dups.length > 0) {
                 info.classList.add('show');
-                info.innerHTML = `⚠️ 发现 ${duplicates.length} 个重复内容，共 ${duplicates.reduce((sum, [_, c]) => sum + c, 0)} 条记录`;
+                info.innerHTML = `⚠️ 发现 ${dups.length} 个重复内容，共 ${dups.reduce((s,[_,c])=>s+c,0)} 条记录`;
             } else { info.classList.remove('show'); }
         }
 
         function clearResults() {
-            document.getElementById('resultsBody').innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>';
+            document.getElementById('resultsBody').innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>';
             document.getElementById('statsText').textContent = '就绪';
             document.getElementById('duplicatesInfo').classList.remove('show');
         }
 
-        loadDateList();
+        // ===== 定时器状态 =====
+        async function loadSchedulerStatus() {
+            try {
+                const res = await fetch('/api/urldata/scheduler_status');
+                const data = await res.json();
+                document.getElementById('schedulerStatus').textContent = data.status || '⏸️ 定时处理未启用';
+            } catch(e) {}
+        }
+
+        // ===== InfluxDB 调试 =====
+        function influxLog(msg, level = 'info') {
+            const box = document.getElementById('influxLog');
+            const time = new Date().toLocaleTimeString();
+            box.innerHTML += `<div class="log-${level}">[${time}] ${msg}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function checkInfluxStatus() {
+            const box = document.getElementById('influxStatus');
+            box.innerHTML = '<span style="color:#60a5fa;">检测中...</span>';
+            influxLog('正在检测 InfluxDB 连接...');
+            try {
+                const res = await fetch('/api/urldata/influx_status');
+                const data = await res.json();
+                if (data.success) {
+                    let html = `<div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:12px;">`;
+                    html += `<div>✅ 数据库状态: <b style="color:#22c55e;">${data.status}</b> | ${data.message}</div>`;
+                    html += `<div style="margin-top:5px;">📡 地址: ${data.config.url} | 组织: ${data.config.org}</div>`;
+                    for (const [name, info] of Object.entries(data.buckets)) {
+                        if (info.connected) {
+                            const dataIcon = info.has_recent_data ? '📊 有数据' : '⚠️ 最近1小时无数据';
+                            html += `<div style="margin-top:5px;">✅ Bucket <b>${name}</b>: 连接成功 | ${dataIcon}</div>`;
+                            influxLog(`Bucket '${name}' 连接成功，${info.has_recent_data ? '有数据' : '最近1小时无数据'}`, info.has_recent_data ? 'success' : 'warning');
+                        } else {
+                            html += `<div style="margin-top:5px;">❌ Bucket <b>${name}</b>: ${info.error}</div>`;
+                            influxLog(`Bucket '${name}' 连接失败: ${info.error}`, 'error');
+                        }
+                    }
+                    html += `</div>`;
+                    box.innerHTML = html;
+                    influxLog('连接检测完成', 'success');
+                } else {
+                    box.innerHTML = `<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:12px;">❌ ${data.error}</div>`;
+                    influxLog('连接失败: ' + data.error, 'error');
+                }
+            } catch (e) {
+                box.innerHTML = `<div style="color:#ef4444;">请求失败: ${e.message}</div>`;
+                influxLog('请求异常: ' + e.message, 'error');
+            }
+        }
+
+        async function queryInfluxSample(bucketKey) {
+            const hours = document.getElementById('influxHours').value;
+            influxLog(`查询 ${bucketKey} 最近 ${hours} 小时数据...`);
+            try {
+                const res = await fetch(`/api/urldata/influx_sample?bucket=${bucketKey}&hours=${hours}&limit=20`);
+                const data = await res.json();
+                if (data.success) {
+                    influxLog(`Bucket '${data.bucket}' 返回 ${data.count} 条记录`, data.count > 0 ? 'success' : 'warning');
+                    if (data.records.length > 0) {
+                        data.records.forEach((r, i) => {
+                            influxLog(`  [${i+1}] ${r.time} | ${r.measurement}.${r.field} = ${r.value}`);
+                        });
+                    } else {
+                        influxLog('  该时间范围内无数据', 'warning');
+                    }
+                } else {
+                    influxLog('查询失败: ' + data.error, 'error');
+                }
+            } catch (e) {
+                influxLog('请求异常: ' + e.message, 'error');
+            }
+        }
+
+        // ===== 弹窗通用 =====
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+        function openNumberQueryModal() {
+            document.getElementById('numberQueryModal').classList.add('show');
+        }
+
+        // ===== 设置上下限弹窗 =====
+        async function openSettingsModal() {
+            const res = await fetch('/api/urldata/settings');
+            const cfg = await res.json();
+            const container = document.getElementById('settingsRows');
+            container.innerHTML = BOX_NAMES.map((name, i) => `
+                <div class="modal-row">
+                    <label>${name}:</label>
+                    <input type="number" id="setMin${i}" value="${cfg.mins[i]}" min="1" style="width:70px;">
+                    <span style="color:#aaa;">~</span>
+                    <input type="number" id="setMax${i}" value="${cfg.maxs[i]}" min="1" style="width:70px;">
+                </div>
+            `).join('');
+            document.getElementById('settingsModal').classList.add('show');
+        }
+
+        async function saveSettings() {
+            const mins = [], maxs = [];
+            for (let i = 0; i < BOX_COUNT; i++) {
+                const mn = parseInt(document.getElementById('setMin'+i).value);
+                const mx = parseInt(document.getElementById('setMax'+i).value);
+                if (isNaN(mn) || isNaN(mx) || mn <= 0 || mx <= 0) { alert('上下限必须为正数'); return; }
+                if (mn > mx) { alert(BOX_NAMES[i] + ' 下限不能大于上限'); return; }
+                mins.push(mn); maxs.push(mx);
+            }
+            const res = await fetch('/api/urldata/settings', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ mins, maxs })
+            });
+            const data = await res.json();
+            if (data.success) { addLog('上下限设置已保存', 'success'); closeModal('settingsModal'); }
+            else alert(data.error || '保存失败');
+        }
+
+        // ===== 定时处理设置弹窗 =====
+        async function openSchedulerModal() {
+            const res = await fetch('/api/urldata/scheduler_config');
+            const cfg = await res.json();
+            document.getElementById('schedulerEnabled').checked = cfg.enabled || false;
+            document.getElementById('schedulerHours').value = cfg.hours || 1;
+            document.getElementById('schedulerMinutes').value = cfg.minutes || 30;
+            document.getElementById('schedulerRetry').checked = cfg.retry || true;
+            document.getElementById('schedulerRetryInterval').value = cfg.retry_interval || 30;
+            document.getElementById('schedulerModal').classList.add('show');
+        }
+
+        async function saveScheduler() {
+            const h = parseInt(document.getElementById('schedulerHours').value) || 0;
+            const m = parseInt(document.getElementById('schedulerMinutes').value) || 0;
+            if (h * 60 + m < 5) { alert('总间隔不能少于5分钟'); return; }
+            const ri = parseInt(document.getElementById('schedulerRetryInterval').value) || 30;
+            const res = await fetch('/api/urldata/scheduler_config', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    enabled: document.getElementById('schedulerEnabled').checked,
+                    hours: h, minutes: m,
+                    retry: document.getElementById('schedulerRetry').checked,
+                    retry_interval: ri
+                })
+            });
+            const data = await res.json();
+            if (data.success) { addLog('定时处理设置已保存', 'success'); closeModal('schedulerModal'); loadSchedulerStatus(); }
+            else alert(data.error || '保存失败');
+        }
+
+        // ===== 手动设定编号弹窗 =====
+        async function openManualNumberModal() {
+            const res = await fetch('/api/urldata/last_numbers');
+            const cfg = await res.json();
+            const container = document.getElementById('manualNumberRows');
+            container.innerHTML = BOX_NAMES.map((name, i) => `
+                <div class="modal-row">
+                    <label>${name}:</label>
+                    <input type="number" id="manNum${i}" value="${cfg.numbers[i]}">
+                </div>
+            `).join('');
+            document.getElementById('manualNumberModal').classList.add('show');
+        }
+
+        async function saveManualNumbers() {
+            const numbers = [];
+            for (let i = 0; i < BOX_COUNT; i++) {
+                const v = parseInt(document.getElementById('manNum'+i).value);
+                if (isNaN(v)) { alert('所有编号必须是有效整数'); return; }
+                numbers.push(v);
+            }
+            const res = await fetch('/api/urldata/last_numbers', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ numbers })
+            });
+            const data = await res.json();
+            if (data.success) { addLog('手动更新编号成功: ' + numbers.join(','), 'success'); closeModal('manualNumberModal'); }
+            else alert(data.error || '保存失败');
+        }
+
+        async function resetNumbers() {
+            if (!confirm('确定要删除编号记录文件吗？下次处理将从下限开始。')) return;
+            const res = await fetch('/api/urldata/last_numbers', { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) { addLog('编号记录已删除', 'success'); closeModal('manualNumberModal'); }
+        }
+
+        // ===== 错误时设置弹窗 =====
+        async function openErrorSettingsModal() {
+            const res = await fetch('/api/urldata/error_settings');
+            const cfg = await res.json();
+            document.getElementById('errorVerifyEnabled').checked = cfg.enabled;
+            const container = document.getElementById('errorSettingsRows');
+            container.innerHTML = BOX_NAMES.map((name, i) => `
+                <div class="modal-row">
+                    <label>${name}:</label>
+                    <input type="number" id="errSet${i}" value="${cfg.error_settings[i]}" min="1">
+                </div>
+            `).join('');
+            document.getElementById('verifyFileStatus').innerHTML = cfg.verify_file_status || '';
+            document.getElementById('errorSettingsModal').classList.add('show');
+        }
+
+        async function saveErrorSettings() {
+            const settings = [];
+            for (let i = 0; i < BOX_COUNT; i++) {
+                const v = parseInt(document.getElementById('errSet'+i).value);
+                if (isNaN(v) || v <= 0) { alert('编号必须为正数'); return; }
+                settings.push(v);
+            }
+            const res = await fetch('/api/urldata/error_settings', {
+                method: 'POST', headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({
+                    enabled: document.getElementById('errorVerifyEnabled').checked,
+                    error_settings: settings
+                })
+            });
+            const data = await res.json();
+            if (data.success) { addLog('错误处理设置已保存', 'success'); closeModal('errorSettingsModal'); }
+            else alert(data.error || '保存失败');
+        }
     </script>
 </body>
 </html>
