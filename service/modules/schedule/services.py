@@ -82,4 +82,9 @@ class ScheduleService:
 
 
 # 创建全局服务实例
-schedule_service = ScheduleService()
+try:
+    schedule_service = ScheduleService()
+except Exception as e:
+    import logging
+    logging.error("ScheduleService 初始化失败: %s", e)
+    schedule_service = None

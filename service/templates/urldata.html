@@ -36,7 +36,7 @@
         .stats-text span { color: #e94560; font-weight: bold; }
         .results-panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden; }
         .table-container { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
         th { background: rgba(0,0,0,0.3); padding: 10px 8px; text-align: left; color: #aaa; font-weight: normal; position: sticky; top: 0; }
         td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
         tr:hover { background: rgba(255,255,255,0.03); }
@@ -44,7 +44,17 @@
         .type-fail { color: #ff6b6b; }
         .type-other { color: #ffbb6b; }
         .content-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .number-cell { font-family: Consolas, monospace; font-size: 0.8rem; color: #888; }
+        .copy-btn {
+    background: rgba(233,69,96,0.2); border: 1px solid rgba(233,69,96,0.4);
+    color: #e94560; border-radius: 4px; padding: 2px 8px; cursor: pointer;
+    font-size: 0.75rem; margin-left: 6px; white-space: nowrap;
+    transition: all 0.2s;
+}
+.copy-btn:hover { background: #e94560; color: #fff; }
+.copy-btn.copied { background: rgba(34,197,94,0.3); border-color: rgba(34,197,94,0.5); color: #22c55e; }
+.content-cell { display: flex; align-items: center; max-width: 400px; }
+.content-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+        .number-cell { font-family: Consolas, monospace; font-size: 1.1rem; color: #888; }
         .empty-state { text-align: center; padding: 60px 20px; color: #666; }
         .empty-state .icon { font-size: 3rem; margin-bottom: 15px; }
         .duplicates-info { background: rgba(255,170,0,0.1); border: 1px solid rgba(255,170,0,0.3); border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; color: #ffaa00; display: none; }
@@ -87,6 +97,8 @@
                 <input type="time" class="query-input time-input" id="processStartTime" value="08:00">
                 <span style="color:#aaa;">~</span>
                 <input type="time" class="query-input time-input" id="processStopTime" value="18:00">
+                <button class="btn" style="background:#6366f1;color:#fff;" onclick="setRecentTime(30)">近半小时</button>
+                <button class="btn" style="background:#6366f1;color:#fff;" onclick="setRecentTime(60)">近一小时</button>
                 <button class="btn btn-primary" onclick="queryByDate()">查询</button>
                 <button class="btn btn-warning" onclick="queryDuplicates()">查重复</button>
             </div>
@@ -118,9 +130,12 @@
 
         <!-- 统计栏 -->
         <div class="stats-bar">
-            <div class="stats-text" id="statsText">就绪</div>
-            <button class="btn btn-secondary" onclick="clearResults()">清空结果</button>
-        </div>
+    <div class="stats-text" id="statsText">就绪</div>
+    <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" id="sortBtn" onclick="toggleSort()">🔼 时间正序</button>
+        <button class="btn btn-secondary" onclick="clearResults()">清空结果</button>
+    </div>
+</div>
         <div class="duplicates-info" id="duplicatesInfo"></div>
 
         <!-- 查询结果 -->
@@ -129,12 +144,12 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>一号</th><th>二号</th><th>三号</th><th>四号</th><th>五号</th><th>六号</th><th>七号</th><th>八号</th>
-                            <th>校验位</th><th>时间</th><th>类型</th><th>二维码</th>
-                        </tr>
+    <th>输送盒模</th><th>一号轮</th><th>二号轮</th><th>三号轮</th><th>四号轮</th><th>五号轮</th><th>六号轮</th><th>七号轮</th><th>八号轮</th>
+    <th>校验位</th><th>时间</th><th>类型</th><th>二维码</th>
+</tr>
                     </thead>
                     <tbody id="resultsBody">
-                        <tr><td colspan="12"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>
+                        <tr><td colspan="13"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>
                     </tbody>
                 </table>
             </div>
@@ -181,10 +196,11 @@
                 <label>启用定时自动处理</label>
             </div>
             <div class="modal-row">
-                <label>执行间隔:</label>
-                <input type="number" id="schedulerHours" min="0" style="width:60px;"> <span style="color:#aaa;">小时</span>
-                <input type="number" id="schedulerMinutes" min="0" style="width:60px;"> <span style="color:#aaa;">分钟</span>
-            </div>
+    <label>执行间隔:</label>
+    <input type="number" id="schedulerHours" min="0" style="width:60px;"> <span style="color:#aaa;">小时</span>
+    <input type="number" id="schedulerMinutes" min="0" style="width:60px;"> <span style="color:#aaa;">分钟</span>
+    <input type="number" id="schedulerSeconds" min="0" style="width:60px;"> <span style="color:#aaa;">秒</span>
+</div>
             <div class="modal-check">
                 <input type="checkbox" id="schedulerRetry">
                 <label>处理失败时自动重试</label>
@@ -220,16 +236,17 @@
             <h3>🔢 编号查询</h3>
             <div class="modal-row">
                 <label>选择轮模盒:</label>
-                <select class="query-input" id="boxSelect" style="flex:1;">
-                    <option value="0">一号轮模盒</option>
-                    <option value="1">二号轮模盒</option>
-                    <option value="2">三号轮模盒</option>
-                    <option value="3">四号轮模盒</option>
-                    <option value="4">五号轮模盒</option>
-                    <option value="5">六号轮模盒</option>
-                    <option value="6">七号轮模盒</option>
-                    <option value="7">八号轮模盒</option>
-                </select>
+               <select class="query-input" id="boxSelect" style="flex:1;">
+    <option value="0">输送盒模</option>
+    <option value="1">一号轮模盒</option>
+    <option value="2">二号轮模盒</option>
+    <option value="3">三号轮模盒</option>
+    <option value="4">四号轮模盒</option>
+    <option value="5">五号轮模盒</option>
+    <option value="6">六号轮模盒</option>
+    <option value="7">七号轮模盒</option>
+    <option value="8">八号轮模盒</option>
+</select>
             </div>
             <div class="modal-row">
                 <label>编号范围:</label>
@@ -263,9 +280,16 @@
     </div>
 
     <script>
-        const BOX_NAMES = ['一号轮模盒','二号轮模盒','三号轮模盒','四号轮模盒','五号轮模盒','六号轮模盒','七号轮模盒','八号轮模盒'];
-        const BOX_COUNT = 8;
+        const BOX_NAMES = ['输送盒模','一号轮模盒','二号轮模盒','三号轮模盒','四号轮模盒','五号轮模盒','六号轮模盒','七号轮模盒','八号轮模盒'];
+const BOX_COUNT = 9;
+let sortOrder = 'asc';  // 默认正序（最早在前）
+let lastQueryParams = null;
 
+function toggleSort() {
+    sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+    document.getElementById('sortBtn').textContent = sortOrder === 'desc' ? '🔽 时间倒序' : '🔼 时间正序';
+    if (lastQueryParams) doQuery({...lastQueryParams, sort_order: sortOrder});
+}
         function addLog(msg, level='info') {
             const box = document.getElementById('logBox');
             const time = new Date().toLocaleTimeString();
@@ -309,29 +333,26 @@
         }
 
         // ===== 查询功能 =====
-        async function queryByDate() {
-            const dateVal = document.getElementById('processDate').value;
-            if (!dateVal) { alert('请选择日期'); return; }
 
-            // 先尝试查询已有数据
-            const res = await fetch('/api/urldata/query', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'date', date: dateVal })
-            });
-            const data = await res.json();
-
-            if (data.results && data.results.length > 0) {
-                displayResults(data.results);
-                updateStats(data.stats, 'date');
-            } else {
-                // 无数据，自动执行处理再查询
-                addLog('该日期暂无数据，自动执行处理...', 'warning');
-                const ok = await doProcess();
-                if (ok) {
-                    await doQuery({ type: 'date', date: dateVal });
-                }
-            }
+        function setRecentTime(minutes) {
+            const now = new Date();
+            const start = new Date(now.getTime() - minutes * 60000);
+            const pad = (n) => String(n).padStart(2, '0');
+            document.getElementById('processDate').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+            document.getElementById('processStartTime').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
+            document.getElementById('processStopTime').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            queryByDate();
         }
+       async function queryByDate() {
+    const dateVal = document.getElementById('processDate').value;
+    if (!dateVal) { alert('请选择日期'); return; }
+    await doQuery({
+        type: 'date',
+        date: dateVal,
+        start_time: document.getElementById('processStartTime').value,
+        stop_time: document.getElementById('processStopTime').value
+    });
+}
 
         async function queryByNumber() {
             const number = document.getElementById('numberInput').value.trim();
@@ -345,23 +366,10 @@
             await doQuery({ type: 'content', content });
         }
         async function queryDuplicates() {
-            const dateVal = document.getElementById('processDate').value;
-            if (!dateVal) { alert('请选择日期'); return; }
-
-            // 同样先检查是否有数据，没有就先处理
-            const res = await fetch('/api/urldata/query', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'date', date: dateVal })
-            });
-            const data = await res.json();
-
-            if (!data.results || data.results.length === 0) {
-                addLog('该日期暂无数据，自动执行处理...', 'warning');
-                const ok = await doProcess();
-                if (!ok) return;
-            }
-            await doQuery({ type: 'duplicates', date: dateVal });
-        }
+    const dateVal = document.getElementById('processDate').value;
+    if (!dateVal) { alert('请选择日期'); return; }
+    await doQuery({ type: 'duplicates', date: dateVal });
+}
         async function queryAll() { await doQuery({ type: 'content', content: '' }); }
 
         function clearNumberInput() {
@@ -370,19 +378,21 @@
         }
 
         async function doQuery(params) {
-            const res = await fetch('/api/urldata/query', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params)
-            });
-            const data = await res.json();
-            displayResults(data.results);
-            updateStats(data.stats, params.type);
-        }
+    if (!params.sort_order) params.sort_order = sortOrder;
+    lastQueryParams = {...params};
+    const res = await fetch('/api/urldata/query', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+    });
+    const data = await res.json();
+    displayResults(data.results);
+    updateStats(data.stats, params.type);
+}
 
         function displayResults(results) {
             const tbody = document.getElementById('resultsBody');
             if (!results || results.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="icon">🔍</div><div>没有找到匹配的数据</div></div></td></tr>';
+              tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state"><div class="icon">🔍</div><div>没有找到匹配的数据</div></div></td></tr>';
                 return;
             }
             tbody.innerHTML = results.map(item => {
@@ -392,7 +402,10 @@
                     <td>${item.verification || 'N/A'}</td>
                     <td>${item.date}</td>
                     <td class="${typeClass}">${item.type}</td>
-                    <td class="content-cell" title="${escapeHtml(item.content)}">${escapeHtml(item.content)}</td>
+                    <td class="content-cell">
+    <span class="content-text" title="${escapeHtml(item.content)}">${escapeHtml(item.content)}</span>
+    <button class="copy-btn" onclick="copyContent(this)">复制</button>
+</td>
                 </tr>`;
             }).join('');
             checkDuplicates(results);
@@ -420,7 +433,7 @@
         }
 
         function clearResults() {
-            document.getElementById('resultsBody').innerHTML = '<tr><td colspan="12"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>';
+            document.getElementById('resultsBody').innerHTML = '<tr><td colspan="13"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>';
             document.getElementById('statsText').textContent = '就绪';
             document.getElementById('duplicatesInfo').classList.remove('show');
         }
@@ -547,6 +560,7 @@
             document.getElementById('schedulerEnabled').checked = cfg.enabled || false;
             document.getElementById('schedulerHours').value = cfg.hours || 1;
             document.getElementById('schedulerMinutes').value = cfg.minutes || 30;
+            document.getElementById('schedulerSeconds').value = cfg.seconds || 0;
             document.getElementById('schedulerRetry').checked = cfg.retry || true;
             document.getElementById('schedulerRetryInterval').value = cfg.retry_interval || 30;
             document.getElementById('schedulerModal').classList.add('show');
@@ -554,14 +568,15 @@
 
         async function saveScheduler() {
             const h = parseInt(document.getElementById('schedulerHours').value) || 0;
-            const m = parseInt(document.getElementById('schedulerMinutes').value) || 0;
-            if (h * 60 + m < 5) { alert('总间隔不能少于5分钟'); return; }
+const m = parseInt(document.getElementById('schedulerMinutes').value) || 0;
+const s = parseInt(document.getElementById('schedulerSeconds').value) || 0;
+if (h * 3600 + m * 60 + s < 10) { alert('总间隔不能少于10秒'); return; }
             const ri = parseInt(document.getElementById('schedulerRetryInterval').value) || 30;
             const res = await fetch('/api/urldata/scheduler_config', {
                 method: 'POST', headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({
                     enabled: document.getElementById('schedulerEnabled').checked,
-                    hours: h, minutes: m,
+                    hours: h, minutes: m, seconds: s,
                     retry: document.getElementById('schedulerRetry').checked,
                     retry_interval: ri
                 })
@@ -624,6 +639,27 @@
             document.getElementById('errorSettingsModal').classList.add('show');
         }
 
+        function copyContent(btn) {
+            const text = btn.parentElement.querySelector('.content-text').textContent;
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            ta.style.top = '-9999px';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try {
+                document.execCommand('copy');
+                btn.textContent = '已复制';
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = '复制'; btn.classList.remove('copied'); }, 1500);
+            } catch (e) {
+                alert('复制失败，请手动复制：\n' + text);
+            }
+            document.body.removeChild(ta);
+        }
         async function saveErrorSettings() {
             const settings = [];
             for (let i = 0; i < BOX_COUNT; i++) {

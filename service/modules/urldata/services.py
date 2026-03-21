@@ -2,14 +2,17 @@ import os
 import json
 import glob
 import logging
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timezone, timedelta
 from collections import Counter
 from config import Config
-from datetime import datetime, timezone, timedelta
+import threading
 BOX_COUNT = 8
+DB_FILE = r'E:\9#\zonghe\service\urldata.db'
+
 
 class UrlDataService:
-    """URL数据管理服务 - 完整版"""
+    """URL数据管理服务 - SQLite版"""
 
     def __init__(self):
         self.config = Config.load_json_config()
@@ -20,6 +23,40 @@ class UrlDataService:
             'bucket_data': 'jbcj01',
             'bucket_verify': 'jbcj03'
         }
+        self._init_db()
+
+    def _init_db(self):
+        """初始化数据库表"""
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transport INTEGER,
+            num1 INTEGER, num2 INTEGER, num3 INTEGER, num4 INTEGER,
+            num5 INTEGER, num6 INTEGER, num7 INTEGER, num8 INTEGER,
+            content TEXT,
+            verification TEXT,
+            record_time TEXT,
+            date_str TEXT,
+            type TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )''')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_date ON records(date_str)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_content ON records(content)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_time ON records(record_time)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_num3 ON records(num3)')
+        # 兼容旧表：如果没有 transport 列就加上
+        try:
+            c.execute('ALTER TABLE records ADD COLUMN transport INTEGER DEFAULT 0')
+        except:
+            pass
+        conn.commit()
+        conn.close()
+
+    def _get_conn(self):
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def _reload_config(self):
         self.config = Config.load_json_config()
@@ -48,14 +85,11 @@ class UrlDataService:
             output_dir = config.get('输出目录', '输出文件')
             min_numbers = config.get('编号下限列表', [1] * BOX_COUNT)
             max_numbers = config.get('编号上限列表', [1000] * BOX_COUNT)
-
             enable_verification = config.get('错误处理', {}).get('启用校验', True)
             intervention_count = 0
 
             log("开始处理数据...")
             log("时间范围: {} ~ {}".format(start_time, stop_time or '现在'))
-            log("配置的下限: {}".format(min_numbers))
-            log("配置的上限: {}".format(max_numbers))
 
             data_records = self._load_data_from_influx(start_time, stop_time)
             log("从 jbcj01 读取到 {} 条数据".format(len(data_records)))
@@ -77,8 +111,21 @@ class UrlDataService:
 
             numbered_data, current_numbers = [], list(last_numbers)
             verification_errors = []
+            db_rows = []  # 待写入数据库的行
+
+            # 输送计数器
+            transport_num = 0
 
             for idx, record in enumerate(data_records):
+                # 输送编号递增
+                transport_num += 1
+                if transport_num > 40:
+                    transport_num = 1
+
+                transport_display = transport_num - 16
+                if transport_display <= 0:
+                    transport_display += 40
+
                 for i in range(BOX_COUNT):
                     current_numbers[i] += 1
                     if current_numbers[i] > max_numbers[i]:
@@ -86,18 +133,15 @@ class UrlDataService:
                         if i == 2:
                             cycle_count += 1
 
-                # 转换为北京时间显示
                 if hasattr(record['time'], 'astimezone'):
                     local_time = record['time'].astimezone(timezone(timedelta(hours=8)))
-                    time_str = local_time.strftime('%Y-%m-%d %H:%M:%S')
+                    time_str = local_time.strftime('%Y-%m-%d %H:%M:%S.') + f'{local_time.microsecond // 1000:03d}'
                 else:
                     time_str = str(record['time'])
 
-                # 取校验值
-                verification_value = verification_records[idx]['value'] if (
-                        enable_verification and idx < len(verification_records)) else "N/A"
+                verification_value = verification_records[idx + 2]['value'] if (
+                        enable_verification and idx + 2 < len(verification_records)) else "N/A"
 
-                # 校验逻辑：校验位与三号轮摸盒对比
                 if enable_verification and verification_value != "N/A":
                     try:
                         ver_num = int(float(str(verification_value).strip()))
@@ -117,51 +161,180 @@ class UrlDataService:
                     except ValueError:
                         pass
 
+                # 判断类型
+                content_val = record['value']
+                dtype = "失败" if content_val.upper() == "FAIL" else \
+                    "URL" if content_val.upper().startswith(("HTTP:", "HTTPS:")) else "其他"
+
+                # 文本行（兼容旧格式）
                 numbered_data.append("{}. {} | 校验位: {} | 时间: {}".format(
-                    ','.join(map(str, current_numbers)), record['value'], verification_value, time_str
+                    ','.join(map(str, current_numbers)), content_val, verification_value, time_str
+                ))
+
+                # 数据库行
+                date_only = time_str[:10] if len(time_str) >= 10 else datetime.now().strftime('%Y-%m-%d')
+                db_rows.append((
+                    transport_display,
+                    current_numbers[0], current_numbers[1], current_numbers[2], current_numbers[3],
+                    current_numbers[4], current_numbers[5], current_numbers[6], current_numbers[7],
+                    content_val, str(verification_value), time_str, date_only, dtype
                 ))
 
             if verification_errors and enable_verification:
                 log("累计触发 {} 次校验纠正".format(intervention_count), "warning")
 
             self._save_last_numbers_raw(current_numbers, cycle_count)
-            log("保存当前最后编号: {}，循环轮数: {}".format(current_numbers, cycle_count))
 
+            # ===== 写入数据库 =====
+            conn = self._get_conn()
+            c = conn.cursor()
+            # 去重：跳过已存在相同 record_time + content 的记录
+            new_count = 0
+            for row in db_rows:
+                c.execute('SELECT id FROM records WHERE record_time=? AND content=?', (row[11], row[9]))
+                if not c.fetchone():
+                    c.execute('''INSERT INTO records
+                        (transport,num1,num2,num3,num4,num5,num6,num7,num8,content,verification,record_time,date_str,type)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', row)
+                    new_count += 1
+            conn.commit()
+            conn.close()
+            log("写入数据库 {} 条新记录（跳过 {} 条重复）".format(new_count, len(db_rows) - new_count), "success")
+
+            # ===== 同时写txt文件（兼容） =====
             try:
                 file_date = start_time[:10].replace('-', '')
             except:
                 file_date = datetime.now().strftime('%Y%m%d')
             output_file = os.path.join(output_dir, "{}{}.txt".format(
-                config.get('输出文件前缀', '排序数据_'),
-                file_date
+                config.get('输出文件前缀', '排序数据_'), file_date
             ))
-
-            cnt = Counter([r['value'] for r in data_records])
-            dups = [(c, n) for c, n in cnt.items() if n > 1]
-            if dups:
-                log("查重提示：发现 {} 个重复内容项".format(len(dups)), "warning")
-
             with open(output_file, 'w', encoding=config.get('文件编码', 'utf-8')) as f:
                 f.write('\n'.join(numbered_data))
 
             msg = "处理了 {} 条数据".format(len(data_records))
             log("处理完成！" + msg, "success")
-            log("输出文件: {}".format(output_file), "success")
             return {'success': True, 'message': msg, 'logs': logs}
 
         except Exception as e:
             log("处理出错: {}".format(e), "error")
             return {'success': False, 'message': str(e), 'logs': logs}
 
-    def _load_verification_data(self):
-        verification_file = self.config.get('校验文件', '校验文件.txt')
-        if not os.path.exists(verification_file):
-            return []
-        try:
-            with open(verification_file, 'r', encoding=self.config.get('文件编码', 'utf-8')) as f:
-                return [line.strip() for line in f.readlines() if line.strip()]
-        except:
-            return []
+    # ========== 查询功能（从数据库） ==========
+
+    def query_by_date(self, date, start_time=None, stop_time=None, sort_order='desc'):
+        order = 'DESC' if sort_order == 'desc' else 'ASC'
+        conn = self._get_conn()
+        c = conn.cursor()
+        if start_time and stop_time:
+            c.execute(f'''SELECT * FROM records WHERE date_str=?
+                AND substr(record_time,12,5) >= ? AND substr(record_time,12,5) <= ?
+                ORDER BY record_time {order}''',
+                      (date, start_time, stop_time))
+        else:
+            c.execute(f'SELECT * FROM records WHERE date_str=? ORDER BY record_time {order}', (date,))
+        rows = c.fetchall()
+        conn.close()
+        return [self._row_to_dict(r) for r in rows]
+
+    def query_by_number(self, num_input, box_index=None, sort_order='desc'):
+        target_nums = set()
+        for part in num_input.split(','):
+            part = part.strip()
+            if '-' in part:
+                s, e = map(int, part.split('-'))
+                target_nums.update(range(min(s, e), max(s, e) + 1))
+            else:
+                target_nums.add(int(part))
+
+        conn = self._get_conn()
+        c = conn.cursor()
+
+        order = 'DESC' if sort_order == 'desc' else 'ASC'
+        if box_index is not None and 0 <= box_index < 9:
+            col = 'transport' if box_index == 0 else f'num{box_index}'
+            placeholders = ','.join('?' * len(target_nums))
+            c.execute(f'SELECT * FROM records WHERE {col} IN ({placeholders}) ORDER BY record_time {order}',
+                      list(target_nums))
+        else:
+            # 任意一列匹配
+            cols = ['transport'] + [f'num{i+1}' for i in range(BOX_COUNT)]
+            conditions = ' OR '.join(f'{col} IN ({",".join("?" * len(target_nums))})' for col in cols)
+            params = list(target_nums) * len(cols)
+            c.execute(f'SELECT * FROM records WHERE {conditions} ORDER BY record_time {order}', params)
+
+        rows = c.fetchall()
+        conn.close()
+        return [self._row_to_dict(r) for r in rows]
+
+    def query_by_content(self, content_search, sort_order='desc'):
+        order = 'DESC' if sort_order == 'desc' else 'ASC'
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute(f'SELECT * FROM records WHERE content LIKE ? ORDER BY record_time {order}',
+                  (f'%{content_search}%',))
+        rows = c.fetchall()
+        conn.close()
+        return [self._row_to_dict(r) for r in rows]
+
+    def query_duplicates(self, date, sort_order='desc'):
+        order = 'DESC' if sort_order == 'desc' else 'ASC'
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute(f'''SELECT * FROM records WHERE date_str=? AND content IN
+            (SELECT content FROM records WHERE date_str=? GROUP BY content HAVING COUNT(*)>1)
+            ORDER BY record_time {order}''', (date, date))
+        rows = c.fetchall()
+        conn.close()
+        return [self._row_to_dict(r) for r in rows]
+
+    def _row_to_dict(self, row):
+        """把数据库行转成前端需要的格式"""
+        return {
+            'numbers': [row['transport'] or 0, row['num1'], row['num2'], row['num3'], row['num4'],
+                        row['num5'], row['num6'], row['num7'], row['num8']],
+            'content': row['content'],
+            'verification': row['verification'],
+            'type': row['type'],
+            'date': row['record_time']
+        }
+
+    def query(self, query_type, **kwargs):
+        sort_order = kwargs.get('sort_order', 'desc')
+        if query_type == 'date':
+            results = self.query_by_date(
+                kwargs.get('date', ''),
+                kwargs.get('start_time'),
+                kwargs.get('stop_time'),
+                sort_order=sort_order
+            )
+        elif query_type == 'number':
+            results = self.query_by_number(kwargs.get('number', ''), kwargs.get('box_index'), sort_order=sort_order)
+        elif query_type == 'content':
+            results = self.query_by_content(kwargs.get('content', ''), sort_order=sort_order)
+        elif query_type == 'duplicates':
+            results = self.query_duplicates(kwargs.get('date', ''), sort_order=sort_order)
+        else:
+            results = []
+        total = len(results)
+        url_count = sum(1 for r in results if r['type'] == 'URL')
+        fail_count = sum(1 for r in results if r['type'] == '失败')
+        return {
+            'results': results,
+            'stats': {'total': total, 'url': url_count, 'fail': fail_count,
+                      'other': total - url_count - fail_count}
+        }
+
+    def get_file_list(self):
+        """从数据库获取有数据的日期列表"""
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute('SELECT DISTINCT date_str FROM records ORDER BY date_str DESC')
+        dates = [row['date_str'] for row in c.fetchall()]
+        conn.close()
+        return dates
+
+    # ========== 辅助方法 ==========
 
     def _get_last_numbers(self):
         number_file = self.config.get('序号记录文件', 'last_numbers.json')
@@ -191,157 +364,15 @@ class UrlDataService:
         except:
             return False
 
-    # ========== 查询功能 ==========
-
-    def _parse_data_line(self, line):
-        line = line.strip()
-        if not line:
-            return None, None, "空行"
-        dot_pos = line.find('. ')
-        if dot_pos == -1:
-            return None, None, "格式错误"
-        numbers_part, content_part = line[:dot_pos], line[dot_pos + 2:]
-        try:
-            number_strings = numbers_part.split(',')
-            if len(number_strings) != BOX_COUNT:
-                return None, None, "编号数量错误"
-            return [int(n.strip()) for n in number_strings], content_part, "成功"
-        except ValueError:
-            return None, None, "编号解析失败"
-
-    def _load_data_file(self, filepath, date_str):
-        data = []
-        try:
-            with open(filepath, 'r', encoding=self.config.get('文件编码', 'utf-8')) as f:
-                lines = f.readlines()
-
-            merged_lines = []
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                if line.startswith('| ') and merged_lines:
-                    merged_lines[-1] += ' ' + line
-                else:
-                    merged_lines.append(line)
-
-            for line in merged_lines:
-                verification_value = 'N/A'
-                time_value = date_str
-
-                if '| 时间:' in line:
-                    line, time_part = line.rsplit('| 时间:', 1)
-                    time_value = time_part.strip()
-
-                if '| 校验位:' in line:
-                    main_part, vp = line.split('| 校验位:', 1)
-                    verification_value = vp.strip()
-                else:
-                    main_part = line
-
-                nums, content, res = self._parse_data_line(main_part)
-                if nums and content:
-                    dtype = "失败" if content.upper() == "FAIL" else \
-                        "URL" if content.upper().startswith(("HTTP:", "HTTPS:")) else "其他"
-                    data.append({
-                        'numbers': nums, 'content': content,
-                        'verification': verification_value,
-                        'type': dtype, 'date': time_value
-                    })
-        except Exception as e:
-            print(f"读取文件失败: {e}")
-        return data
-
-    def get_file_list(self):
-        self._reload_config()
-        output_dir = self.config.get('输出目录', '输出文件')
-        prefix = self.config.get('输出文件前缀', '排序数据_')
-        files = []
-        if os.path.exists(output_dir):
-            for filepath in glob.glob(os.path.join(output_dir, f"{prefix}*.txt")):
-                filename = os.path.basename(filepath)
-                date_str = filename.replace(prefix, '').replace('.txt', '')
-                if len(date_str) == 8:
-                    files.append(f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:]}")
-        files.sort(reverse=True)
-        return files
-
-    def query_by_date(self, date):
-        self._reload_config()
-        output_dir = self.config.get('输出目录', '输出文件')
-        prefix = self.config.get('输出文件前缀', '排序数据_')
-        date_str = date.replace('-', '')
-        filepath = os.path.join(output_dir, f"{prefix}{date_str}.txt")
-        return self._load_data_file(filepath, date_str) if os.path.exists(filepath) else []
-
-    def query_by_number(self, num_input, box_index=None):
-        self._reload_config()
-        output_dir = self.config.get('输出目录', '输出文件')
-        prefix = self.config.get('输出文件前缀', '排序数据_')
-        target_nums = set()
-        for part in num_input.split(','):
-            part = part.strip()
-            if '-' in part:
-                s, e = map(int, part.split('-'))
-                target_nums.update(range(min(s, e), max(s, e) + 1))
-            else:
-                target_nums.add(int(part))
-        results = []
-        for filepath in glob.glob(os.path.join(output_dir, f"{prefix}*.txt")):
-            date_str = os.path.basename(filepath).replace(prefix, '').replace('.txt', '')
-            for item in self._load_data_file(filepath, date_str):
-                if box_index is not None and 0 <= box_index < BOX_COUNT:
-                    if item['numbers'][box_index] in target_nums:
-                        results.append(item)
-                else:
-                    if any(n in target_nums for n in item['numbers']):
-                        results.append(item)
-        return results
-
-    def query_by_content(self, content_search):
-        self._reload_config()
-        output_dir = self.config.get('输出目录', '输出文件')
-        prefix = self.config.get('输出文件前缀', '排序数据_')
-        results = []
-        for filepath in glob.glob(os.path.join(output_dir, f"{prefix}*.txt")):
-            date_str = os.path.basename(filepath).replace(prefix, '').replace('.txt', '')
-            for item in self._load_data_file(filepath, date_str):
-                if content_search in item['content']:
-                    results.append(item)
-        return results
-
-    def query_duplicates(self, date):
-        self._reload_config()
-        output_dir = self.config.get('输出目录', '输出文件')
-        prefix = self.config.get('输出文件前缀', '排序数据_')
-        date_str = date.replace('-', '')
-        filepath = os.path.join(output_dir, f"{prefix}{date_str}.txt")
-        if not os.path.exists(filepath):
+    def _load_verification_data(self):
+        verification_file = self.config.get('校验文件', '校验文件.txt')
+        if not os.path.exists(verification_file):
             return []
-        file_data = self._load_data_file(filepath, date_str)
-        cnt = Counter(item['content'] for item in file_data)
-        dup_keys = {c for c, n in cnt.items() if n > 1}
-        return [item for item in file_data if item['content'] in dup_keys]
-
-    def query(self, query_type, **kwargs):
-        if query_type == 'date':
-            results = self.query_by_date(kwargs.get('date', ''))
-        elif query_type == 'number':
-            results = self.query_by_number(kwargs.get('number', ''), kwargs.get('box_index'))
-        elif query_type == 'content':
-            results = self.query_by_content(kwargs.get('content', ''))
-        elif query_type == 'duplicates':
-            results = self.query_duplicates(kwargs.get('date', ''))
-        else:
-            results = []
-        total = len(results)
-        url_count = sum(1 for r in results if r['type'] == 'URL')
-        fail_count = sum(1 for r in results if r['type'] == '失败')
-        return {
-            'results': results,
-            'stats': {'total': total, 'url': url_count, 'fail': fail_count,
-                      'other': total - url_count - fail_count}
-        }
+        try:
+            with open(verification_file, 'r', encoding=self.config.get('文件编码', 'utf-8')) as f:
+                return [line.strip() for line in f.readlines() if line.strip()]
+        except:
+            return []
 
     # ========== 设置相关 ==========
 
@@ -416,6 +447,7 @@ class UrlDataService:
             'enabled': tc.get('启用', False),
             'hours': tc.get('间隔小时', 1),
             'minutes': tc.get('间隔分钟', 30),
+            'seconds': tc.get('间隔秒', 0),
             'retry': tc.get('失败重试', True),
             'retry_interval': tc.get('重试间隔', 30)
         }
@@ -428,6 +460,7 @@ class UrlDataService:
                 '启用': data.get('enabled', False),
                 '间隔小时': data.get('hours', 1),
                 '间隔分钟': data.get('minutes', 30),
+                '间隔秒': data.get('seconds', 0),
                 '失败重试': data.get('retry', True),
                 '重试间隔': data.get('retry_interval', 30)
             }
@@ -440,7 +473,9 @@ class UrlDataService:
         tc = self.config.get('定时处理', {})
         if tc.get('启用', False):
             return {
-                'status': "⏰ 定时处理已启用 | 间隔: {}小时 {}分钟".format(tc.get('间隔小时', 1), tc.get('间隔分钟', 30))}
+                'status': "⏰ 定时处理已启用 | 间隔: {}小时 {}分钟 {}秒".format(tc.get('间隔小时', 1),
+                                                                               tc.get('间隔分钟', 30),
+                                                                               tc.get('间隔秒', 0))}
         return {'status': '⏸️ 定时处理未启用'}
 
     # ========== InfluxDB ==========
@@ -518,24 +553,15 @@ class UrlDataService:
                     query = f'from(bucket: "{bucket}") |> range(start: -1h) |> limit(n: 1)'
                     tables = query_api.query(query, org=self.influx_config['org'])
                     has_data = any(len(t.records) > 0 for t in tables)
-                    bucket_status[bucket] = {
-                        'connected': True,
-                        'has_recent_data': has_data
-                    }
+                    bucket_status[bucket] = {'connected': True, 'has_recent_data': has_data}
                 except Exception as e:
-                    bucket_status[bucket] = {
-                        'connected': False,
-                        'error': str(e)
-                    }
+                    bucket_status[bucket] = {'connected': False, 'error': str(e)}
             client.close()
             return {
-                'success': True,
-                'status': health.status,
-                'message': health.message,
+                'success': True, 'status': health.status, 'message': health.message,
                 'buckets': bucket_status,
                 'config': {
-                    'url': self.influx_config['url'],
-                    'org': self.influx_config['org'],
+                    'url': self.influx_config['url'], 'org': self.influx_config['org'],
                     'bucket_data': self.influx_config['bucket_data'],
                     'bucket_verify': self.influx_config['bucket_verify']
                 }
@@ -571,5 +597,80 @@ class UrlDataService:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
+    def query_box_by_qrcode(self, qrcode):
+        """先从数据库查，查不到再走InfluxDB"""
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute('SELECT * FROM records WHERE content LIKE ? ORDER BY record_time DESC LIMIT 50',
+                  (f'%{qrcode}%',))
+        rows = c.fetchall()
+        conn.close()
+
+        if rows:
+            matched = []
+            for row in rows:
+                matched.append({
+                    'index': row['id'],
+                    'numbers': [row['num3']],
+                    'box_num': row['num3'],
+                    'content': row['content'],
+                    'time': row['record_time']
+                })
+            return {'success': True, 'total_records': len(rows), 'matches': matched, 'source': 'database'}
+
+        # 数据库没有则fallback到InfluxDB
+        records = self._load_data_from_influx('-2h')
+        if not records:
+            return {'success': False, 'error': '最近2小时无数据'}
+        verification_records = self._load_verification_from_influx('-2h')
+        matched = []
+        for idx, record in enumerate(records):
+            if qrcode and qrcode in str(record['value']):
+                box_num = None
+                if idx + 2 < len(verification_records):
+                    try:
+                        box_num = int(float(str(verification_records[idx + 2]['value']).strip()))
+                    except (ValueError, TypeError):
+                        box_num = None
+                matched.append({
+                    'index': idx,
+                    'numbers': [box_num] if box_num is not None else [None],
+                    'box_num': box_num,
+                    'content': record['value'],
+                    'time': str(record['time'])
+                })
+        return {'success': True, 'total_records': len(records), 'matches': matched, 'source': 'influxdb'}
+
+    def start_auto_sync(self):
+        """启动后台自动同步"""
+
+        def _sync_loop():
+            while True:
+                try:
+                    self._reload_config()
+                    tc = self.config.get('定时处理', {})
+                    if tc.get('启用', False):
+                        hours = tc.get('间隔小时', 0)
+                        minutes = tc.get('间隔分钟', 30)
+                        seconds = tc.get('间隔秒', 0)
+                        interval = hours * 3600 + minutes * 60 + seconds
+                        if interval < 10:
+                            interval = 10  # 最少10秒
+
+                        logging.info("自动同步：开始处理...")
+                        self.process_data('-{}s'.format(interval + 60))  # 多拉1分钟确保不漏
+                        logging.info("自动同步：处理完成，等待 %d 秒", interval)
+                        threading.Event().wait(interval)
+                    else:
+                        threading.Event().wait(30)  # 未启用时每30秒检查一次配置
+                except Exception as e:
+                    logging.error("自动同步出错: %s", e)
+                    threading.Event().wait(60)  # 出错等1分钟再试
+
+        t = threading.Thread(target=_sync_loop, daemon=True)
+        t.start()
+        logging.info("后台自动同步线程已启动")
+
 # 创建全局服务实例
 urldata_service = UrlDataService()
+urldata_service.start_auto_sync()

@@ -18,12 +18,16 @@ def get_data_files():
 def query_urldata():
     data = request.json
     query_type = data.get('type', 'date')
+    # 在现有的 query_urldata 中，给 urldata_service.query 多传两个参数
     result = urldata_service.query(
         query_type,
         date=data.get('date', ''),
         number=data.get('number', ''),
         content=data.get('content', ''),
-        box_index=data.get('box_index')
+        box_index=data.get('box_index'),
+        start_time=data.get('start_time'),
+        stop_time=data.get('stop_time'),
+        sort_order=data.get('sort_order', 'desc')
     )
     return jsonify(result)
 
@@ -109,3 +113,17 @@ def get_influx_sample():
     hours = int(request.args.get('hours', 1))
     limit = int(request.args.get('limit', 10))
     return jsonify(urldata_service.query_influx_sample(bucket_key, hours, limit))
+
+@urldata_bp.route('/boxquery')
+def boxquery_page():
+    return render_template('boxquery.html')
+
+
+@urldata_bp.route('/api/urldata/box_query', methods=['POST'])
+def box_query():
+    data = request.json
+    qrcode = data.get('qrcode', '')
+    if not qrcode:
+        return jsonify({'success': False, 'error': '请输入二维码'}), 400
+    result = urldata_service.query_box_by_qrcode(qrcode)
+    return jsonify(result)
