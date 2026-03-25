@@ -18,13 +18,12 @@ def get_data_files():
 def query_urldata():
     data = request.json
     query_type = data.get('type', 'date')
-    # 在现有的 query_urldata 中，给 urldata_service.query 多传两个参数
     result = urldata_service.query(
         query_type,
         date=data.get('date', ''),
         number=data.get('number', ''),
         content=data.get('content', ''),
-        box_index=data.get('box_index'),
+        box_indices=data.get('box_indices'),
         start_time=data.get('start_time'),
         stop_time=data.get('stop_time'),
         sort_order=data.get('sort_order', 'desc')

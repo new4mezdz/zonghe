@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from collections import Counter
 from config import Config
 import threading
-BOX_COUNT = 8
+BOX_COUNT = 9
 DB_FILE = r'E:\9#\zonghe\service\urldata.db'
 
 
@@ -45,7 +45,6 @@ class UrlDataService:
         c.execute('CREATE INDEX IF NOT EXISTS idx_content ON records(content)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_time ON records(record_time)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_num3 ON records(num3)')
-        # 兼容旧表：如果没有 transport 列就加上
         try:
             c.execute('ALTER TABLE records ADD COLUMN transport INTEGER DEFAULT 0')
         except:
@@ -76,8 +75,13 @@ class UrlDataService:
     def process_data(self, start_time='-1h', stop_time=None):
         logs = []
 
-        def log(msg, level='info'):
-            logs.append({'msg': msg, 'level': level})
+        def log(msg, level='info', content=None, time_str=None):
+            entry = {'msg': msg, 'level': level}
+            if content is not None:
+                entry['content'] = content
+            if time_str is not None:
+                entry['time_str'] = time_str
+            logs.append(entry)
 
         try:
             self._reload_config()
@@ -111,26 +115,14 @@ class UrlDataService:
 
             numbered_data, current_numbers = [], list(last_numbers)
             verification_errors = []
-            db_rows = []  # 待写入数据库的行
-
-            # 输送计数器
-            transport_num = 0
+            db_rows = []
 
             for idx, record in enumerate(data_records):
-                # 输送编号递增
-                transport_num += 1
-                if transport_num > 40:
-                    transport_num = 1
-
-                transport_display = transport_num - 16
-                if transport_display <= 0:
-                    transport_display += 40
-
                 for i in range(BOX_COUNT):
                     current_numbers[i] += 1
                     if current_numbers[i] > max_numbers[i]:
                         current_numbers[i] = min_numbers[i]
-                        if i == 2:
+                        if i == 3:
                             cycle_count += 1
 
                 if hasattr(record['time'], 'astimezone'):
@@ -139,20 +131,22 @@ class UrlDataService:
                 else:
                     time_str = str(record['time'])
 
+                content_val = record['value']
+
                 verification_value = verification_records[idx + 2]['value'] if (
                         enable_verification and idx + 2 < len(verification_records)) else "N/A"
 
                 if enable_verification and verification_value != "N/A":
                     try:
                         ver_num = int(float(str(verification_value).strip()))
-                        if current_numbers[2] != ver_num:
-                            error_msg = "第{}行：三号轮摸盒({})与校验位({})不匹配，按校验位纠正，当前第{}轮循环".format(
-                                idx + 1, current_numbers[2], ver_num, cycle_count)
+                        if current_numbers[3] != ver_num:
+                            error_msg = "第{}行：三号轮摸盒({})与校验位({})不匹配，按校验位纠正 | 二维码: {} | 时间: {}".format(
+                                idx + 1, current_numbers[3], ver_num, content_val, time_str)
                             verification_errors.append(error_msg)
-                            log(error_msg, "warning")
-                            current_numbers[2] = ver_num
+                            log(error_msg, "warning", content=content_val, time_str=time_str)
+                            current_numbers[3] = ver_num
                             for i in range(BOX_COUNT):
-                                if i != 2:
+                                if i != 3:
                                     corrected = (cycle_count * 8 + ver_num) % max_numbers[i]
                                     if corrected == 0:
                                         corrected = max_numbers[i]
@@ -161,22 +155,18 @@ class UrlDataService:
                     except ValueError:
                         pass
 
-                # 判断类型
-                content_val = record['value']
                 dtype = "失败" if content_val.upper() == "FAIL" else \
                     "URL" if content_val.upper().startswith(("HTTP:", "HTTPS:")) else "其他"
 
-                # 文本行（兼容旧格式）
                 numbered_data.append("{}. {} | 校验位: {} | 时间: {}".format(
                     ','.join(map(str, current_numbers)), content_val, verification_value, time_str
                 ))
 
-                # 数据库行
                 date_only = time_str[:10] if len(time_str) >= 10 else datetime.now().strftime('%Y-%m-%d')
                 db_rows.append((
-                    transport_display,
-                    current_numbers[0], current_numbers[1], current_numbers[2], current_numbers[3],
-                    current_numbers[4], current_numbers[5], current_numbers[6], current_numbers[7],
+                    current_numbers[0],
+                    current_numbers[1], current_numbers[2], current_numbers[3], current_numbers[4],
+                    current_numbers[5], current_numbers[6], current_numbers[7], current_numbers[8],
                     content_val, str(verification_value), time_str, date_only, dtype
                 ))
 
@@ -185,10 +175,8 @@ class UrlDataService:
 
             self._save_last_numbers_raw(current_numbers, cycle_count)
 
-            # ===== 写入数据库 =====
             conn = self._get_conn()
             c = conn.cursor()
-            # 去重：跳过已存在相同 record_time + content 的记录
             new_count = 0
             for row in db_rows:
                 c.execute('SELECT id FROM records WHERE record_time=? AND content=?', (row[11], row[9]))
@@ -201,7 +189,6 @@ class UrlDataService:
             conn.close()
             log("写入数据库 {} 条新记录（跳过 {} 条重复）".format(new_count, len(db_rows) - new_count), "success")
 
-            # ===== 同时写txt文件（兼容） =====
             try:
                 file_date = start_time[:10].replace('-', '')
             except:
@@ -237,7 +224,7 @@ class UrlDataService:
         conn.close()
         return [self._row_to_dict(r) for r in rows]
 
-    def query_by_number(self, num_input, box_index=None, sort_order='desc'):
+    def query_by_number(self, num_input, box_indices=None, sort_order='desc'):
         target_nums = set()
         for part in num_input.split(','):
             part = part.strip()
@@ -249,16 +236,24 @@ class UrlDataService:
 
         conn = self._get_conn()
         c = conn.cursor()
-
         order = 'DESC' if sort_order == 'desc' else 'ASC'
-        if box_index is not None and 0 <= box_index < 9:
-            col = 'transport' if box_index == 0 else f'num{box_index}'
-            placeholders = ','.join('?' * len(target_nums))
-            c.execute(f'SELECT * FROM records WHERE {col} IN ({placeholders}) ORDER BY record_time {order}',
-                      list(target_nums))
+
+        if box_indices and len(box_indices) > 0:
+            cols = []
+            for bi in box_indices:
+                if bi == 0:
+                    cols.append('transport')
+                elif 1 <= bi <= 8:
+                    cols.append(f'num{bi}')
+            if cols:
+                placeholders = ','.join('?' * len(target_nums))
+                conditions = ' OR '.join(f'{col} IN ({placeholders})' for col in cols)
+                params = list(target_nums) * len(cols)
+                c.execute(f'SELECT * FROM records WHERE {conditions} ORDER BY record_time {order}', params)
+            else:
+                return []
         else:
-            # 任意一列匹配
-            cols = ['transport'] + [f'num{i+1}' for i in range(BOX_COUNT)]
+            cols = ['transport'] + [f'num{i+1}' for i in range(BOX_COUNT - 1)]
             conditions = ' OR '.join(f'{col} IN ({",".join("?" * len(target_nums))})' for col in cols)
             params = list(target_nums) * len(cols)
             c.execute(f'SELECT * FROM records WHERE {conditions} ORDER BY record_time {order}', params)
@@ -289,7 +284,6 @@ class UrlDataService:
         return [self._row_to_dict(r) for r in rows]
 
     def _row_to_dict(self, row):
-        """把数据库行转成前端需要的格式"""
         return {
             'numbers': [row['transport'] or 0, row['num1'], row['num2'], row['num3'], row['num4'],
                         row['num5'], row['num6'], row['num7'], row['num8']],
@@ -309,7 +303,7 @@ class UrlDataService:
                 sort_order=sort_order
             )
         elif query_type == 'number':
-            results = self.query_by_number(kwargs.get('number', ''), kwargs.get('box_index'), sort_order=sort_order)
+            results = self.query_by_number(kwargs.get('number', ''), kwargs.get('box_indices'), sort_order=sort_order)
         elif query_type == 'content':
             results = self.query_by_content(kwargs.get('content', ''), sort_order=sort_order)
         elif query_type == 'duplicates':
@@ -326,7 +320,6 @@ class UrlDataService:
         }
 
     def get_file_list(self):
-        """从数据库获取有数据的日期列表"""
         conn = self._get_conn()
         c = conn.cursor()
         c.execute('SELECT DISTINCT date_str FROM records ORDER BY date_str DESC')
@@ -348,9 +341,17 @@ class UrlDataService:
             if isinstance(data, dict):
                 nums = data.get('numbers', default)
                 cycle = data.get('cycle_count', 0)
-                return (nums if isinstance(nums, list) and len(nums) == BOX_COUNT else default), cycle
-            elif isinstance(data, list) and len(data) == BOX_COUNT:
-                return data, 0
+                if isinstance(nums, list):
+                    if len(nums) == BOX_COUNT:
+                        return nums, cycle
+                    elif len(nums) == BOX_COUNT - 1:
+                        return [min_numbers[0] - 1] + nums, cycle
+                return default, cycle
+            elif isinstance(data, list):
+                if len(data) == BOX_COUNT:
+                    return data, 0
+                elif len(data) == BOX_COUNT - 1:
+                    return [min_numbers[0] - 1] + data, 0
             return default, 0
         except:
             return default, 0
@@ -598,7 +599,6 @@ class UrlDataService:
             return {'success': False, 'error': str(e)}
 
     def query_box_by_qrcode(self, qrcode):
-        """先从数据库查，查不到再走InfluxDB"""
         conn = self._get_conn()
         c = conn.cursor()
         c.execute('SELECT * FROM records WHERE content LIKE ? ORDER BY record_time DESC LIMIT 50',
@@ -618,7 +618,6 @@ class UrlDataService:
                 })
             return {'success': True, 'total_records': len(rows), 'matches': matched, 'source': 'database'}
 
-        # 数据库没有则fallback到InfluxDB
         records = self._load_data_from_influx('-2h')
         if not records:
             return {'success': False, 'error': '最近2小时无数据'}
@@ -642,8 +641,6 @@ class UrlDataService:
         return {'success': True, 'total_records': len(records), 'matches': matched, 'source': 'influxdb'}
 
     def start_auto_sync(self):
-        """启动后台自动同步"""
-
         def _sync_loop():
             while True:
                 try:
@@ -655,17 +652,16 @@ class UrlDataService:
                         seconds = tc.get('间隔秒', 0)
                         interval = hours * 3600 + minutes * 60 + seconds
                         if interval < 10:
-                            interval = 10  # 最少10秒
-
+                            interval = 10
                         logging.info("自动同步：开始处理...")
-                        self.process_data('-{}s'.format(interval + 60))  # 多拉1分钟确保不漏
+                        self.process_data('-{}s'.format(interval + 60))
                         logging.info("自动同步：处理完成，等待 %d 秒", interval)
                         threading.Event().wait(interval)
                     else:
-                        threading.Event().wait(30)  # 未启用时每30秒检查一次配置
+                        threading.Event().wait(30)
                 except Exception as e:
                     logging.error("自动同步出错: %s", e)
-                    threading.Event().wait(60)  # 出错等1分钟再试
+                    threading.Event().wait(60)
 
         t = threading.Thread(target=_sync_loop, daemon=True)
         t.start()

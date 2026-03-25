@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>YOLO 缺陷检测</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+
+        .header { background: #1a1d28; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a2d3a; }
+        .header h1 { font-size: 20px; color: #60a5fa; }
+        .header a { color: #888; text-decoration: none; font-size: 14px; }
+        .header a:hover { color: #60a5fa; }
+
+        .tabs { display: flex; background: #1a1d28; border-bottom: 1px solid #2a2d3a; padding: 0 24px; }
+        .tab { padding: 12px 24px; cursor: pointer; color: #888; font-size: 14px; border-bottom: 2px solid transparent; transition: all 0.2s; }
+        .tab:hover { color: #e0e0e0; }
+        .tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .detect-panel { padding: 20px 24px; }
+        .panel-row { display: flex; gap: 20px; margin-bottom: 16px; align-items: flex-start; }
+        .panel-left { flex: 1; min-width: 0; }
+        .panel-right { width: 300px; }
+
+        .connection-bar { background: #1a1d28; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+        .conn-dot { width: 10px; height: 10px; border-radius: 50%; background: #666; }
+        .conn-dot.online { background: #22c55e; }
+        .conn-dot.offline { background: #ef4444; }
+
+        .file-browser { background: #1a1d28; border-radius: 8px; border: 1px solid #2a2d3a; overflow: hidden; }
+        .browser-header { padding: 12px 16px; background: #252830; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #aaa; }
+        .browser-actions { display: none; padding: 8px 16px; background: #252830; border-bottom: 1px solid #2a2d3a; align-items: center; }
+        .browser-list { max-height: 500px; overflow-y: auto; }
+        .browser-item { padding: 10px 16px; display: flex; align-items: center; gap: 10px; cursor: pointer; border-bottom: 1px solid #1e2130; font-size: 14px; }
+        .browser-item:hover { background: #252830; }
+        .browser-item.selected { background: #1e3a5f; border-left: 3px solid #60a5fa; }
+        .browser-item .icon { font-size: 18px; }
+        .browser-item .name { flex: 1; }
+        .browser-back { color: #60a5fa; }
+
+        .control-box { background: #1a1d28; border-radius: 8px; padding: 16px; border: 1px solid #2a2d3a; }
+        .control-box h3 { font-size: 14px; color: #aaa; margin-bottom: 12px; }
+        .control-box select { width: 100%; background: #252830; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 6px; padding: 8px 12px; font-size: 14px; margin-bottom: 12px; }
+        .control-box input { width: 100%; background: #252830; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 6px; padding: 8px 12px; font-size: 14px; margin-bottom: 12px; }
+        .btn-detect { width: 100%; background: #2563eb; color: white; border: none; border-radius: 6px; padding: 12px; font-size: 15px; font-weight: bold; cursor: pointer; }
+        .btn-detect:hover { background: #1d4ed8; }
+        .btn-detect:disabled { background: #444; cursor: not-allowed; }
+
+        .progress-box { background: #252830; border-radius: 6px; padding: 12px; margin-top: 12px; font-size: 13px; }
+        .progress-bar { height: 6px; background: #333; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #60a5fa; border-radius: 3px; transition: width 0.3s; }
+
+        .selected-path { background: #252830; padding: 8px 12px; border-radius: 6px; font-family: Consolas, monospace; font-size: 12px; color: #60a5fa; margin-bottom: 12px; min-height: 36px; display: flex; align-items: center; word-break: break-all; }
+
+        .toolbar { background: #1a1d28; padding: 12px 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid #2a2d3a; }
+        .toolbar select { background: #252830; color: #e0e0e0; border: 1px solid #3a3d4a; border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+        .toolbar button { background: #2563eb; color: white; border: none; border-radius: 6px; padding: 8px 18px; font-size: 14px; cursor: pointer; }
+        .toolbar button:hover { background: #1d4ed8; }
+
+        .stats-bar { padding: 12px 24px; display: flex; gap: 20px; background: #151720; }
+        .stat-card { background: #1a1d28; border-radius: 8px; padding: 12px 20px; min-width: 140px; }
+        .stat-card .label { font-size: 12px; color: #888; }
+        .stat-card .value { font-size: 24px; font-weight: bold; margin-top: 4px; }
+        .stat-card .value.danger { color: #ef4444; }
+        .stat-card .value.normal { color: #22c55e; }
+
+        .content { padding: 16px 24px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .det-card { background: #1a1d28; border-radius: 10px; overflow: hidden; border: 1px solid #2a2d3a; transition: border-color 0.2s; cursor: pointer; }
+        .det-card:hover { border-color: #60a5fa; }
+        .det-card.alert-card { border-color: rgba(239,68,68,0.4); }
+        .det-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; background: #000; }
+        .det-card .info { padding: 12px; }
+        .det-card .info .title { font-size: 14px; font-weight: bold; color: #f0f0f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .det-card .info .meta { font-size: 12px; color: #888; margin-top: 6px; }
+        .fbox-tag { display: inline-block; background: rgba(239,68,68,0.15); color: #f87171; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-top: 6px; }
+        .normal-tag { display: inline-block; background: rgba(34,197,94,0.15); color: #22c55e; border-radius: 4px; padding: 2px 8px; font-size: 12px; margin-top: 6px; }
+
+        .summary-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        .summary-table th { background: #252830; color: #aaa; font-size: 13px; padding: 10px 14px; text-align: left; }
+        .summary-table td { padding: 10px 14px; border-bottom: 1px solid #2a2d3a; font-size: 14px; }
+        .summary-table tr:hover { background: #1e2130; }
+
+        .empty { text-align: center; padding: 80px 20px; color: #555; }
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-overlay img { max-width: 92vw; max-height: 90vh; border-radius: 8px; }
+        .modal-close { position: fixed; top: 20px; right: 30px; color: white; font-size: 32px; cursor: pointer; z-index: 1001; }
+
+        .live-bar { background: #1a1d28; padding: 10px 24px; border-bottom: 1px solid #2a2d3a; font-size: 13px; color: #888; display: none; }
+        .live-bar.active { display: flex; align-items: center; gap: 8px; }
+        .live-badge { display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 50%; margin-right: 6px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        .btn-select-folder { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+        .btn-select-folder:hover { background: #1d4ed8; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>YOLO 缺陷检测</h1>
+    <a href="/">← 返回首页</a>
+</div>
+
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('detect')">开始检测</div>
+    <div class="tab" onclick="switchTab('results')">查看结果</div>
+</div>
+
+<div class="live-bar" id="liveBar">
+    <span class="live-badge"></span>
+    <span id="liveMsg">等待实时推送...</span>
+</div>
+
+<!-- ===== 检测面板 ===== -->
+<div class="tab-content active" id="tab-detect">
+    <div class="detect-panel">
+        <div class="connection-bar">
+            <div class="conn-dot" id="connDot"></div>
+            <span id="connText">检测中...</span>
+            <button onclick="checkConnection()" style="margin-left:auto; background:#333; color:#ccc; border:none; border-radius:4px; padding:4px 12px; cursor:pointer; font-size:12px;">刷新</button>
+        </div>
+
+        <div class="panel-row">
+            <div class="panel-left">
+                <div class="file-browser">
+                    <div class="browser-header">
+                        <span>📁</span>
+                        <input type="text" id="pathInput" placeholder="输入文件夹路径后按回车或点前往"
+                            style="flex:1; background:#1a1d28; color:#e0e0e0; border:1px solid #3a3d4a; border-radius:4px; padding:6px 10px; font-size:13px; font-family:Consolas,monospace;"
+                            onkeydown="if(event.key==='Enter') browseTo(this.value)" />
+                        <button onclick="browseTo(document.getElementById('pathInput').value)"
+                            style="background:#2563eb; color:white; border:none; border-radius:4px; padding:6px 12px; cursor:pointer; font-size:12px;">前往</button>
+                    </div>
+                    <div class="browser-actions" id="browserActions">
+                        <button class="btn-select-folder" onclick="selectCurrentFolder()">✅ 选择当前文件夹</button>
+                        <span id="imageCountInfo" style="margin-left:12px; color:#888; font-size:12px;"></span>
+                    </div>
+                    <div class="browser-list" id="browserList">
+                        <div style="padding:20px; color:#888; text-align:center;">正在加载文件夹...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel-right">
+                <div class="control-box">
+                    <h3>检测设置</h3>
+                    <label style="font-size:12px; color:#888;">已选择的文件夹:</label>
+                    <div class="selected-path" id="selectedPath">未选择</div>
+
+                    <label style="font-size:12px; color:#888;">封箱机名称:</label>
+                    <input type="text" id="machineName" placeholder="如: 1号封箱机" />
+
+                    <label style="font-size:12px; color:#888;">品牌:</label>
+                    <select id="brandSelect2"></select>
+
+                    <button class="btn-detect" id="btnDetect" onclick="startDetect()" disabled>开始检测</button>
+
+                    <div class="progress-box" id="progressBox" style="display:none;">
+                        <div id="progressText">准备中...</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== 结果面板 ===== -->
+<div class="tab-content" id="tab-results">
+    <div class="toolbar">
+        <select id="dateSelect" onchange="onDateChange()">
+            <option value="">选择日期</option>
+        </select>
+        <select id="machineSelect">
+            <option value="">全部封箱机</option>
+        </select>
+        <select id="brandSelectQ">
+            <option value="">全部品牌</option>
+        </select>
+        <button onclick="doQuery()">查询</button>
+        <select id="alertFilter" onchange="applyFilter()">
+            <option value="all">全部图片</option>
+            <option value="alert">仅异常</option>
+            <option value="normal">仅正常</option>
+        </select>
+    </div>
+
+    <div class="stats-bar" id="statsBar" style="display:none;">
+        <div class="stat-card"><div class="label">异常图片</div><div class="value danger" id="statFbox">0</div></div>
+        <div class="stat-card"><div class="label">正常图片</div><div class="value normal" id="statNormal">0</div></div>
+        <div class="stat-card"><div class="label">涉及批次</div><div class="value" id="statBatch" style="color:#60a5fa;">0</div></div>
+        <div class="stat-card"><div class="label">批次总图片</div><div class="value" id="statTotal" style="color:#aaa;">0</div></div>
+    </div>
+
+    <div class="content">
+        <div id="resultArea">
+            <div class="empty"><div class="icon">📷</div><div>选择日期查询检测结果</div></div>
+        </div>
+    </div>
+</div>
+
+<!-- 图片弹窗 -->
+<div class="modal-overlay" id="imageModal" onclick="closeModal()">
+    <span class="modal-close" onclick="closeModal()">✕</span>
+    <img id="modalImg" src="" />
+</div>
+
+<script>
+    const socket = io();
+    let selectedFolder = '';
+    let pollTimer = null;
+    let lastQueryData = null;
+
+    // ===== 标签切换 =====
+    function switchTab(name) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+        if (name === 'results') loadDates();
+    }
+
+    // ===== 检测机器连接 =====
+    async function checkConnection() {
+        const dot = document.getElementById('connDot');
+        const text = document.getElementById('connText');
+        try {
+            const res = await fetch('/api/yolo/ping_detect');
+            const data = await res.json();
+            if (data.success) {
+                dot.className = 'conn-dot online';
+                text.textContent = '检测机器在线';
+                loadBrands();
+                browseTo('');
+            } else {
+                dot.className = 'conn-dot offline';
+                text.textContent = '检测机器离线: ' + (data.error || '');
+            }
+        } catch (e) {
+            dot.className = 'conn-dot offline';
+            text.textContent = '无法连接检测机器';
+        }
+    }
+
+    // ===== 品牌列表 =====
+    async function loadBrands() {
+        try {
+            const res = await fetch('/api/yolo/brands');
+            const data = await res.json();
+            const sel = document.getElementById('brandSelect2');
+            sel.innerHTML = '<option value="">选择品牌</option>';
+            (data.brands || []).forEach(b => { sel.innerHTML += '<option value="' + b + '">' + b + '</option>'; });
+        } catch (e) { console.error(e); }
+    }
+
+    // ===== 文件浏览器 =====
+    async function browseTo(path) {
+        try {
+            var url = '/api/yolo/browse?path=' + encodeURIComponent(path);
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (!data.success) {
+                if (data.need_input) {
+                    document.getElementById('browserList').innerHTML =
+                        '<div style="padding:20px; color:#888; text-align:center;">请在上方输入文件夹路径后点击"前往"</div>';
+                    return;
+                }
+                alert(data.error);
+                return;
+            }
+
+            document.getElementById('pathInput').value = data.path;
+
+            var actions = document.getElementById('browserActions');
+            actions.style.display = 'flex';
+            actions.style.alignItems = 'center';
+            document.getElementById('imageCountInfo').textContent =
+                data.image_count > 0 ? '📊 包含 ' + data.image_count + ' 张图片' : '无图片';
+            window.currentBrowsePath = data.path;
+
+            var list = document.getElementById('browserList');
+            var html = '';
+
+            if (data.parent) {
+                html += '<div class="browser-item browser-back" onclick="browseTo(\'' + data.parent.replace(/\\/g, '\\\\') + '\')">' +
+                    '<span class="icon">⬆️</span><span class="name">返回上级</span></div>';
+            }
+
+            data.items.forEach(function(item) {
+                if (item.type === 'folder') {
+                    var escaped = item.path.replace(/\\/g, '\\\\');
+                    html += '<div class="browser-item" ondblclick="browseTo(\'' + escaped + '\')" onclick="selectSubFolder(\'' + escaped + '\', this)">' +
+                        '<span class="icon">📁</span><span class="name">' + item.name + '</span></div>';
+                }
+            });
+
+            var imageItems = data.items.filter(function(i) { return i.type === 'image'; });
+            if (imageItems.length > 0) {
+                html += '<div style="padding:10px 16px; color:#22c55e; font-size:13px; background:#151720; border-bottom:1px solid #2a2d3a;">✅ 包含 ' + imageItems.length + ' 张图片（预览前20张）</div>';
+                html += '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; padding:12px 16px; max-height:300px; overflow-y:auto;">';
+                var previewCount = Math.min(imageItems.length, 20);
+                for (var pi = 0; pi < previewCount; pi++) {
+                    var imgItem = imageItems[pi];
+                    html += '<div style="position:relative; cursor:pointer;" onclick="showImage(\'/api/yolo/preview?path=' + encodeURIComponent(imgItem.path) + '\')">' +
+                        '<img src="/api/yolo/preview?path=' + encodeURIComponent(imgItem.path) + '" loading="lazy" style="width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:6px; background:#000;" />' +
+                        '<div style="font-size:11px; color:#888; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + imgItem.name + '</div></div>';
+                }
+                html += '</div>';
+            }
+
+            if (!html) {
+                html = '<div style="padding:20px; color:#555; text-align:center;">空文件夹</div>';
+            }
+
+            list.innerHTML = html;
+
+        } catch (e) {
+            alert('浏览失败: ' + e.message);
+        }
+    }
+
+    function selectSubFolder(path, el) {
+        document.querySelectorAll('.browser-item').forEach(function(i) { i.classList.remove('selected'); });
+        el.classList.add('selected');
+        selectedFolder = path;
+        document.getElementById('selectedPath').textContent = path;
+        document.getElementById('btnDetect').disabled = false;
+    }
+
+    function selectCurrentFolder() {
+        if (!window.currentBrowsePath) { alert('请先浏览到一个文件夹'); return; }
+        selectedFolder = window.currentBrowsePath;
+        document.getElementById('selectedPath').textContent = selectedFolder;
+        document.getElementById('btnDetect').disabled = false;
+    }
+
+    // ===== 开始检测 =====
+    async function startDetect() {
+        if (!selectedFolder) { alert('请先选择文件夹'); return; }
+        var brand = document.getElementById('brandSelect2').value;
+        if (!brand) { alert('请选择品牌'); return; }
+        var machine = document.getElementById('machineName').value || '未知';
+
+        document.getElementById('btnDetect').disabled = true;
+        document.getElementById('progressBox').style.display = 'block';
+        document.getElementById('progressText').textContent = '正在下发任务...';
+
+        try {
+            var res = await fetch('/api/yolo/start_detect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ folder: selectedFolder, brand: brand, machine: machine })
+            });
+            var data = await res.json();
+            if (!data.success) {
+                alert(data.error);
+                document.getElementById('btnDetect').disabled = false;
+                return;
+            }
+            pollProgress();
+        } catch (e) {
+            alert('下发任务失败: ' + e.message);
+            document.getElementById('btnDetect').disabled = false;
+        }
+    }
+
+    function pollProgress() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(async function() {
+            try {
+                var res = await fetch('/api/yolo/detect_status');
+                var s = await res.json();
+                document.getElementById('progressText').textContent = s.progress || '处理中...';
+
+                if (s.total > 0) {
+                    var pct = Math.round((s.current / s.total) * 100);
+                    document.getElementById('progressFill').style.width = pct + '%';
+                }
+
+                if (!s.running) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                    document.getElementById('btnDetect').disabled = false;
+                    setTimeout(function() {
+                        document.querySelectorAll('.tab')[1].click();
+                        loadDates();
+                    }, 1500);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }, 1000);
+    }
+
+    // ===== 实时推送 =====
+    socket.on('yolo_new_detection', function(data) {
+        var bar = document.getElementById('liveBar');
+        bar.classList.add('active');
+        var msg = '[' + data.detect_time + '] ' + data.machine + ' / ' + data.brand;
+        if (data.is_alert) {
+            msg += ' 检测到缺陷: ' + data.filename;
+        } else {
+            msg += ' 正常: ' + data.filename;
+        }
+        document.getElementById('liveMsg').textContent = msg;
+    });
+
+    socket.on('yolo_summary', function(data) {
+        var bar = document.getElementById('liveBar');
+        bar.classList.add('active');
+        document.getElementById('liveMsg').textContent =
+            '[' + data.detect_time + '] ' + data.machine + ' / ' + data.brand + ' 完成: ' + data.total_images + '张, 异常' + data.fbox_count + '张';
+    });
+
+    // ===== 结果查询 =====
+    async function loadDates() {
+        try {
+            var res = await fetch('/api/yolo/dates');
+            var data = await res.json();
+            var sel = document.getElementById('dateSelect');
+            sel.innerHTML = '<option value="">选择日期</option>';
+            var today = new Date().toISOString().slice(0, 10);
+            var allDates = data.dates || [];
+            if (allDates.indexOf(today) === -1) allDates.unshift(today);
+            allDates.forEach(function(d) { sel.innerHTML += '<option value="' + d + '">' + d + '</option>'; });
+        } catch (e) { console.error(e); }
+    }
+
+    async function onDateChange() {
+        var date = document.getElementById('dateSelect').value;
+        if (!date) return;
+        try {
+            var res = await fetch('/api/yolo/filters?date=' + date);
+            var data = await res.json();
+            var ms = document.getElementById('machineSelect');
+            ms.innerHTML = '<option value="">全部封箱机</option>';
+            (data.machines || []).forEach(function(m) { ms.innerHTML += '<option value="' + m + '">' + m + '</option>'; });
+            var bs = document.getElementById('brandSelectQ');
+            bs.innerHTML = '<option value="">全部品牌</option>';
+            (data.brands || []).forEach(function(b) { bs.innerHTML += '<option value="' + b + '">' + b + '</option>'; });
+        } catch (e) { console.error(e); }
+    }
+
+    async function doQuery() {
+        var date = document.getElementById('dateSelect').value;
+        if (!date) { alert('请选择日期'); return; }
+        var machine = document.getElementById('machineSelect').value;
+        var brand = document.getElementById('brandSelectQ').value;
+        var url = '/api/yolo/query?date=' + date;
+        if (machine) url += '&machine=' + encodeURIComponent(machine);
+        if (brand) url += '&brand=' + encodeURIComponent(brand);
+        try {
+            var res = await fetch(url);
+            var data = await res.json();
+            if (!data.success) { alert(data.error); return; }
+            lastQueryData = data;
+            renderResults(data);
+        } catch (e) { alert('查询失败: ' + e.message); }
+    }
+
+    function applyFilter() {
+        if (lastQueryData) renderResults(lastQueryData);
+    }
+
+    function renderResults(data) {
+        var area = document.getElementById('resultArea');
+        var statsBar = document.getElementById('statsBar');
+        var allDetections = data.detections || [];
+        var summaries = data.summaries || [];
+
+        var filter = document.getElementById('alertFilter').value;
+        var detections = allDetections;
+        if (filter === 'alert') detections = allDetections.filter(function(d) { return d.is_alert; });
+        if (filter === 'normal') detections = allDetections.filter(function(d) { return !d.is_alert; });
+
+        var alertCount = allDetections.filter(function(d) { return d.is_alert; }).length;
+        var normalCount = allDetections.filter(function(d) { return !d.is_alert; }).length;
+
+        statsBar.style.display = 'flex';
+        document.getElementById('statFbox').textContent = alertCount;
+        document.getElementById('statNormal').textContent = normalCount;
+        document.getElementById('statBatch').textContent = summaries.length;
+        var totalImages = summaries.reduce(function(s, r) { return s + (r.total_images || 0); }, 0);
+        document.getElementById('statTotal').textContent = totalImages;
+
+        if (detections.length === 0 && summaries.length === 0) {
+            var emptyMsg = filter === 'alert' ? '没有异常图片' : filter === 'normal' ? '没有正常图片' : '该日期没有检测记录';
+            area.innerHTML = '<div class="empty"><div class="icon">✅</div><div>' + emptyMsg + '</div></div>';
+            return;
+        }
+
+        var html = '';
+
+        if (detections.length > 0) {
+            var title = filter === 'alert' ? '缺陷图片' : filter === 'normal' ? '正常图片' : '全部图片';
+            var titleColor = filter === 'alert' ? '#f87171' : filter === 'normal' ? '#22c55e' : '#60a5fa';
+            html += '<h3 style="color:' + titleColor + '; margin-bottom:12px;">' + title + ' (' + detections.length + '张)</h3>';
+            html += '<div class="card-grid">';
+            detections.forEach(function(d) {
+                var cardClass = d.is_alert ? 'det-card alert-card' : 'det-card';
+                var positions = (d.fbox_positions || []).map(function(p) { return p[0] + '行' + p[1] + '列'; }).join(', ') || '未知';
+                var tag = d.is_alert
+                    ? '<div class="fbox-tag">缺陷位置: ' + positions + '</div>'
+                    : '<div class="normal-tag">✅ 正常</div>';
+
+                html += '<div class="' + cardClass + '" onclick="showImage(\'/api/yolo/image/' + d.image + '\')">' +
+                    '<img src="/api/yolo/image/' + d.image + '" loading="lazy" />' +
+                    '<div class="info">' +
+                    '<div class="title">' + d.filename + '</div>' +
+                    '<div class="meta">' + d.machine + ' / ' + d.brand + ' · ' + d.detect_time + '</div>' +
+                    tag +
+                    '</div></div>';
+            });
+            html += '</div>';
+        }
+
+        if (summaries.length > 0) {
+            html += '<h3 style="color:#60a5fa; margin:24px 0 12px;">批次汇总</h3>';
+            html += '<table class="summary-table"><tr><th>封箱机</th><th>品牌</th><th>总图片</th><th>异常数</th><th>异常率</th><th>时间</th></tr>';
+            summaries.forEach(function(s) {
+                var rate = s.total_images > 0 ? ((s.fbox_count / s.total_images) * 100).toFixed(2) + '%' : '0%';
+                var rc = s.fbox_count > 0 ? '#f87171' : '#22c55e';
+                html += '<tr><td>' + s.machine + '</td><td>' + s.brand + '</td><td>' + s.total_images + '</td>' +
+                    '<td style="color:#f87171;">' + s.fbox_count + '</td><td style="color:' + rc + ';">' + rate + '</td><td>' + s.detect_time + '</td></tr>';
+            });
+            html += '</table>';
+        }
+
+        area.innerHTML = html;
+    }
+
+    function showImage(src) {
+        document.getElementById('modalImg').src = src;
+        document.getElementById('imageModal').classList.add('show');
+    }
+    function closeModal() { document.getElementById('imageModal').classList.remove('show'); }
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeModal(); });
+
+    // 初始化
+    checkConnection();
+</script>
+</body>
+</html>

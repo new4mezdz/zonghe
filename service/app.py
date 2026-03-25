@@ -19,11 +19,13 @@ from modules.monitor.routes import monitor_bp
 from modules.schedule.routes import schedule_bp
 from modules.urldata.routes import urldata_bp
 from modules.bindui.routes import bindui_bp
+from modules.yolo_detect.routes import yolo_bp
 
 app.register_blueprint(monitor_bp)
 app.register_blueprint(schedule_bp)
 app.register_blueprint(urldata_bp)
 app.register_blueprint(bindui_bp)
+app.register_blueprint(yolo_bp)
 
 # 注册Socket.IO事件处理
 from modules.monitor.socket_handlers import register_socket_handlers
