@@ -92,6 +92,7 @@ def upload_detection():
         'fbox_positions': request.form.get('fbox_positions', '[]'),
         'detect_time': request.form.get('detect_time', ''),
         'is_alert': request.form.get('is_alert', '0') == '1',
+        'mode': request.form.get('mode', 'manual'),
     }
     try:
         metadata['fbox_positions'] = _json.loads(metadata['fbox_positions'])
@@ -162,3 +163,66 @@ def get_filters():
 @yolo_bp.route('/api/yolo/image/<path:img_path>')
 def get_image(img_path):
     return send_from_directory(services.DATA_DIR, img_path)
+
+
+# === 自动模式 API ===
+
+@yolo_bp.route('/api/yolo/auto/start', methods=['POST'])
+def auto_start():
+    data = request.json or {}
+    try:
+        resp = requests.post(f"{DETECT_SERVER}/api/auto/start", json=data, timeout=10)
+        return jsonify(resp.json())
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'无法连接检测机器: {e}'})
+
+
+@yolo_bp.route('/api/yolo/auto/stop', methods=['POST'])
+def auto_stop():
+    try:
+        resp = requests.post(f"{DETECT_SERVER}/api/auto/stop", timeout=10)
+        return jsonify(resp.json())
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'无法连接检测机器: {e}'})
+
+
+@yolo_bp.route('/api/yolo/auto/status', methods=['GET'])
+def auto_status():
+    try:
+        resp = requests.get(f"{DETECT_SERVER}/api/auto/status", timeout=5)
+        return jsonify(resp.json())
+    except Exception as e:
+        return jsonify({'running': False, 'error': str(e)})
+
+
+
+
+@yolo_bp.route('/api/yolo/export', methods=['GET'])
+def export_alerts():
+    import zipfile
+    import io
+    from flask import Response
+
+    date_str = request.args.get('date', '')
+    machine = request.args.get('machine', '') or None
+    brand = request.args.get('brand', '') or None
+
+    if not date_str:
+        return jsonify({'success': False, 'error': '请选择日期'}), 400
+
+    alert_files = services.export_alert_images(date_str, machine, brand)
+    if not alert_files:
+        return jsonify({'success': False, 'error': '没有缺陷图片'}), 404
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for f in alert_files:
+            zf.write(f['path'], f['arcname'])
+    buf.seek(0)
+
+    filename = f"defects_{date_str}.zip"
+    return Response(
+        buf.getvalue(),
+        mimetype='application/zip',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )

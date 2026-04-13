@@ -51,7 +51,22 @@ task_status = {
     'current': 0,
     'fbox_count': 0,
 }
+# ========================================
+# ★★★ 自动模式配置 ★★★
+# ========================================
+AUTO_MONITOR_BASE = r'\\10.164.62.212\Picture'
+AUTO_MONITOR_MACHINES = ['1号封箱机', '2号封箱机', '3号封箱机']
+AUTO_SCAN_INTERVAL = 5  # 扫描间隔（秒）
 
+auto_status = {
+    'running': False,
+    'brand': '',
+    'processed_files': {},   # {machine: set(filename)}
+    'alert_count': 0,
+    'total_count': 0,
+    'last_scan': '',
+}
+auto_thread = None
 
 def get_model_for_brand(brand_name):
     model_map = {
@@ -399,7 +414,6 @@ def run_detection_task(folder_path, brand_name, machine_name):
             task_status['running'] = False
             return
 
-        # 获取图片列表
         all_files = [f for f in os.listdir(folder_path)
                      if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
         total = len(all_files)
@@ -425,17 +439,22 @@ def run_detection_task(folder_path, brand_name, machine_name):
                 fbox_count += 1
                 task_status['fbox_count'] = fbox_count
 
-            # 所有图片都推送（异常用标注图，正常用原图）
             try:
                 if is_alert:
                     _, img_bytes = cv2.imencode('.jpg', result['image_bgr'])
+                    orig = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+                    _, orig_bytes = cv2.imencode('.jpg', orig)
+                    files = {
+                        'image': (file, img_bytes.tobytes(), 'image/jpeg'),
+                        'original': (file, orig_bytes.tobytes(), 'image/jpeg'),
+                    }
                 else:
                     orig = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
                     if orig is None:
                         continue
                     _, img_bytes = cv2.imencode('.jpg', orig)
+                    files = {'image': (file, img_bytes.tobytes(), 'image/jpeg')}
 
-                files = {'image': (file, img_bytes.tobytes(), 'image/jpeg')}
                 data = {
                     'machine': machine_name,
                     'brand': brand_name,
@@ -443,12 +462,12 @@ def run_detection_task(folder_path, brand_name, machine_name):
                     'fbox_positions': json.dumps(result['fbox_positions'] if is_alert else []),
                     'detect_time': detect_time,
                     'is_alert': '1' if is_alert else '0',
+                    'mode': 'manual',
                 }
                 requests.post(f"{WEB_SERVER_URL}/api/yolo/upload", files=files, data=data, timeout=30)
             except Exception as e:
                 logger.error(f"推送失败 {file}: {e}")
 
-        # 推送汇总
         try:
             summary = {
                 'machine': machine_name,
@@ -470,7 +489,103 @@ def run_detection_task(folder_path, brand_name, machine_name):
     finally:
         task_status['running'] = False
 
+def run_auto_monitor(brand_name):
+    """自动模式：持续监控多个封箱机文件夹"""
+    global auto_status
+    import time
 
+    auto_status = {
+        'running': True,
+        'brand': brand_name,
+        'processed_files': {m: set() for m in AUTO_MONITOR_MACHINES},
+        'alert_count': 0,
+        'total_count': 0,
+        'last_scan': '',
+    }
+
+    model = load_model(brand_name)
+    if model is None:
+        auto_status['running'] = False
+        auto_status['last_scan'] = f'模型加载失败: {brand_name}'
+        return
+
+    logger.info(f"自动模式启动，品牌: {brand_name}")
+
+    while auto_status['running']:
+        for machine_name in AUTO_MONITOR_MACHINES:
+            if not auto_status['running']:
+                break
+
+            today_str = datetime.now().strftime('%Y%m%d')
+            date_dir = os.path.join(AUTO_MONITOR_BASE, machine_name, today_str)
+            if not os.path.exists(date_dir):
+                continue
+
+            for sub in os.listdir(date_dir):
+                sub_path = os.path.join(date_dir, sub)
+                if not os.path.isdir(sub_path):
+                    continue
+
+                try:
+                    all_files = [f for f in os.listdir(sub_path)
+                                 if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+                except Exception as e:
+                    logger.error(f"读取文件夹失败 {sub_path}: {e}")
+                    continue
+
+                processed = auto_status['processed_files'][machine_name]
+                new_files = [f for f in all_files if f not in processed]
+
+                for file in new_files:
+                    if not auto_status['running']:
+                        break
+
+                    img_path = os.path.join(sub_path, file)
+                    processed.add(file)
+                    auto_status['total_count'] += 1
+
+                    detect_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    result = detect_single(model, img_path)
+                    is_alert = result is not None
+
+                    if is_alert:
+                        auto_status['alert_count'] += 1
+
+                    try:
+                        if is_alert:
+                            _, img_bytes = cv2.imencode('.jpg', result['image_bgr'])
+                            orig = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+                            _, orig_bytes = cv2.imencode('.jpg', orig)
+                            files = {
+                                'image': (file, img_bytes.tobytes(), 'image/jpeg'),
+                                'original': (file, orig_bytes.tobytes(), 'image/jpeg'),
+                            }
+                        else:
+                            orig = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+                            if orig is None:
+                                continue
+                            _, img_bytes = cv2.imencode('.jpg', orig)
+                            files = {'image': (file, img_bytes.tobytes(), 'image/jpeg')}
+
+                        data = {
+                            'machine': machine_name,
+                            'brand': brand_name,
+                            'filename': file,
+                            'fbox_positions': json.dumps(result['fbox_positions'] if is_alert else []),
+                            'detect_time': detect_time,
+                            'is_alert': '1' if is_alert else '0',
+                            'mode': 'auto',
+                        }
+                        requests.post(f"{WEB_SERVER_URL}/api/yolo/upload", files=files, data=data, timeout=30)
+                    except Exception as e:
+                        logger.error(f"自动模式推送失败 {file}: {e}")
+
+                    auto_status['last_scan'] = f'{machine_name}: {file}'
+
+        auto_status['last_scan'] = f'扫描完成 {datetime.now().strftime("%H:%M:%S")}，等待下次扫描...'
+        time.sleep(AUTO_SCAN_INTERVAL)
+
+    logger.info("自动模式已停止")
 # ========================================
 # ★★★ API 路由 ★★★
 # ========================================
@@ -539,6 +654,43 @@ def start_detect():
 
     return jsonify({'success': True, 'message': '任务已启动'})
 
+
+@app.route('/api/auto/start', methods=['POST'])
+def start_auto():
+    global auto_thread, auto_status
+    if auto_status['running']:
+        return jsonify({'success': False, 'error': '自动模式已在运行中'})
+    if task_status['running']:
+        return jsonify({'success': False, 'error': '手动检测任务正在运行，请等待完成'})
+
+    data = request.json or {}
+    brand_name = data.get('brand', '')
+    if not brand_name:
+        return jsonify({'success': False, 'error': '请选择品牌'})
+
+    auto_thread = threading.Thread(target=run_auto_monitor, args=(brand_name,))
+    auto_thread.daemon = True
+    auto_thread.start()
+    return jsonify({'success': True, 'message': '自动模式已启动'})
+
+
+@app.route('/api/auto/stop', methods=['POST'])
+def stop_auto():
+    global auto_status
+    auto_status['running'] = False
+    return jsonify({'success': True, 'message': '正在停止自动模式...'})
+
+
+@app.route('/api/auto/status', methods=['GET'])
+def auto_mode_status():
+    return jsonify({
+        'running': auto_status['running'],
+        'brand': auto_status['brand'],
+        'alert_count': auto_status['alert_count'],
+        'total_count': auto_status['total_count'],
+        'last_scan': auto_status['last_scan'],
+        'machines': AUTO_MONITOR_MACHINES,
+    })
 
 @app.route('/api/status', methods=['GET'])
 def get_status():

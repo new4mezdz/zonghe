@@ -9,6 +9,7 @@ from config import Config
 import threading
 BOX_COUNT = 9
 DB_FILE = r'E:\9#\zonghe\service\urldata.db'
+LAST_SYNC_FILE = r'E:\9#\zonghe\service\last_sync_time.json'
 
 
 class UrlDataService:
@@ -16,6 +17,7 @@ class UrlDataService:
 
     def __init__(self):
         self.config = Config.load_json_config()
+        self.last_process_logs = []
         self.influx_config = {
             'url': 'http://10.164.62.253:8086/',
             'token': 'u31cmj6sXb8CjYO1r0TcBbSNToKHXVsqbgMn-KBq7zvnmAEemTtYlN8ZwX7wXydgRr6VkdjuwwbiD0YgS6lq0A==',
@@ -39,6 +41,7 @@ class UrlDataService:
             record_time TEXT,
             date_str TEXT,
             type TEXT,
+            corrected INTEGER DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_date ON records(date_str)')
@@ -47,6 +50,10 @@ class UrlDataService:
         c.execute('CREATE INDEX IF NOT EXISTS idx_num3 ON records(num3)')
         try:
             c.execute('ALTER TABLE records ADD COLUMN transport INTEGER DEFAULT 0')
+        except:
+            pass
+        try:
+            c.execute('ALTER TABLE records ADD COLUMN corrected INTEGER DEFAULT 0')
         except:
             pass
         conn.commit()
@@ -118,6 +125,8 @@ class UrlDataService:
             db_rows = []
 
             for idx, record in enumerate(data_records):
+                was_corrected = 0
+
                 for i in range(BOX_COUNT):
                     current_numbers[i] += 1
                     if current_numbers[i] > max_numbers[i]:
@@ -152,6 +161,7 @@ class UrlDataService:
                                         corrected = max_numbers[i]
                                     current_numbers[i] = corrected
                             intervention_count += 1
+                            was_corrected = 1
                     except ValueError:
                         pass
 
@@ -167,7 +177,7 @@ class UrlDataService:
                     current_numbers[0],
                     current_numbers[1], current_numbers[2], current_numbers[3], current_numbers[4],
                     current_numbers[5], current_numbers[6], current_numbers[7], current_numbers[8],
-                    content_val, str(verification_value), time_str, date_only, dtype
+                    content_val, str(verification_value), time_str, date_only, dtype, was_corrected
                 ))
 
             if verification_errors and enable_verification:
@@ -182,12 +192,16 @@ class UrlDataService:
                 c.execute('SELECT id FROM records WHERE record_time=? AND content=?', (row[11], row[9]))
                 if not c.fetchone():
                     c.execute('''INSERT INTO records
-                        (transport,num1,num2,num3,num4,num5,num6,num7,num8,content,verification,record_time,date_str,type)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', row)
+                        (transport,num1,num2,num3,num4,num5,num6,num7,num8,content,verification,record_time,date_str,type,corrected)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', row)
                     new_count += 1
             conn.commit()
             conn.close()
             log("写入数据库 {} 条新记录（跳过 {} 条重复）".format(new_count, len(db_rows) - new_count), "success")
+
+            # 记录本次处理的最新数据时间
+            if db_rows:
+                self._save_last_sync_time(db_rows[-1][11])  # record_time
 
             try:
                 file_date = start_time[:10].replace('-', '')
@@ -262,6 +276,35 @@ class UrlDataService:
         conn.close()
         return [self._row_to_dict(r) for r in rows]
 
+    def query_by_number_multi(self, box_queries, sort_order='desc'):
+        order = 'DESC' if sort_order == 'desc' else 'ASC'
+        conn = self._get_conn()
+        c = conn.cursor()
+        conditions = []
+        params = []
+        for box_idx_str, num_input in box_queries.items():
+            bi = int(box_idx_str)
+            col = 'transport' if bi == 0 else f'num{bi}'
+            target_nums = set()
+            for part in num_input.split(','):
+                part = part.strip()
+                if '-' in part:
+                    s, e = map(int, part.split('-'))
+                    target_nums.update(range(min(s, e), max(s, e) + 1))
+                else:
+                    target_nums.add(int(part))
+            placeholders = ','.join('?' * len(target_nums))
+            conditions.append(f'{col} IN ({placeholders})')
+            params.extend(target_nums)
+        if not conditions:
+            conn.close()
+            return []
+        sql = f'SELECT * FROM records WHERE {" OR ".join(conditions)} ORDER BY record_time {order}'
+        c.execute(sql, params)
+        rows = c.fetchall()
+        conn.close()
+        return [self._row_to_dict(r) for r in rows]
+
     def query_by_content(self, content_search, sort_order='desc'):
         order = 'DESC' if sort_order == 'desc' else 'ASC'
         conn = self._get_conn()
@@ -290,7 +333,8 @@ class UrlDataService:
             'content': row['content'],
             'verification': row['verification'],
             'type': row['type'],
-            'date': row['record_time']
+            'date': row['record_time'],
+            'corrected': row['corrected'] if 'corrected' in row.keys() else 0
         }
 
     def query(self, query_type, **kwargs):
@@ -303,7 +347,11 @@ class UrlDataService:
                 sort_order=sort_order
             )
         elif query_type == 'number':
-            results = self.query_by_number(kwargs.get('number', ''), kwargs.get('box_indices'), sort_order=sort_order)
+            box_queries = kwargs.get('box_queries')
+            if box_queries:
+                results = self.query_by_number_multi(box_queries, sort_order=sort_order)
+            else:
+                results = self.query_by_number(kwargs.get('number', ''), kwargs.get('box_indices'), sort_order=sort_order)
         elif query_type == 'content':
             results = self.query_by_content(kwargs.get('content', ''), sort_order=sort_order)
         elif query_type == 'duplicates':
@@ -374,6 +422,25 @@ class UrlDataService:
                 return [line.strip() for line in f.readlines() if line.strip()]
         except:
             return []
+
+    def _get_last_sync_time(self):
+        """读取上次同步成功的时间"""
+        try:
+            if os.path.exists(LAST_SYNC_FILE):
+                with open(LAST_SYNC_FILE, 'r') as f:
+                    data = json.load(f)
+                return data.get('last_sync_time')
+        except:
+            pass
+        return None
+
+    def _save_last_sync_time(self, time_str):
+        """保存本次同步成功的时间"""
+        try:
+            with open(LAST_SYNC_FILE, 'w') as f:
+                json.dump({'last_sync_time': time_str}, f)
+        except:
+            pass
 
     # ========== 设置相关 ==========
 
@@ -479,6 +546,9 @@ class UrlDataService:
                                                                                tc.get('间隔秒', 0))}
         return {'status': '⏸️ 定时处理未启用'}
 
+    def get_last_process_logs(self):
+        return self.last_process_logs
+
     # ========== InfluxDB ==========
 
     def _load_data_from_influx(self, start_time, stop_time=None):
@@ -492,9 +562,9 @@ class UrlDataService:
             bucket = self.influx_config['bucket_data']
             stop_clause = f', stop: {stop_time}' if stop_time else ''
             query = f'''from(bucket: "{bucket}")
-              |> range(start: {start_time}{stop_clause})
-              |> filter(fn: (r) => r["_field"] == "code")
-              |> sort(columns: ["_time"])'''
+                |> range(start: {start_time}{stop_clause})
+                |> filter(fn: (r) => r["_field"] == "code")
+                |> sort(columns: ["_time"])'''
             tables = client.query_api().query(query, org=self.influx_config['org'])
             records = []
             for table in tables:
@@ -504,6 +574,7 @@ class UrlDataService:
                         'value': str(record.get_value())
                     })
             client.close()
+            records.sort(key=lambda r: r['time'])
             return records
         except Exception as e:
             logging.error("读取 jbcj01 失败: %s", e)
@@ -532,6 +603,7 @@ class UrlDataService:
                         'value': str(record.get_value())
                     })
             client.close()
+            records.sort(key=lambda r: r['time'])
             return records
         except Exception as e:
             logging.error("读取 jbcj03 失败: %s", e)
@@ -654,7 +726,13 @@ class UrlDataService:
                         if interval < 10:
                             interval = 10
                         logging.info("自动同步：开始处理...")
-                        self.process_data('-{}s'.format(interval + 60))
+                        last_sync = self._get_last_sync_time()
+                        if last_sync:
+                            start_time = last_sync.replace(' ', 'T') + '+08:00'
+                        else:
+                            start_time = '-{}s'.format(interval + 60)
+                        result = self.process_data(start_time)
+                        self.last_process_logs = result.get('logs', [])
                         logging.info("自动同步：处理完成，等待 %d 秒", interval)
                         threading.Event().wait(interval)
                     else:

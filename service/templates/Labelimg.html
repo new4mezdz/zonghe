@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片标注工具 - LabelImg Web</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #111; color: #e8e8e8; overflow: hidden; height: 100vh; display: flex; }
+
+        /* 左侧面板 */
+        .sidebar {
+            width: 230px; background: #1a1a1a; border-right: 1px solid #2a2a2a;
+            display: flex; flex-direction: column; flex-shrink: 0; user-select: none;
+        }
+        .sidebar-header {
+            padding: 14px 16px; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .sidebar-header .dot { width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; }
+        .sidebar-header .title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+        .sidebar-header .ver { font-size: 11px; color: #666; margin-left: auto; }
+
+        .panel-section { padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        .section-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+        .tool-btns { display: flex; gap: 4px; }
+        .tool-btn {
+            flex: 1; padding: 6px 0; font-size: 12px; border-radius: 5px;
+            cursor: pointer; text-align: center; border: 1px solid #333;
+            background: #222; color: #aaa; transition: all 0.15s;
+        }
+        .tool-btn.active-draw { background: #2a5a3a; color: #5ee89a; border-color: #3a7a4a; }
+        .tool-btn.active-select { background: #2a3a5a; color: #5eaae8; border-color: #3a5a7a; }
+
+        .label-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .label-tag {
+            padding: 3px 10px; font-size: 12px; border-radius: 4px;
+            cursor: pointer; border: 1px solid #333; background: #222; color: #999;
+            transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+        }
+        .label-tag .remove { font-size: 10px; opacity: 0.5; cursor: pointer; }
+        .label-tag .remove:hover { opacity: 1; }
+        .add-label-row { display: flex; gap: 4px; margin-top: 8px; }
+        .add-label-row input {
+            flex: 1; padding: 4px 8px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #ddd; outline: none;
+        }
+        .add-label-row button {
+            padding: 4px 10px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #aaa; cursor: pointer;
+        }
+
+        .box-list { flex: 1; overflow-y: auto; padding: 12px; }
+        .box-item {
+            padding: 6px 8px; margin-bottom: 4px; font-size: 12px;
+            border: 1px solid transparent; border-radius: 5px; cursor: pointer;
+            display: flex; align-items: center; gap: 6px; transition: all 0.1s;
+        }
+        .box-item:hover { background: #222; }
+        .box-item.selected { background: #252525; }
+        .box-item .color-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+        .box-item select {
+            flex: 1; font-size: 11px; background: transparent; border: none;
+            color: #ccc; cursor: pointer; outline: none;
+        }
+        .box-item select option { background: #222; }
+        .box-item .size { font-size: 10px; color: #666; }
+        .box-item .del-btn {
+            background: none; border: none; color: #666; cursor: pointer;
+            font-size: 14px; padding: 0; line-height: 1;
+        }
+        .box-item .del-btn:hover { color: #e55; }
+        .empty-hint { font-size: 12px; color: #555; text-align: center; padding: 20px; }
+
+        .export-section { padding: 12px; border-top: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 4px; }
+        .export-btn {
+            padding: 7px; font-size: 12px; color: #fff; border: none;
+            border-radius: 5px; cursor: pointer; transition: opacity 0.15s;
+        }
+        .export-btn:disabled { opacity: 0.4; cursor: default; }
+        .export-btn.yolo { background: #1D9E75; }
+        .export-btn.voc { background: #378ADD; }
+
+        /* 主区域 */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .toolbar {
+            height: 44px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; padding: 0 16px; gap: 8px;
+        }
+        .toolbar-btn {
+            padding: 5px 14px; font-size: 12px; background: #222;
+            border: 1px solid #444; border-radius: 5px; color: #ddd; cursor: pointer;
+        }
+        .toolbar-btn:hover { background: #333; }
+        .toolbar-btn:disabled { color: #555; cursor: default; }
+        .toolbar-btn:disabled:hover { background: #222; }
+        .nav-info { font-size: 12px; color: #888; }
+        .file-info { font-size: 12px; color: #666; }
+        .img-info { font-size: 11px; color: #555; }
+        .spacer { margin-left: auto; }
+
+        .canvas-wrap {
+            flex: 1; position: relative; overflow: hidden; background: #111;
+        }
+        .canvas-wrap.crosshair { cursor: crosshair; }
+        .canvas-wrap canvas { position: absolute; top: 0; left: 0; }
+
+        .drop-zone {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; cursor: pointer;
+        }
+        .drop-icon {
+            width: 80px; height: 80px; border-radius: 16px; background: #1a1a1a;
+            border: 2px dashed #333; display: flex; align-items: center;
+            justify-content: center; font-size: 32px; margin-bottom: 16px;
+        }
+        .drop-text { font-size: 16px; color: #666; margin-bottom: 4px; }
+        .drop-sub { font-size: 12px; color: #444; }
+
+        .statusbar {
+            height: 28px; background: #1a1a1a; border-top: 1px solid #2a2a2a;
+            display: flex; align-items: center; padding: 0 16px;
+        }
+        .statusbar span { font-size: 11px; color: #666; }
+
+        .output-dir-section { padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        .output-dir-btn {
+            width: 100%; padding: 6px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #aaa; cursor: pointer;
+            text-align: left; transition: all 0.15s;
+        }
+        .output-dir-btn:hover { background: #2a2a2a; border-color: #444; }
+        .output-dir-path {
+            margin-top: 6px; font-size: 11px; color: #1D9E75;
+            word-break: break-all; line-height: 1.4;
+        }
+
+        input[type="file"] { display: none; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="dot"></div>
+        <span class="title">LabelImg</span>
+        <span class="ver">web</span>
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">工具</div>
+        <div class="tool-btns">
+            <div class="tool-btn active-draw" id="btnDraw" onclick="setTool('draw')">✎ 绘制 (D)</div>
+            <div class="tool-btn" id="btnSelect" onclick="setTool('select')">◻ 选择 (S)</div>
+        </div>
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">当前标签</div>
+        <div class="label-tags" id="labelTags"></div>
+        <div class="add-label-row">
+            <input id="newLabelInput" placeholder="添加标签..." onkeydown="if(event.key==='Enter')addLabel()">
+            <button onclick="addLabel()">+</button>
+        </div>
+    </div>
+
+    <div class="box-list" id="boxList">
+        <div class="section-title">标注列表 (<span id="boxCount">0</span>)</div>
+        <div id="boxItems"></div>
+    </div>
+
+
+
+    <div class="export-section">
+        <button class="export-btn yolo" id="exportYolo" onclick="exportYOLO()" disabled>导出 YOLO 格式</button>
+        <button class="export-btn voc" id="exportVoc" onclick="exportVOC()" disabled>导出 Pascal VOC</button>
+    </div>
+</div>
+
+<div class="main">
+    <div class="toolbar">
+        <button class="toolbar-btn" onclick="fileInput.click()">📂 打开图片</button>
+        <button class="toolbar-btn" onclick="folderInput.click()">📁 打开文件夹</button>
+        <input type="file" id="fileInput" accept="image/*" multiple onchange="handleFiles(event)">
+        <input type="file" id="folderInput" webkitdirectory directory onchange="handleFolder(event)">
+        <button class="toolbar-btn" id="btnPrev" onclick="goImage(-1)" disabled>◀ 上一张</button>
+        <span class="nav-info" id="navInfo"></span>
+        <button class="toolbar-btn" id="btnNext" onclick="goImage(1)" disabled>下一张 ▶</button>
+        <span class="spacer"></span>
+        <span class="file-info" id="fileInfo"></span>
+        <span class="img-info" id="imgInfo"></span>
+    </div>
+
+    <div class="canvas-wrap crosshair" id="canvasWrap">
+        <div class="drop-zone" id="dropZone" onclick="fileInput.click()">
+            <div class="drop-icon">📷</div>
+            <div class="drop-text">点击或拖拽图片到这里</div>
+            <div class="drop-sub">支持 JPG, PNG, BMP, WEBP 格式，可多选</div>
+        </div>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <div class="statusbar">
+        <span>快捷键: D=绘制 S=选择 Del=删除 ←→=切换图片 滚轮=缩放</span>
+    </div>
+</div>
+
+<script>
+const COLORS = ['#E24B4A','#378ADD','#1D9E75','#D85A30','#639922','#D4537E','#534AB7','#BA7517'];
+function getColor(i) { return COLORS[i % COLORS.length]; }
+
+let labels = JSON.parse(localStorage.getItem('labelimg_labels')) || ['person','car','dog','cat','bird'];
+let currentLabel = labels[0];
+let tool = 'draw';
+let boxes = [];
+let selectedBox = -1;
+let images = [];
+let currentIdx = 0;
+let allAnnotations = {};
+let fileName = '';
+let imgEl = null;
+let imgW = 0, imgH = 0;
+let scale = 1, offX = 0, offY = 0;
+
+let drawing = false, startPt = null, curPt = null;
+let resizing = null, moving = null;
+
+let allImageSizes = {};
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+const dropZone = document.getElementById('dropZone');
+
+// ===== 工具切换 =====
+function setTool(t) {
+    tool = t;
+    document.getElementById('btnDraw').className = 'tool-btn' + (t === 'draw' ? ' active-draw' : '');
+    document.getElementById('btnSelect').className = 'tool-btn' + (t === 'select' ? ' active-select' : '');
+    wrap.className = 'canvas-wrap' + (t === 'draw' ? ' crosshair' : '');
+}
+
+// ===== 标签管理 =====
+function renderLabels() {
+    const el = document.getElementById('labelTags');
+    el.innerHTML = '';
+    labels.forEach((l, i) => {
+        const tag = document.createElement('div');
+        tag.className = 'label-tag';
+        const c = getColor(i);
+        if (l === currentLabel) {
+            tag.style.background = c + '30';
+            tag.style.color = c;
+            tag.style.borderColor = c;
+        }
+        tag.onclick = () => { currentLabel = l; renderLabels(); };
+        tag.textContent = l;
+        if (labels.length > 1) {
+            const rm = document.createElement('span');
+            rm.className = 'remove';
+            rm.textContent = '×';
+            rm.onclick = (e) => { e.stopPropagation(); removeLabel(l); };
+            tag.appendChild(rm);
+        }
+        el.appendChild(tag);
+    });
+}
+
+function addLabel() {
+    const input = document.getElementById('newLabelInput');
+    const l = input.value.trim();
+    if (l && !labels.includes(l)) {
+        labels.push(l);
+        currentLabel = l;
+        saveLabels();
+        renderLabels();
+    }
+    input.value = '';
+}
+
+function removeLabel(l) {
+    if (labels.length <= 1) return;
+    labels = labels.filter(x => x !== l);
+    if (currentLabel === l) currentLabel = labels[0];
+    saveLabels();
+    renderLabels();
+}
+
+function saveLabels() {
+    localStorage.setItem('labelimg_labels', JSON.stringify(labels));
+}
+
+// ===== 输出目录 =====
+
+
+
+
+// ===== 标注列表 =====
+function renderBoxList() {
+    document.getElementById('boxCount').textContent = boxes.length;
+    const el = document.getElementById('boxItems');
+    el.innerHTML = '';
+    if (boxes.length === 0) {
+        el.innerHTML = '<div class="empty-hint">暂无标注</div>';
+    }
+    boxes.forEach((b, i) => {
+        const item = document.createElement('div');
+        item.className = 'box-item' + (i === selectedBox ? ' selected' : '');
+        if (i === selectedBox) item.style.borderColor = b.color + '60';
+        item.onclick = () => { selectedBox = i; renderBoxList(); render(); };
+
+        const dot = document.createElement('div');
+        dot.className = 'color-dot';
+        dot.style.background = b.color;
+
+        const sel = document.createElement('select');
+        labels.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l; opt.textContent = l;
+            if (l === b.label) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.onchange = (e) => { e.stopPropagation(); changeBoxLabel(i, sel.value); };
+        sel.onclick = (e) => e.stopPropagation();
+
+        const sz = document.createElement('span');
+        sz.className = 'size';
+        sz.textContent = Math.round(b.w) + '×' + Math.round(b.h);
+
+        const del = document.createElement('button');
+        del.className = 'del-btn';
+        del.textContent = '×';
+        del.onclick = (e) => { e.stopPropagation(); deleteBox(i); };
+
+        item.append(dot, sel, sz, del);
+        el.appendChild(item);
+    });
+
+    document.getElementById('exportYolo').disabled = boxes.length === 0;
+    document.getElementById('exportVoc').disabled = boxes.length === 0;
+}
+
+function deleteBox(i) {
+    boxes.splice(i, 1);
+    selectedBox = -1;
+    renderBoxList();
+    render();
+}
+
+function changeBoxLabel(i, label) {
+    boxes[i].label = label;
+    boxes[i].color = getColor(labels.indexOf(label));
+    renderBoxList();
+    render();
+}
+
+// ===== 图片加载 =====
+function fitImage(w, h) {
+    const cW = wrap.clientWidth;
+    const cH = wrap.clientHeight;
+    scale = Math.min(cW / w, cH / h, 1);
+    offX = (cW - w * scale) / 2;
+    offY = (cH - h * scale) / 2;
+}
+
+function loadImage(file, idx) {
+    if (imgEl && fileName) {
+        allAnnotations[fileName] = [...boxes];
+    }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+        imgEl = img;
+        imgW = img.width;
+        imgH = img.height;
+        fileName = file.name;
+        currentIdx = idx;
+        selectedBox = -1;
+
+        canvas.width = wrap.clientWidth;
+        canvas.height = wrap.clientHeight;
+        fitImage(imgW, imgH);
+
+        boxes = allAnnotations[file.name] ? [...allAnnotations[file.name]] : [];
+        allImageSizes[file.name] = { w: imgW, h: imgH };
+
+        dropZone.style.display = 'none';
+        canvas.style.display = 'block';
+
+        updateToolbar();
+        renderBoxList();
+        render();
+    };
+    img.src = url;
+}
+
+function handleFiles(e) {
+    const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+    if (files.length === 0) return;
+    images = files;
+    loadImage(files[0], 0);
+}
+
+function handleFolder(e) {
+    const files = Array.from(e.target.files)
+        .filter(f => /\.(jpe?g|png|bmp|webp|gif)$/i.test(f.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    if (files.length === 0) return;
+    images = files;
+    loadImage(files[0], 0);
+}
+
+function goImage(dir) {
+    if (images.length === 0) return;
+    allAnnotations[fileName] = [...boxes];
+    const next = Math.max(0, Math.min(images.length - 1, currentIdx + dir));
+    if (next !== currentIdx) loadImage(images[next], next);
+}
+
+function updateToolbar() {
+    document.getElementById('btnPrev').disabled = currentIdx === 0 || images.length === 0;
+    document.getElementById('btnNext').disabled = currentIdx >= images.length - 1 || images.length === 0;
+    document.getElementById('navInfo').textContent = images.length > 0 ? (currentIdx + 1) + ' / ' + images.length : '';
+    document.getElementById('fileInfo').textContent = fileName;
+    document.getElementById('imgInfo').textContent = imgEl ? imgW + '×' + imgH + ' | ' + Math.round(scale * 100) + '%' : '';
+}
+
+// ===== 坐标转换 =====
+function toImg(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    return {
+        x: (clientX - r.left - offX) / scale,
+        y: (clientY - r.top - offY) / scale
+    };
+}
+
+function hitBox(pt) {
+    for (let i = boxes.length - 1; i >= 0; i--) {
+        const b = boxes[i];
+        if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return i;
+    }
+    return -1;
+}
+
+function hitHandle(pt, box) {
+    const thr = 8 / scale;
+    const corners = [
+        { id: 'tl', x: box.x, y: box.y },
+        { id: 'tr', x: box.x + box.w, y: box.y },
+        { id: 'bl', x: box.x, y: box.y + box.h },
+        { id: 'br', x: box.x + box.w, y: box.y + box.h }
+    ];
+    for (const c of corners) {
+        if (Math.abs(pt.x - c.x) < thr && Math.abs(pt.y - c.y) < thr) return c.id;
+    }
+    return null;
+}
+
+// ===== 鼠标事件 =====
+canvas.addEventListener('mousedown', (e) => {
+    if (!imgEl || e.button !== 0) return;
+    const pt = toImg(e.clientX, e.clientY);
+
+    if (selectedBox >= 0 && boxes[selectedBox]) {
+        const handle = hitHandle(pt, boxes[selectedBox]);
+        if (handle) {
+            resizing = { idx: selectedBox, handle, startBox: { ...boxes[selectedBox] }, sp: { ...pt } };
+            return;
+        }
+    }
+
+    const hit = hitBox(pt);
+    if (tool === 'select' || (hit >= 0 && tool === 'draw')) {
+        if (hit >= 0) {
+            selectedBox = hit;
+            moving = { idx: hit, startBox: { ...boxes[hit] }, sp: { ...pt } };
+        } else {
+            selectedBox = -1;
+        }
+        renderBoxList();
+        render();
+        return;
+    }
+
+    if (tool === 'draw') {
+        drawing = true;
+        startPt = pt;
+        curPt = pt;
+        selectedBox = -1;
+        renderBoxList();
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (!imgEl) return;
+    const pt = toImg(e.clientX, e.clientY);
+
+    if (resizing) {
+        const { idx, handle, startBox, sp } = resizing;
+        const dx = pt.x - sp.x, dy = pt.y - sp.y;
+        const nb = { ...startBox };
+        if (handle.includes('l')) { nb.x = startBox.x + dx; nb.w = startBox.w - dx; }
+        if (handle.includes('r')) { nb.w = startBox.w + dx; }
+        if (handle.includes('t')) { nb.y = startBox.y + dy; nb.h = startBox.h - dy; }
+        if (handle.includes('b')) { nb.h = startBox.h + dy; }
+        if (nb.w < 5 || nb.h < 5) return;
+        boxes[idx] = { ...boxes[idx], ...nb };
+        render();
+        return;
+    }
+
+    if (moving) {
+        const { idx, startBox, sp } = moving;
+        boxes[idx].x = startBox.x + pt.x - sp.x;
+        boxes[idx].y = startBox.y + pt.y - sp.y;
+        render();
+        return;
+    }
+
+    if (drawing) {
+        curPt = pt;
+        render();
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    if (resizing) { resizing = null; renderBoxList(); return; }
+    if (moving) { moving = null; renderBoxList(); return; }
+    if (!drawing || !startPt || !curPt) return;
+
+    const x = Math.min(startPt.x, curPt.x);
+    const y = Math.min(startPt.y, curPt.y);
+    const w = Math.abs(curPt.x - startPt.x);
+    const h = Math.abs(curPt.y - startPt.y);
+
+    if (w > 3 && h > 3) {
+        boxes.push({ x, y, w, h, label: currentLabel, color: getColor(labels.indexOf(currentLabel)) });
+        selectedBox = boxes.length - 1;
+    }
+
+    drawing = false;
+    startPt = null;
+    curPt = null;
+    renderBoxList();
+    render();
+});
+
+canvas.addEventListener('mouseleave', () => {
+    if (drawing) {
+        drawing = false;
+        startPt = null;
+        curPt = null;
+        render();
+    }
+});
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(0.1, Math.min(5, scale * delta));
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+    offX = mx - (mx - offX) * (newScale / scale);
+    offY = my - (my - offY) * (newScale / scale);
+    scale = newScale;
+    updateToolbar();
+    render();
+}, { passive: false });
+
+// ===== 拖拽上传 =====
+wrap.addEventListener('dragover', (e) => { e.preventDefault(); });
+wrap.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (files.length > 0) {
+        images = files;
+        loadImage(files[0], 0);
+    }
+});
+
+// ===== 键盘事件 =====
+document.addEventListener('keydown', (e) => {
+    if (document.activeElement.tagName === 'INPUT') return;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBox >= 0) {
+        e.preventDefault();
+        deleteBox(selectedBox);
+    }
+    if (e.key === 'ArrowLeft') goImage(-1);
+    if (e.key === 'ArrowRight') goImage(1);
+    if (e.key === 'd' || e.key === 'D') setTool('draw');
+    if (e.key === 's' || e.key === 'S') setTool('select');
+});
+
+// ===== 渲染 =====
+function render() {
+    const cW = canvas.width, cH = canvas.height;
+    ctx.clearRect(0, 0, cW, cH);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, cW, cH);
+
+    if (!imgEl) return;
+
+    ctx.save();
+    ctx.translate(offX, offY);
+    ctx.scale(scale, scale);
+    ctx.drawImage(imgEl, 0, 0);
+
+    boxes.forEach((b, i) => {
+        const c = b.color || '#E24B4A';
+        ctx.fillStyle = c + '25';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+        const fs = Math.max(12, 14 / scale);
+        ctx.font = '500 ' + fs + 'px system-ui, "Microsoft YaHei", sans-serif';
+        const tw = ctx.measureText(b.label).width;
+        const pad = 4 / scale;
+        ctx.fillStyle = c;
+        ctx.fillRect(b.x, b.y - fs - pad * 2, tw + pad * 2, fs + pad * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(b.label, b.x + pad, b.y - pad);
+
+        if (i === selectedBox) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5 / scale;
+            ctx.setLineDash([4 / scale, 4 / scale]);
+            ctx.strokeRect(b.x, b.y, b.w, b.h);
+            ctx.setLineDash([]);
+
+            const hs = 5 / scale;
+            [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].forEach(([hx, hy]) => {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(hx - hs, hy - hs, hs * 2, hs * 2);
+                ctx.strokeStyle = c;
+                ctx.lineWidth = 1 / scale;
+                ctx.strokeRect(hx - hs, hy - hs, hs * 2, hs * 2);
+            });
+        }
+    });
+
+    if (drawing && startPt && curPt) {
+        const dx = Math.min(startPt.x, curPt.x);
+        const dy = Math.min(startPt.y, curPt.y);
+        const dw = Math.abs(curPt.x - startPt.x);
+        const dh = Math.abs(curPt.y - startPt.y);
+        const c = getColor(labels.indexOf(currentLabel));
+        ctx.fillStyle = c + '15';
+        ctx.fillRect(dx, dy, dw, dh);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 2 / scale;
+        ctx.setLineDash([6 / scale, 3 / scale]);
+        ctx.strokeRect(dx, dy, dw, dh);
+        ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+}
+
+// ===== 导出 =====
+async function exportYOLO() {
+    allAnnotations[fileName] = [...boxes];
+    allImageSizes[fileName] = { w: imgW, h: imgH };
+    const ann = { ...allAnnotations };
+
+    const zip = new JSZip();
+    zip.file('classes.txt', labels.join('\n'));
+
+    let count = 0;
+    for (const [fn, bxs] of Object.entries(ann)) {
+        if (!bxs || !bxs.length) continue;
+        const sz = allImageSizes[fn] || { w: imgW, h: imgH };
+        const txtName = fn.replace(/\.[^.]+$/, '.txt');
+        const lines = bxs.map(b => {
+            const cx = (b.x + b.w / 2) / sz.w;
+            const cy = (b.y + b.h / 2) / sz.h;
+            const bw = b.w / sz.w;
+            const bh = b.h / sz.h;
+            return labels.indexOf(b.label) + ' ' + cx.toFixed(6) + ' ' + cy.toFixed(6) + ' ' + bw.toFixed(6) + ' ' + bh.toFixed(6);
+        }).join('\n');
+        zip.file(txtName, lines);
+        const imgFile = images.find(f => f.name === fn);
+        if (imgFile) zip.file(fn, imgFile);
+        count++;
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'yolo_annotations.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+async function exportVOC() {
+    allAnnotations[fileName] = [...boxes];
+    allImageSizes[fileName] = { w: imgW, h: imgH };
+    const ann = { ...allAnnotations };
+
+    const zip = new JSZip();
+    let count = 0;
+    for (const [fn, bxs] of Object.entries(ann)) {
+        if (!bxs || !bxs.length) continue;
+        const sz = allImageSizes[fn] || { w: imgW, h: imgH };
+        const xmlName = fn.replace(/\.[^.]+$/, '.xml');
+        let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<annotation>\n  <filename>' + fn + '</filename>\n  <size>\n    <width>' + sz.w + '</width>\n    <height>' + sz.h + '</height>\n    <depth>3</depth>\n  </size>\n';
+        for (const b of bxs) {
+            xml += '  <object>\n    <name>' + b.label + '</name>\n    <pose>Unspecified</pose>\n    <truncated>0</truncated>\n    <difficult>0</difficult>\n    <bndbox>\n      <xmin>' + Math.round(b.x) + '</xmin>\n      <ymin>' + Math.round(b.y) + '</ymin>\n      <xmax>' + Math.round(b.x + b.w) + '</xmax>\n      <ymax>' + Math.round(b.y + b.h) + '</ymax>\n    </bndbox>\n  </object>\n';
+        }
+        xml += '</annotation>';
+        zip.file(xmlName, xml);
+        const imgFile = images.find(f => f.name === fn);
+        if (imgFile) zip.file(fn, imgFile);
+        count++;
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'voc_annotations.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+function download(text, name) {
+    const blob = new Blob([text], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+// ===== 窗口变化 =====
+window.addEventListener('resize', () => {
+    if (!imgEl) return;
+    canvas.width = wrap.clientWidth;
+    canvas.height = wrap.clientHeight;
+    fitImage(imgW, imgH);
+    updateToolbar();
+    render();
+});
+
+// ===== 初始化 =====
+renderLabels();
+renderBoxList();
+</script>
+
+</body>
+</html>

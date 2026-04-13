@@ -24,6 +24,7 @@ def query_urldata():
         number=data.get('number', ''),
         content=data.get('content', ''),
         box_indices=data.get('box_indices'),
+        box_queries=data.get('box_queries'),
         start_time=data.get('start_time'),
         stop_time=data.get('stop_time'),
         sort_order=data.get('sort_order', 'desc')
@@ -118,6 +119,9 @@ def boxquery_page():
     return render_template('boxquery.html')
 
 
+@urldata_bp.route('/api/urldata/process_logs', methods=['GET'])
+def get_process_logs():
+    return jsonify({'logs': urldata_service.get_last_process_logs()})
 @urldata_bp.route('/api/urldata/box_query', methods=['POST'])
 def box_query():
     data = request.json

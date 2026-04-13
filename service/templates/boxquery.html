@@ -172,6 +172,33 @@
     .main-layout { flex-direction: column; }
     .history-panel { width: 100%; min-width: 0; height: auto; max-height: 200px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
 }
+        /* 轮次记录 */
+.round-item { margin-bottom: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; }
+.round-item.current { border-color: #e94560; background: rgba(233,69,96,0.05); }
+.round-item.completed { border-color: #4CAF50; }
+.round-header { padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
+.round-header:hover { background: rgba(255,255,255,0.06); }
+.round-title { font-size: 0.85rem; color: #ddd; }
+.round-title .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+.round-title .badge-ok { background: rgba(76,175,80,0.2); color: #81c784; }
+.round-title .badge-ing { background: rgba(233,69,96,0.2); color: #e94560; }
+.round-meta { font-size: 0.72rem; color: #888; }
+.round-progress { font-size: 0.72rem; color: #aaa; margin-top: 4px; }
+.round-detail { display: none; padding: 0 12px 10px; border-top: 1px solid rgba(255,255,255,0.06); }
+.round-detail.open { display: block; }
+.rd-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.78rem; }
+.rd-row:last-child { border-bottom: none; }
+.rd-qr { color: #ccc; font-family: Consolas, monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+.rd-box { color: #4CAF50; font-weight: bold; min-width: 36px; text-align: center; }
+.rd-time { color: #888; min-width: 60px; text-align: right; }
+/* 完成弹窗 */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; animation: fadeIn 0.2s; }
+.modal-box { background: #1e1e30; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 40px 50px; text-align: center; animation: popIn 0.3s; }
+.modal-box h2 { font-size: 1.5rem; color: #4CAF50; margin-bottom: 10px; }
+.modal-box p { color: #aaa; font-size: 1rem; margin-bottom: 25px; }
+.modal-box .btn { min-width: 120px; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
     </style>
 </head>
 <body>
@@ -283,180 +310,232 @@
 </div>
 
     <script>
-    let boxHitCounts = [0, 0, 0, 0, 0, 0, 0, 0];
-    let queryHistory = []; // {qrcode, time, boxNum, matches}
+let boxHitCounts = [0,0,0,0,0,0,0,0];
+let boxLit = [false,false,false,false,false,false,false,false];
+let roundCount = 0;
+let currentRoundItems = [];
+let roundHistory = [];   // [{roundNum, completedTime, items:[{qrcode,time,boxNum,matches}]}]
 
-    document.getElementById('qrcodeInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') doQuery();
+document.getElementById('qrcodeInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doQuery();
+});
+
+function clearInput() {
+    document.getElementById('qrcodeInput').value = '';
+    document.getElementById('qrcodeInput').focus();
+}
+
+function resetBoxes() {
+    boxHitCounts = [0,0,0,0,0,0,0,0];
+    boxLit = [false,false,false,false,false,false,false,false];
+    for (let i = 0; i < 8; i++) {
+        document.getElementById('box' + i).classList.remove('highlight');
+        document.getElementById('boxVal' + i).textContent = '-';
+        const c = document.getElementById('boxCount' + i);
+        c.textContent = '0'; c.classList.remove('show');
+    }
+    document.getElementById('dataStats').textContent = '按回车或点击查询按钮开始';
+    document.getElementById('resultInfo').classList.remove('show');
+    document.getElementById('matchPanel').style.display = 'none';
+}
+
+function clearHistory() {
+    roundHistory = [];
+    currentRoundItems = [];
+    roundCount = 0;
+    renderHistory();
+    document.getElementById('resultInfo').classList.remove('show');
+    document.getElementById('matchPanel').style.display = 'none';
+}
+
+function getNowStr() {
+    const now = new Date();
+    return now.getFullYear() + '-' +
+        String(now.getMonth()+1).padStart(2,'0') + '-' +
+        String(now.getDate()).padStart(2,'0') + ' ' +
+        String(now.getHours()).padStart(2,'0') + ':' +
+        String(now.getMinutes()).padStart(2,'0') + ':' +
+        String(now.getSeconds()).padStart(2,'0');
+}
+
+function getTimeOnly(str) {
+    return str.split(' ')[1] || str;
+}
+
+/* ---- 渲染左侧记录 ---- */
+function renderHistory() {
+    const list = document.getElementById('historyList');
+    let html = '';
+
+    // 当前进行中的轮次
+    if (currentRoundItems.length > 0) {
+        const litCount = boxLit.filter(b => b).length;
+        html += '<li class="round-item current">' +
+            '<div class="round-header" onclick="toggleRound(\'current\')">' +
+                '<div><div class="round-title">第 ' + (roundCount + 1) + ' 轮 <span class="badge badge-ing">进行中</span></div>' +
+                '<div class="round-progress">' + litCount + '/8 已点亮 · ' + currentRoundItems.length + ' 次扫码</div></div>' +
+                '<div class="round-meta">▼</div>' +
+            '</div>' +
+            '<div class="round-detail" id="detail-current">' +
+                currentRoundItems.map(it =>
+                    '<div class="rd-row">' +
+                        '<span class="rd-qr" title="' + escapeHtml(it.qrcode) + '">' + escapeHtml(it.qrcode) + '</span>' +
+                        '<span class="rd-box">盒' + (it.boxNum || '-') + '</span>' +
+                        '<span class="rd-time">' + getTimeOnly(it.time) + '</span>' +
+                    '</div>'
+                ).join('') +
+            '</div>' +
+        '</li>';
+    }
+
+    // 已完成的轮次
+    roundHistory.forEach((r, idx) => {
+        html += '<li class="round-item completed">' +
+            '<div class="round-header" onclick="toggleRound(' + idx + ')">' +
+                '<div><div class="round-title">第 ' + r.roundNum + ' 轮 <span class="badge badge-ok">✓ 完成</span></div>' +
+                '<div class="round-progress">' + r.items.length + ' 次扫码 · ' + getTimeOnly(r.completedTime) + '</div></div>' +
+                '<div class="round-meta">▼</div>' +
+            '</div>' +
+            '<div class="round-detail" id="detail-' + idx + '">' +
+                r.items.map(it =>
+                    '<div class="rd-row">' +
+                        '<span class="rd-qr" title="' + escapeHtml(it.qrcode) + '">' + escapeHtml(it.qrcode) + '</span>' +
+                        '<span class="rd-box">盒' + (it.boxNum || '-') + '</span>' +
+                        '<span class="rd-time">' + getTimeOnly(it.time) + '</span>' +
+                    '</div>'
+                ).join('') +
+            '</div>' +
+        '</li>';
     });
 
-    function clearInput() {
-        document.getElementById('qrcodeInput').value = '';
-        document.getElementById('qrcodeInput').focus();
+    if (!html) {
+        html = '<li style="color:#666;font-size:0.8rem;text-align:center;padding:20px 0;">暂无查询记录</li>';
     }
+    list.innerHTML = html;
+}
 
-    function resetBoxes() {
-        boxHitCounts = [0, 0, 0, 0, 0, 0, 0, 0];
-        for (let i = 0; i < 8; i++) {
-            document.getElementById('box' + i).classList.remove('highlight');
-            document.getElementById('boxVal' + i).textContent = '-';
-            const countEl = document.getElementById('boxCount' + i);
-            countEl.textContent = '0';
-            countEl.classList.remove('show');
-        }
-        document.getElementById('dataStats').textContent = '按回车或点击查询按钮开始';
-        document.getElementById('resultInfo').classList.remove('show');
-        document.getElementById('matchPanel').style.display = 'none';
-    }
+function toggleRound(id) {
+    const el = document.getElementById('detail-' + id);
+    if (el) el.classList.toggle('open');
+}
 
-    function clearHistory() {
-        queryHistory = [];
-        renderHistory();
-        document.getElementById('resultInfo').classList.remove('show');
-        document.getElementById('matchPanel').style.display = 'none';
-    }
+/* ---- 完成弹窗 ---- */
+function showCompleteModal(roundNum) {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+        '<div class="modal-box">' +
+            '<h2>🎉 检验完成</h2>' +
+            '<p>已完成今日第 <strong style="color:#e94560;font-size:1.3rem;">' + roundNum + '</strong> 轮检验</p>' +
+            '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').remove()">确 定</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
 
-    function renderHistory() {
-        const list = document.getElementById('historyList');
-        if (queryHistory.length === 0) {
-            list.innerHTML = '<li style="color:#666;font-size:0.8rem;text-align:center;padding:20px 0;">暂无查询记录</li>';
-            return;
-        }
-        list.innerHTML = queryHistory.map((item, idx) => {
-            const boxText = item.boxNum != null ? '盒' + item.boxNum : '未匹配';
-            return '<li class="history-item" onclick="showHistoryItem(' + idx + ')" id="hItem' + idx + '">' +
-                '<div class="hi-qrcode" title="' + escapeHtml(item.qrcode) + '">' + escapeHtml(item.qrcode) + '</div>' +
-                '<div class="hi-meta"><span>' + item.time + '</span><span class="hi-box">' + boxText + '</span></div>' +
-            '</li>';
-        }).join('');
-    }
+/* ---- 查询 ---- */
+async function doQuery() {
+    const qrcode = document.getElementById('qrcodeInput').value.trim();
+    if (!qrcode) { alert('请输入二维码内容'); return; }
 
-    function showHistoryItem(idx) {
-        // 高亮选中
-        document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
-        const el = document.getElementById('hItem' + idx);
-        if (el) el.classList.add('active');
+    document.getElementById('loading').classList.add('show');
+    document.getElementById('resultInfo').classList.remove('show');
+    document.getElementById('matchPanel').style.display = 'none';
 
-        const item = queryHistory[idx];
-        if (!item) return;
+    try {
+        const res = await fetch('/api/urldata/box_query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qrcode })
+        });
+        const data = await res.json();
+        document.getElementById('loading').classList.remove('show');
 
-        // 显示结果信息
-        if (item.matches.length === 0) {
-            showResult('warning', '【' + item.qrcode + '】未找到匹配记录');
+        if (!data.success) { showResult('error', data.error || '查询失败'); return; }
+
+        document.getElementById('dataStats').innerHTML =
+            '共 <span>' + data.total_records + '</span> 条记录，匹配到 <span>' + data.matches.length + '</span> 条';
+
+        const timeStr = getNowStr();
+        let boxNum = null;
+
+        if (data.matches.length === 0) {
+            showResult('warning', '未找到匹配的二维码，请确认输入是否正确');
         } else {
-            showResult('success', '【' + item.qrcode + '】找到 ' + item.matches.length + ' 条记录，三号轮模盒编号为 ' + item.boxNum);
-        }
+            const latest = data.matches[data.matches.length - 1];
+            boxNum = latest.box_num;
+            const boxIndex = boxNum - 1;
 
-        // 显示匹配详情表
-        if (item.matches.length > 0) {
+            if (boxIndex >= 0 && boxIndex < 8) {
+                document.getElementById('box' + boxIndex).classList.add('highlight');
+                document.getElementById('boxVal' + boxIndex).textContent = '编号: ' + boxNum;
+                boxHitCounts[boxIndex]++;
+                boxLit[boxIndex] = true;
+                const countEl = document.getElementById('boxCount' + boxIndex);
+                countEl.textContent = boxHitCounts[boxIndex];
+                if (boxHitCounts[boxIndex] >= 2) countEl.classList.add('show');
+            }
+
+            showResult('success', '找到 ' + data.matches.length + ' 条匹配记录，三号轮模盒编号为 ' + boxNum);
+
             document.getElementById('matchPanel').style.display = 'block';
             const tbody = document.getElementById('matchBody');
-            tbody.innerHTML = item.matches.map(m => {
-                const timeStr = m.time.includes('T') ? m.time.replace('T', ' ').substring(0, 19) : m.time;
+            tbody.innerHTML = data.matches.map(m => {
+                const t = m.time.includes('T') ? m.time.replace('T', ' ').substring(0, 19) : m.time;
                 return '<tr>' +
                     '<td style="font-family:Consolas;color:#888;font-size:1.1rem;font-weight:bold;">' + m.box_num + '</td>' +
                     '<td>' + escapeHtml(m.content) + '</td>' +
-                    '<td>' + timeStr + '</td>' +
+                    '<td>' + t + '</td>' +
                 '</tr>';
             }).join('');
-        } else {
-            document.getElementById('matchPanel').style.display = 'none';
         }
-    }
 
-    async function doQuery() {
-        const qrcode = document.getElementById('qrcodeInput').value.trim();
-        if (!qrcode) { alert('请输入二维码内容'); return; }
+        // 记录到当前轮次
+        currentRoundItems.unshift({ qrcode, time: timeStr, boxNum, matches: data.matches });
+        renderHistory();
 
-        document.getElementById('loading').classList.add('show');
-        document.getElementById('resultInfo').classList.remove('show');
-        document.getElementById('matchPanel').style.display = 'none';
-
-        try {
-            const res = await fetch('/api/urldata/box_query', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ qrcode })
-            });
-            const data = await res.json();
-            document.getElementById('loading').classList.remove('show');
-
-            if (!data.success) {
-                showResult('error', data.error || '查询失败');
-                return;
+        // 检查是否8个盒子全亮 → 完成一轮
+        if (boxLit.every(b => b)) {
+            roundCount++;
+            const completedTime = getNowStr();
+            roundHistory.unshift({ roundNum: roundCount, completedTime, items: [...currentRoundItems] });
+            currentRoundItems = [];
+            // 重置盒子
+            boxLit = [false,false,false,false,false,false,false,false];
+            boxHitCounts = [0,0,0,0,0,0,0,0];
+            for (let i = 0; i < 8; i++) {
+                document.getElementById('box' + i).classList.remove('highlight');
+                document.getElementById('boxVal' + i).textContent = '-';
+                const c = document.getElementById('boxCount' + i);
+                c.textContent = '0'; c.classList.remove('show');
             }
-
-            document.getElementById('dataStats').innerHTML =
-                '共 <span>' + data.total_records + '</span> 条记录，匹配到 <span>' + data.matches.length + '</span> 条';
-
-            const now = new Date();
-            const timeStr = now.getFullYear() + '-' +
-                String(now.getMonth()+1).padStart(2,'0') + '-' +
-                String(now.getDate()).padStart(2,'0') + ' ' +
-                String(now.getHours()).padStart(2,'0') + ':' +
-                String(now.getMinutes()).padStart(2,'0') + ':' +
-                String(now.getSeconds()).padStart(2,'0');
-
-            let boxNum = null;
-
-            if (data.matches.length === 0) {
-                showResult('warning', '未找到匹配的二维码，请确认输入是否正确');
-            } else {
-                const latest = data.matches[data.matches.length - 1];
-                boxNum = latest.box_num;
-                const boxIndex = boxNum - 1;
-
-                if (boxIndex >= 0 && boxIndex < 8) {
-                    document.getElementById('box' + boxIndex).classList.add('highlight');
-                    document.getElementById('boxVal' + boxIndex).textContent = '编号: ' + boxNum;
-                    boxHitCounts[boxIndex]++;
-                    const countEl = document.getElementById('boxCount' + boxIndex);
-                    countEl.textContent = boxHitCounts[boxIndex];
-                    if (boxHitCounts[boxIndex] >= 2) countEl.classList.add('show');
-                }
-
-                showResult('success', '找到 ' + data.matches.length + ' 条匹配记录，三号轮模盒编号为 ' + boxNum);
-
-                document.getElementById('matchPanel').style.display = 'block';
-                const tbody = document.getElementById('matchBody');
-                tbody.innerHTML = data.matches.map(m => {
-                    const t = m.time.includes('T') ? m.time.replace('T', ' ').substring(0, 19) : m.time;
-                    return '<tr>' +
-                        '<td style="font-family:Consolas;color:#888;font-size:1.1rem;font-weight:bold;">' + m.box_num + '</td>' +
-                        '<td>' + escapeHtml(m.content) + '</td>' +
-                        '<td>' + t + '</td>' +
-                    '</tr>';
-                }).join('');
-            }
-
-            // 记录到查询历史（最新的在最上面）
-            queryHistory.unshift({ qrcode, time: timeStr, boxNum, matches: data.matches });
             renderHistory();
-
-            // 清空输入框，准备下一次扫码
-            document.getElementById('qrcodeInput').value = '';
-            document.getElementById('qrcodeInput').focus();
-
-        } catch (e) {
-            document.getElementById('loading').classList.remove('show');
-            showResult('error', '请求失败: ' + e.message);
+            // 延迟弹窗，让用户先看到UI更新
+            setTimeout(() => showCompleteModal(roundCount), 300);
         }
-    }
 
-    function showResult(type, msg) {
-        const el = document.getElementById('resultInfo');
-        el.className = 'result-info show ' + type;
-        el.textContent = msg;
-    }
+        document.getElementById('qrcodeInput').value = '';
+        document.getElementById('qrcodeInput').focus();
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    } catch (e) {
+        document.getElementById('loading').classList.remove('show');
+        showResult('error', '请求失败: ' + e.message);
     }
+}
 
-    // 初始化
-    renderHistory();
+function showResult(type, msg) {
+    const el = document.getElementById('resultInfo');
+    el.className = 'result-info show ' + type;
+    el.textContent = msg;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+renderHistory();
 </script>
 </body>
 </html>

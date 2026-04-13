@@ -26,6 +26,8 @@ app.register_blueprint(schedule_bp)
 app.register_blueprint(urldata_bp)
 app.register_blueprint(bindui_bp)
 app.register_blueprint(yolo_bp)
+from modules.labelimg.routes import labelimg_bp
+app.register_blueprint(labelimg_bp)
 
 # 注册Socket.IO事件处理
 from modules.monitor.socket_handlers import register_socket_handlers

@@ -168,15 +168,31 @@
             <div class="log-box" id="logBox"></div>
         </div>
 
-        <!-- 系统设置模块 -->
+        <!-- 常用功能（不需要密码） -->
         <div class="panel" style="margin-top: 15px;">
-            <div class="panel-title">🔧 系统设置</div>
-            <div class="settings-grid">
-                <button class="btn btn-secondary btn-block" onclick="openNumberQueryModal()">🔢 编号查询</button>
-                <button class="btn btn-secondary btn-block" onclick="openSettingsModal()">⚙️ 设置上下限</button>
-                <button class="btn btn-secondary btn-block" onclick="openSchedulerModal()">⏰ 定时处理设置</button>
-                <button class="btn btn-secondary btn-block" onclick="openManualNumberModal()">🔢 手动设定编号</button>
-                <button class="btn btn-secondary btn-block" onclick="openErrorSettingsModal()">⚠️ 错误时设置</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-secondary" style="flex:1;padding:10px;" onclick="openNumberQueryModal()">🔢 编号查询</button>
+                <button class="btn btn-secondary" style="flex:1;padding:10px;" onclick="loadProcessLogs()">📋 查看处理日志</button>
+            </div>
+        </div>
+
+        <!-- 系统设置模块（需要密码） -->
+        <div class="panel" style="margin-top: 15px;">
+            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span>🔧 系统设置</span>
+                <span id="settingsLockIcon" style="font-size:1.2rem;cursor:pointer;" onclick="toggleSettingsLock()">🔒</span>
+            </div>
+            <div id="settingsLocked" style="text-align:center;padding:20px;color:#888;">
+                <div style="font-size:2rem;margin-bottom:10px;">🔒</div>
+                <div>系统设置已锁定，点击上方锁图标输入密码解锁</div>
+            </div>
+            <div id="settingsUnlocked" style="display:none;">
+                <div class="settings-grid">
+                    <button class="btn btn-secondary btn-block" onclick="openSettingsModal()">⚙️ 设置上下限</button>
+                    <button class="btn btn-secondary btn-block" onclick="openSchedulerModal()">⏰ 定时处理设置</button>
+                    <button class="btn btn-secondary btn-block" onclick="openManualNumberModal()">🔢 手动设定编号</button>
+                    <button class="btn btn-secondary btn-block" onclick="openErrorSettingsModal()">⚠️ 错误时设置</button>
+                </div>
             </div>
             <div class="scheduler-status" id="schedulerStatus">⏸️ 定时处理未启用</div>
         </div>
@@ -241,15 +257,8 @@
     <div class="modal-overlay" id="numberQueryModal">
         <div class="modal">
             <h3>🔢 编号查询</h3>
-            <p style="color:#aaa; font-size:0.85rem; margin-bottom:10px;">选择轮模盒（可多选）：</p>
-            <div class="box-check-grid" id="boxCheckGrid"></div>
-            <div style="margin-bottom:12px; display:flex; gap:8px;">
-                <button class="btn btn-secondary" onclick="toggleAllBoxChecks()" style="font-size:0.8rem; padding:4px 12px;">全选/取消</button>
-            </div>
-            <div class="modal-row">
-                <label>编号范围:</label>
-                <input type="text" class="query-input" id="numberInput" placeholder="如: 1-100 或 1,5,10" style="flex:1;">
-            </div>
+            <p style="color:#aaa; font-size:0.85rem; margin-bottom:10px;">勾选轮模盒并输入对应编号范围：</p>
+            <div id="boxCheckGrid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:15px;"></div>
             <div class="modal-btns">
                 <button class="btn btn-primary" onclick="queryByNumber();closeModal('numberQueryModal')">🔍 查询</button>
                 <button class="btn btn-secondary" onclick="queryAll();closeModal('numberQueryModal')">全部</button>
@@ -278,10 +287,35 @@
     </div>
 
     <script>
+        // ===== 系统设置密码锁 =====
+        const SETTINGS_PASSWORD = '123456';
+        let settingsUnlocked = false;
+
+        function toggleSettingsLock() {
+            if (settingsUnlocked) {
+                settingsUnlocked = false;
+                document.getElementById('settingsLocked').style.display = '';
+                document.getElementById('settingsUnlocked').style.display = 'none';
+                document.getElementById('settingsLockIcon').textContent = '🔒';
+                return;
+            }
+            const pwd = prompt('请输入系统设置密码：');
+            if (pwd === null) return;
+            if (pwd === SETTINGS_PASSWORD) {
+                settingsUnlocked = true;
+                document.getElementById('settingsLocked').style.display = 'none';
+                document.getElementById('settingsUnlocked').style.display = '';
+                document.getElementById('settingsLockIcon').textContent = '🔓';
+            } else {
+                alert('密码错误');
+            }
+        }
+
         const BOX_NAMES = ['输送盒模','一号轮模盒','二号轮模盒','三号轮模盒','四号轮模盒','五号轮模盒','六号轮模盒','七号轮模盒','八号轮模盒'];
         const BOX_COUNT = 9;
         let sortOrder = 'asc';
         let lastQueryParams = null;
+        let lastQueryResults = [];
 
         function toggleSort() {
             sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
@@ -304,26 +338,21 @@
         function onLogClick(el) {
             const content = el.getAttribute('data-content');
             if (!content) return;
-            // 先在当前结果中查找匹配行
             const rows = document.querySelectorAll('#resultsBody tr[data-content]');
             let found = false;
             for (const row of rows) {
                 if (row.getAttribute('data-content') === content) {
-                    // 移除之前的高亮
                     document.querySelectorAll('tr.highlight-row').forEach(r => r.classList.remove('highlight-row'));
                     row.classList.add('highlight-row');
-                    // 滚动到该行
                     const container = document.getElementById('tableContainer');
                     const rowTop = row.offsetTop - container.offsetTop;
                     container.scrollTo({ top: rowTop - 50, behavior: 'smooth' });
-                    // 3秒后移除高亮
                     setTimeout(() => row.classList.remove('highlight-row'), 3000);
                     found = true;
                     break;
                 }
             }
             if (!found) {
-                // 当前结果没有，自动搜索该二维码
                 document.getElementById('contentInput').value = content;
                 queryByContent();
             }
@@ -340,10 +369,13 @@
         function initBoxCheckGrid() {
             const grid = document.getElementById('boxCheckGrid');
             grid.innerHTML = BOX_NAMES.map((name, i) => `
-                <label class="box-check-item" id="boxItem${i}" onclick="toggleBoxItem(${i})">
-                    <input type="checkbox" class="boxCheck" value="${i}" onclick="event.stopPropagation();" onchange="updateBoxItemStyle(${i})">
-                    ${name}
-                </label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label class="box-check-item" id="boxItem${i}" onclick="toggleBoxItem(${i})" style="min-width:130px;margin:0;">
+                        <input type="checkbox" class="boxCheck" value="${i}" onclick="event.stopPropagation();" onchange="updateBoxItemStyle(${i})">
+                        ${name}
+                    </label>
+                    <input type="text" class="query-input" id="boxNumInput${i}" placeholder="如: 1-100 或 1,5,10" style="flex:1;display:none;">
+                </div>
             `).join('');
         }
 
@@ -356,10 +388,14 @@
         function updateBoxItemStyle(i) {
             const item = document.getElementById('boxItem' + i);
             const cb = item.querySelector('.boxCheck');
+            const input = document.getElementById('boxNumInput' + i);
             if (cb.checked) {
                 item.classList.add('checked');
+                input.style.display = '';
             } else {
                 item.classList.remove('checked');
+                input.style.display = 'none';
+                input.value = '';
             }
         }
 
@@ -429,10 +465,16 @@
         }
 
         async function queryByNumber() {
-            const number = document.getElementById('numberInput').value.trim();
-            if (!number) { alert('请输入编号'); return; }
-            const boxIndices = getSelectedBoxIndices();
-            await doQuery({ type: 'number', number, box_indices: boxIndices.length > 0 ? boxIndices : null });
+            const boxQueries = {};
+            for (let i = 0; i < BOX_COUNT; i++) {
+                const cb = document.querySelector(`#boxItem${i} .boxCheck`);
+                if (cb && cb.checked) {
+                    const val = document.getElementById('boxNumInput' + i).value.trim();
+                    if (val) boxQueries[i] = val;
+                }
+            }
+            if (Object.keys(boxQueries).length === 0) { alert('请勾选轮模盒并输入编号'); return; }
+            await doQuery({ type: 'number', box_queries: boxQueries });
         }
 
         async function queryByContent() {
@@ -450,14 +492,17 @@
         async function queryAll() { await doQuery({ type: 'content', content: '' }); }
 
         function clearNumberInput() {
-            document.getElementById('numberInput').value = '';
+            for (let i = 0; i < BOX_COUNT; i++) {
+                const input = document.getElementById('boxNumInput' + i);
+                if (input) input.value = '';
+            }
             document.querySelectorAll('.boxCheck').forEach((c, i) => {
                 c.checked = false;
                 updateBoxItemStyle(i);
             });
         }
 
-        async function doQuery(params) {
+       async function doQuery(params) {
             if (!params.sort_order) params.sort_order = sortOrder;
             lastQueryParams = {...params};
             const res = await fetch('/api/urldata/query', {
@@ -465,10 +510,10 @@
                 body: JSON.stringify(params)
             });
             const data = await res.json();
+            lastQueryResults = data.results || [];
             displayResults(data.results);
             updateStats(data.stats, params.type);
         }
-
         function displayResults(results) {
             const tbody = document.getElementById('resultsBody');
             if (!results || results.length === 0) {
@@ -478,9 +523,11 @@
             tbody.innerHTML = results.map((item, idx) => {
                 const typeClass = item.type === 'URL' ? 'type-url' : item.type === '失败' ? 'type-fail' : 'type-other';
                 const safeContent = escapeHtml(item.content);
-                return `<tr data-content="${safeContent}" data-idx="${idx}">
+                const correctedStyle = item.corrected ? 'background:rgba(255,170,0,0.15);' : '';
+                const correctedTag = item.corrected ? ' <span style="color:#ffaa00;font-size:0.75rem;">⚠纠正</span>' : '';
+                return `<tr data-content="${safeContent}" data-idx="${idx}" style="${correctedStyle}">
                     ${item.numbers.map(n => `<td class="number-cell">${n}</td>`).join('')}
-                    <td>${item.verification || 'N/A'}</td>
+                    <td>${item.verification || 'N/A'}${correctedTag}</td>
                     <td>${item.date}</td>
                     <td class="${typeClass}">${item.type}</td>
                     <td class="content-cell">
@@ -526,6 +573,25 @@
                 const data = await res.json();
                 document.getElementById('schedulerStatus').textContent = data.status || '⏸️ 定时处理未启用';
             } catch(e) {}
+        }
+
+        // ===== 查看处理日志 =====
+        async function loadProcessLogs() {
+            const logBox = document.getElementById('logBox');
+            logBox.innerHTML = '';
+            if (!lastQueryResults || lastQueryResults.length === 0) {
+                addLog('请先执行查询', 'info');
+                return;
+            }
+            const corrected = lastQueryResults.filter(r => r.corrected);
+            if (corrected.length > 0) {
+                addLog(`当前查询共 ${lastQueryResults.length} 条记录，其中 ${corrected.length} 条被校验纠正`, 'warning');
+                corrected.forEach(r => {
+                    addLog(`⚠ 纠正记录 | 编号: ${r.numbers.join(',')} | 校验位: ${r.verification} | 时间: ${r.date} | 内容: ${r.content}`, 'warning', r.content, r.date);
+                });
+            } else {
+                addLog(`当前查询共 ${lastQueryResults.length} 条记录，无校验纠正`, 'success');
+            }
         }
 
         // ===== InfluxDB 调试 =====

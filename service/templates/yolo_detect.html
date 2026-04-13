@@ -99,6 +99,8 @@
 
         .btn-select-folder { background: #2563eb; color: white; border: none; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
         .btn-select-folder:hover { background: #1d4ed8; }
+        .btn-detect.running { background: #ef4444; }
+        .btn-detect.running:hover { background: #dc2626; }
     </style>
 </head>
 <body>
@@ -109,7 +111,8 @@
 </div>
 
 <div class="tabs">
-    <div class="tab active" onclick="switchTab('detect')">开始检测</div>
+    <div class="tab active" onclick="switchTab('detect')">手动检测</div>
+    <div class="tab" onclick="switchTab('auto')">自动模式</div>
     <div class="tab" onclick="switchTab('results')">查看结果</div>
 </div>
 
@@ -173,6 +176,59 @@
     </div>
 </div>
 
+<!-- ===== 自动模式面板 ===== -->
+<div class="tab-content" id="tab-auto">
+    <div class="detect-panel">
+        <div class="connection-bar">
+            <div class="conn-dot" id="autoConnDot"></div>
+            <span id="autoConnText">检测中...</span>
+        </div>
+
+        <div class="panel-row">
+            <div class="panel-left">
+                <div style="background:#1a1d28; border-radius:8px; padding:16px; border:1px solid #2a2d3a;">
+                    <h3 style="color:#60a5fa; margin-bottom:12px;">监控目录</h3>
+                    <p style="font-size:13px; color:#888; margin-bottom:8px;">自动监控以下路径，实时检测新增图片：</p>
+                    <div style="font-family:Consolas,monospace; font-size:13px; color:#e0e0e0; background:#252830; padding:12px; border-radius:6px;">
+                        <div>\\10.164.62.212\Picture\1号封箱机</div>
+                        <div style="margin-top:4px;">\\10.164.62.212\Picture\2号封箱机</div>
+                        <div style="margin-top:4px;">\\10.164.62.212\Picture\3号封箱机</div>
+                    </div>
+                </div>
+
+                <!-- 自动模式实时状态 -->
+                <div id="autoStatsPanel" style="background:#1a1d28; border-radius:8px; padding:16px; border:1px solid #2a2d3a; margin-top:16px; display:none;">
+                    <h3 style="color:#60a5fa; margin-bottom:12px;">运行状态</h3>
+                    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+                        <div class="stat-card"><div class="label">已扫描</div><div class="value" id="autoTotal" style="color:#60a5fa;">0</div></div>
+                        <div class="stat-card"><div class="label">异常数</div><div class="value danger" id="autoAlerts">0</div></div>
+                    </div>
+                    <div style="margin-top:12px; font-size:13px; color:#888;" id="autoLastScan">等待扫描...</div>
+                </div>
+
+                <!-- 自动模式异常图片实时展示 -->
+                <div id="autoAlertArea" style="margin-top:16px;">
+                    <h3 style="color:#f87171; margin-bottom:12px;">实时异常图片</h3>
+                    <div class="card-grid" id="autoAlertGrid"></div>
+                </div>
+            </div>
+
+            <div class="panel-right">
+                <div class="control-box">
+                    <h3>自动模式设置</h3>
+                    <label style="font-size:12px; color:#888;">品牌:</label>
+                    <select id="autoBrandSelect"></select>
+
+                    <button class="btn-detect" id="btnAutoStart" onclick="toggleAutoMode()" style="background:#22c55e;">启动自动模式</button>
+
+                    <div class="progress-box" id="autoProgressBox" style="display:none; margin-top:12px;">
+                        <div id="autoProgressText" style="color:#22c55e;">自动模式运行中...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 <!-- ===== 结果面板 ===== -->
 <div class="tab-content" id="tab-results">
     <div class="toolbar">
@@ -186,6 +242,12 @@
             <option value="">全部品牌</option>
         </select>
         <button onclick="doQuery()">查询</button>
+        <button onclick="exportAlerts()" style="background:#ef4444;">导出缺陷图片</button>
+        <select id="modeFilter" onchange="applyFilter()">
+            <option value="all">全部模式</option>
+            <option value="manual">手动检测</option>
+            <option value="auto">自动模式</option>
+        </select>
         <select id="alertFilter" onchange="applyFilter()">
             <option value="all">全部图片</option>
             <option value="alert">仅异常</option>
@@ -226,6 +288,16 @@
         event.target.classList.add('active');
         document.getElementById('tab-' + name).classList.add('active');
         if (name === 'results') loadDates();
+        if (name === 'auto') {
+            loadAutoBrands();
+            fetch('/api/yolo/auto/status').then(r => r.json()).then(function(s) {
+                if (s.running) {
+                    autoRunning = true;
+                    updateAutoUI();
+                    pollAutoStatus();
+                }
+            }).catch(function(){});
+        }
     }
 
     // ===== 检测机器连接 =====
@@ -391,7 +463,7 @@
                     pollTimer = null;
                     document.getElementById('btnDetect').disabled = false;
                     setTimeout(function() {
-                        document.querySelectorAll('.tab')[1].click();
+                        document.querySelectorAll('.tab')[2].click();
                         loadDates();
                     }, 1500);
                 }
@@ -401,6 +473,80 @@
         }, 1000);
     }
 
+    // ===== 自动模式 =====
+    let autoRunning = false;
+    let autoPollTimer = null;
+
+    async function toggleAutoMode() {
+        if (autoRunning) {
+            try {
+                await fetch('/api/yolo/auto/stop', { method: 'POST' });
+                autoRunning = false;
+                updateAutoUI();
+                if (autoPollTimer) { clearInterval(autoPollTimer); autoPollTimer = null; }
+            } catch (e) { alert('停止失败: ' + e.message); }
+        } else {
+            var brand = document.getElementById('autoBrandSelect').value;
+            if (!brand) { alert('请选择品牌'); return; }
+            try {
+                var res = await fetch('/api/yolo/auto/start', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ brand: brand })
+                });
+                var data = await res.json();
+                if (!data.success) { alert(data.error); return; }
+                autoRunning = true;
+                updateAutoUI();
+                pollAutoStatus();
+            } catch (e) { alert('启动失败: ' + e.message); }
+        }
+    }
+
+    function updateAutoUI() {
+        var btn = document.getElementById('btnAutoStart');
+        if (autoRunning) {
+            btn.textContent = '停止自动模式';
+            btn.className = 'btn-detect running';
+            document.getElementById('autoProgressBox').style.display = 'block';
+            document.getElementById('autoStatsPanel').style.display = 'block';
+        } else {
+            btn.textContent = '启动自动模式';
+            btn.className = 'btn-detect';
+            btn.style.background = '#22c55e';
+            document.getElementById('autoProgressBox').style.display = 'none';
+        }
+    }
+
+    function pollAutoStatus() {
+        if (autoPollTimer) clearInterval(autoPollTimer);
+        autoPollTimer = setInterval(async function() {
+            try {
+                var res = await fetch('/api/yolo/auto/status');
+                var s = await res.json();
+                document.getElementById('autoTotal').textContent = s.total_count || 0;
+                document.getElementById('autoAlerts').textContent = s.alert_count || 0;
+                document.getElementById('autoLastScan').textContent = s.last_scan || '等待扫描...';
+                document.getElementById('autoProgressText').textContent = '自动模式运行中 - ' + (s.last_scan || '');
+                if (!s.running && autoRunning) {
+                    autoRunning = false;
+                    updateAutoUI();
+                    clearInterval(autoPollTimer);
+                    autoPollTimer = null;
+                }
+            } catch (e) { console.error(e); }
+        }, 2000);
+    }
+
+    async function loadAutoBrands() {
+        try {
+            var res = await fetch('/api/yolo/brands');
+            var data = await res.json();
+            var sel = document.getElementById('autoBrandSelect');
+            sel.innerHTML = '<option value="">选择品牌</option>';
+            (data.brands || []).forEach(function(b) { sel.innerHTML += '<option value="' + b + '">' + b + '</option>'; });
+        } catch (e) { console.error(e); }
+    }
     // ===== 实时推送 =====
     socket.on('yolo_new_detection', function(data) {
         var bar = document.getElementById('liveBar');
@@ -412,13 +558,24 @@
             msg += ' 正常: ' + data.filename;
         }
         document.getElementById('liveMsg').textContent = msg;
-    });
 
-    socket.on('yolo_summary', function(data) {
-        var bar = document.getElementById('liveBar');
-        bar.classList.add('active');
-        document.getElementById('liveMsg').textContent =
-            '[' + data.detect_time + '] ' + data.machine + ' / ' + data.brand + ' 完成: ' + data.total_images + '张, 异常' + data.fbox_count + '张';
+        if (data.is_alert && autoRunning) {
+            var grid = document.getElementById('autoAlertGrid');
+            var today = new Date().toISOString().slice(0, 10);
+            var imgUrl = '/api/yolo/image/' + today + '/' + data.machine + '/' + data.brand + '/' + data.filename;
+            var positions = (data.fbox_positions || []).map(function(p) { return p[0] + '行' + p[1] + '列'; }).join(', ') || '未知';
+            var card = document.createElement('div');
+            card.className = 'det-card alert-card';
+            card.onclick = function() { showImage(imgUrl); };
+            card.innerHTML =
+                '<img src="' + imgUrl + '" loading="lazy" />' +
+                '<div class="info">' +
+                '<div class="title">' + data.filename + '</div>' +
+                '<div class="meta">' + data.machine + ' / ' + data.brand + ' · ' + data.detect_time + '</div>' +
+                '<div class="fbox-tag">缺陷位置: ' + positions + '</div>' +
+                '</div>';
+            grid.insertBefore(card, grid.firstChild);
+        }
     });
 
     // ===== 结果查询 =====
@@ -435,6 +592,17 @@
         } catch (e) { console.error(e); }
     }
 
+
+    function exportAlerts() {
+    var date = document.getElementById('dateSelect').value;
+    if (!date) { alert('请先选择日期并查询'); return; }
+    var machine = document.getElementById('machineSelect').value;
+    var brand = document.getElementById('brandSelectQ').value;
+    var url = '/api/yolo/export?date=' + date;
+    if (machine) url += '&machine=' + encodeURIComponent(machine);
+    if (brand) url += '&brand=' + encodeURIComponent(brand);
+    window.open(url, '_blank');
+}
     async function onDateChange() {
         var date = document.getElementById('dateSelect').value;
         if (!date) return;
@@ -478,9 +646,13 @@
         var summaries = data.summaries || [];
 
         var filter = document.getElementById('alertFilter').value;
+        var modeFilter = document.getElementById('modeFilter').value;
+
         var detections = allDetections;
-        if (filter === 'alert') detections = allDetections.filter(function(d) { return d.is_alert; });
-        if (filter === 'normal') detections = allDetections.filter(function(d) { return !d.is_alert; });
+        if (modeFilter === 'auto') detections = detections.filter(function(d) { return d.mode === 'auto'; });
+        if (modeFilter === 'manual') detections = detections.filter(function(d) { return d.mode !== 'auto'; });
+        if (filter === 'alert') detections = detections.filter(function(d) { return d.is_alert; });
+        if (filter === 'normal') detections = detections.filter(function(d) { return !d.is_alert; });
 
         var alertCount = allDetections.filter(function(d) { return d.is_alert; }).length;
         var normalCount = allDetections.filter(function(d) { return !d.is_alert; }).length;
@@ -512,10 +684,14 @@
                     ? '<div class="fbox-tag">缺陷位置: ' + positions + '</div>'
                     : '<div class="normal-tag">✅ 正常</div>';
 
+                var modeLabel = d.mode === 'auto'
+                    ? '<span style="display:inline-block;background:rgba(96,165,250,0.15);color:#60a5fa;border-radius:4px;padding:2px 8px;font-size:11px;margin-left:6px;">自动</span>'
+                    : '<span style="display:inline-block;background:rgba(168,85,247,0.15);color:#a855f7;border-radius:4px;padding:2px 8px;font-size:11px;margin-left:6px;">手动</span>';
+
                 html += '<div class="' + cardClass + '" onclick="showImage(\'/api/yolo/image/' + d.image + '\')">' +
                     '<img src="/api/yolo/image/' + d.image + '" loading="lazy" />' +
                     '<div class="info">' +
-                    '<div class="title">' + d.filename + '</div>' +
+                    '<div class="title">' + d.filename + modeLabel + '</div>' +
                     '<div class="meta">' + d.machine + ' / ' + d.brand + ' · ' + d.detect_time + '</div>' +
                     tag +
                     '</div></div>';

@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片标注工具 - LabelImg</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #111; color: #e8e8e8; overflow: hidden; height: 100vh; display: flex; }
+
+        /* 左侧面板 */
+        .sidebar {
+            width: 230px; background: #1a1a1a; border-right: 1px solid #2a2a2a;
+            display: flex; flex-direction: column; flex-shrink: 0; user-select: none;
+        }
+        .sidebar-header {
+            padding: 14px 16px; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .sidebar-header .dot { width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; }
+        .sidebar-header .title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+        .sidebar-header .ver { font-size: 11px; color: #666; margin-left: auto; }
+
+        .panel-section { padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        .section-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+
+        .tool-btns { display: flex; gap: 4px; }
+        .tool-btn {
+            flex: 1; padding: 6px 0; font-size: 12px; border-radius: 5px;
+            cursor: pointer; text-align: center; border: 1px solid #333;
+            background: #222; color: #aaa; transition: all 0.15s;
+        }
+        .tool-btn.active-draw { background: #2a5a3a; color: #5ee89a; border-color: #3a7a4a; }
+        .tool-btn.active-select { background: #2a3a5a; color: #5eaae8; border-color: #3a5a7a; }
+
+        .label-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+        .label-tag {
+            padding: 3px 10px; font-size: 12px; border-radius: 4px;
+            cursor: pointer; border: 1px solid #333; background: #222; color: #999;
+            transition: all 0.15s; display: flex; align-items: center; gap: 4px;
+        }
+        .label-tag .remove { font-size: 10px; opacity: 0.5; cursor: pointer; }
+        .label-tag .remove:hover { opacity: 1; }
+        .add-label-row { display: flex; gap: 4px; margin-top: 8px; }
+        .add-label-row input {
+            flex: 1; padding: 4px 8px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #ddd; outline: none;
+        }
+        .add-label-row button {
+            padding: 4px 10px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #aaa; cursor: pointer;
+        }
+
+        .grid-section { padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        .grid-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .grid-field { display: flex; flex-direction: column; gap: 4px; }
+        .grid-field span { font-size: 11px; color: #777; }
+        .grid-field input {
+            width: 100%; padding: 5px 7px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #ddd; outline: none;
+        }
+        .grid-check {
+            display: flex; align-items: center; gap: 6px; margin-top: 10px;
+            font-size: 12px; color: #bbb;
+        }
+        .grid-check input { accent-color: #1D9E75; }
+        .grid-action-row { display: flex; gap: 6px; margin-top: 10px; }
+        .grid-btn {
+            flex: 1; padding: 7px 8px; font-size: 12px; border-radius: 5px;
+            border: 1px solid #35506f; background: #243246; color: #dbe9ff;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .grid-btn:hover { background: #2d3d56; }
+        .grid-btn:disabled { opacity: 0.45; cursor: default; }
+        .grid-note { margin-top: 8px; font-size: 11px; line-height: 1.4; color: #666; }
+        .grid-status { margin-top: 8px; font-size: 11px; line-height: 1.4; color: #8aa0b9; }
+
+        .adjust-section { padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        .adjust-info { font-size: 11px; line-height: 1.4; color: #8aa0b9; margin-bottom: 8px; }
+        .adjust-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .adjust-btn-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+
+        .box-list { flex: 1; overflow-y: auto; padding: 12px; }
+        .box-item {
+            padding: 6px 8px; margin-bottom: 4px; font-size: 12px;
+            border: 1px solid transparent; border-radius: 5px; cursor: pointer;
+            display: flex; align-items: center; gap: 6px; transition: all 0.1s;
+        }
+        .box-item:hover { background: #222; }
+        .box-item.selected { background: #252525; }
+        .box-item .color-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+        .box-item select {
+            flex: 1; font-size: 11px; background: transparent; border: none;
+            color: #ccc; cursor: pointer; outline: none;
+        }
+        .box-item select option { background: #222; }
+        .box-item .size { font-size: 10px; color: #666; }
+        .box-item .del-btn {
+            background: none; border: none; color: #666; cursor: pointer;
+            font-size: 14px; padding: 0; line-height: 1;
+        }
+        .box-item .del-btn:hover { color: #e55; }
+        .empty-hint { font-size: 12px; color: #555; text-align: center; padding: 20px; }
+
+        .export-section { padding: 12px; border-top: 1px solid #2a2a2a; display: flex; flex-direction: column; gap: 4px; }
+        .export-btn {
+            padding: 7px; font-size: 12px; color: #fff; border: none;
+            border-radius: 5px; cursor: pointer; transition: opacity 0.15s;
+        }
+        .export-btn:disabled { opacity: 0.4; cursor: default; }
+        .export-btn.yolo { background: #1D9E75; }
+        .export-btn.voc { background: #378ADD; }
+        .export-btn.save { background: #BA7517; }
+
+        /* 主区域 */
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .toolbar {
+            height: 44px; background: #1a1a1a; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; padding: 0 16px; gap: 8px;
+        }
+        .toolbar-btn {
+            padding: 5px 14px; font-size: 12px; background: #222;
+            border: 1px solid #444; border-radius: 5px; color: #ddd; cursor: pointer;
+        }
+        .toolbar-btn:hover { background: #333; }
+        .toolbar-btn:disabled { color: #555; cursor: default; }
+        .toolbar-btn:disabled:hover { background: #222; }
+        .nav-info { font-size: 12px; color: #888; }
+        .file-info { font-size: 12px; color: #666; }
+        .img-info { font-size: 11px; color: #555; }
+        .spacer { margin-left: auto; }
+
+        .canvas-wrap {
+            flex: 1; position: relative; overflow: hidden; background: #111;
+        }
+        .canvas-wrap.crosshair { cursor: crosshair; }
+        .canvas-wrap canvas { position: absolute; top: 0; left: 0; }
+
+        .drop-zone {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; cursor: pointer;
+        }
+        .drop-icon {
+            width: 80px; height: 80px; border-radius: 16px; background: #1a1a1a;
+            border: 2px dashed #333; display: flex; align-items: center;
+            justify-content: center; font-size: 32px; margin-bottom: 16px;
+        }
+        .drop-text { font-size: 16px; color: #666; margin-bottom: 4px; }
+        .drop-sub { font-size: 12px; color: #444; }
+
+        .statusbar {
+            height: 28px; background: #1a1a1a; border-top: 1px solid #2a2a2a;
+            display: flex; align-items: center; padding: 0 16px;
+        }
+        .statusbar span { font-size: 11px; color: #666; }
+
+        .output-dir-section { padding: 12px; border-bottom: 1px solid #2a2a2a; }
+        .output-dir-btn {
+            width: 100%; padding: 6px; font-size: 12px; background: #222;
+            border: 1px solid #333; border-radius: 4px; color: #aaa; cursor: pointer;
+            text-align: left; transition: all 0.15s;
+        }
+        .output-dir-btn:hover { background: #2a2a2a; border-color: #444; }
+        .output-dir-path {
+            margin-top: 6px; font-size: 11px; color: #1D9E75;
+            word-break: break-all; line-height: 1.4;
+        }
+
+        .save-hint {
+            font-size: 11px; color: #1D9E75; text-align: center;
+            padding: 4px; opacity: 0; transition: opacity 0.3s;
+        }
+        .save-hint.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="dot"></div>
+        <span class="title">LabelImg</span>
+        <span class="ver">desktop</span>
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">工具</div>
+        <div class="tool-btns">
+            <div class="tool-btn active-draw" id="btnDraw" onclick="setTool('draw')">✎ 绘制 (D)</div>
+            <div class="tool-btn" id="btnSelect" onclick="setTool('select')">◻ 选择 (S)</div>
+        </div>
+    </div>
+
+    <div class="panel-section">
+        <div class="section-title">当前标签</div>
+        <div class="label-tags" id="labelTags"></div>
+        <div class="add-label-row">
+            <input id="newLabelInput" placeholder="添加标签..." onkeydown="if(event.key==='Enter')addLabel()">
+            <button onclick="addLabel()">+</button>
+        </div>
+    </div>
+
+    <div class="grid-section">
+        <div class="section-title">Grid Layout</div>
+        <div class="grid-grid">
+            <label class="grid-field">
+                <span>Rows</span>
+                <input id="gridRows" type="number" min="1" max="20" value="5">
+            </label>
+            <label class="grid-field">
+                <span>Cols</span>
+                <input id="gridCols" type="number" min="1" max="20" value="5">
+            </label>
+            <label class="grid-field">
+                <span>Gap X</span>
+                <input id="gridGapX" type="number" value="0" step="1">
+            </label>
+            <label class="grid-field">
+                <span>Gap Y</span>
+                <input id="gridGapY" type="number" value="0" step="1">
+            </label>
+            <label class="grid-field">
+                <span>Tilt °</span>
+                <input id="gridTilt" type="number" value="0" step="0.1">
+            </label>
+        </div>
+        <label class="grid-check">
+            <input id="gridAuto" type="checkbox" checked>
+            <span>Auto after first box</span>
+        </label>
+        <label class="grid-check">
+            <input id="gridAutoTilt" type="checkbox" checked>
+            <span>Auto tilt estimate</span>
+        </label>
+        <label class="grid-check">
+            <input id="gridAutoRefine" type="checkbox" checked>
+            <span>Auto refine each box</span>
+        </label>
+        <div class="grid-action-row">
+            <button class="grid-btn" id="btnGridGenerate" onclick="generateGridFromSelection()">Generate Grid (G)</button>
+            <button class="grid-btn" id="btnTiltEstimate" onclick="estimateTiltAndSyncInput(true)">Estimate Tilt</button>
+        </div>
+        <div class="grid-action-row">
+            <button class="grid-btn" id="btnStart3Point" onclick="startThreePointGridSetup()">3-Point Grid</button>
+            <button class="grid-btn" id="btnCancel3Point" onclick="cancelThreePointGridSetup()">Cancel</button>
+        </div>
+        <div class="grid-status" id="gridStatus">Fast mode: draw the top-left box, or switch to 3-point mode for harder images.</div>
+        <div class="grid-note">Draw or select the top-left box, then fill the full layout. Small overall slant can be compensated automatically.</div>
+    </div>
+
+    <div class="adjust-section">
+        <div class="section-title">Compensation</div>
+        <div class="adjust-info" id="adjustInfo">Select a box to compensate the current box, row, or column.</div>
+        <div class="adjust-grid">
+            <label class="grid-field">
+                <span>ΔX</span>
+                <input id="adjustDx" type="number" value="0" step="1">
+            </label>
+            <label class="grid-field">
+                <span>ΔY</span>
+                <input id="adjustDy" type="number" value="0" step="1">
+            </label>
+            <label class="grid-field">
+                <span>ΔW</span>
+                <input id="adjustDw" type="number" value="0" step="1">
+            </label>
+            <label class="grid-field">
+                <span>ΔH</span>
+                <input id="adjustDh" type="number" value="0" step="1">
+            </label>
+        </div>
+        <div class="adjust-btn-grid">
+            <button class="grid-btn" id="btnApplyBox" onclick="applyCompensation('box')">Apply Box</button>
+            <button class="grid-btn" id="btnApplyRow" onclick="applyCompensation('row')">Apply Row</button>
+            <button class="grid-btn" id="btnApplyCol" onclick="applyCompensation('col')">Apply Col</button>
+        </div>
+        <div class="grid-note">Use positive or negative values. Row and column compensation are available for grid-generated boxes.</div>
+    </div>
+
+    <div class="output-dir-section">
+        <div class="section-title">输出目录</div>
+        <button class="output-dir-btn" onclick="selectOutputDir()">📁 选择输出目录...</button>
+        <div class="output-dir-path" id="outputDirPath">默认：与图片同目录</div>
+    </div>
+
+    <div class="box-list" id="boxList">
+        <div class="section-title">标注列表 (<span id="boxCount">0</span>)</div>
+        <div id="boxItems"></div>
+    </div>
+
+    <div class="export-section">
+        <button class="export-btn save" id="btnSave" onclick="saveCurrentAnnotation()" disabled>💾 保存当前标注 (Ctrl+S)</button>
+        <button class="export-btn yolo" id="exportYolo" onclick="exportAllYOLO()" disabled>导出全部 YOLO 格式</button>
+        <button class="export-btn voc" id="exportVoc" onclick="exportAllVOC()" disabled>导出全部 Pascal VOC</button>
+        <div class="save-hint" id="saveHint">已保存</div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="toolbar">
+        <button class="toolbar-btn" onclick="openFolder()">📁 打开文件夹</button>
+        <button class="toolbar-btn" id="btnPrev" onclick="goImage(-1)" disabled>◀ 上一张</button>
+        <span class="nav-info" id="navInfo"></span>
+        <button class="toolbar-btn" id="btnNext" onclick="goImage(1)" disabled>下一张 ▶</button>
+        <span class="spacer"></span>
+        <span class="file-info" id="fileInfo"></span>
+        <span class="img-info" id="imgInfo"></span>
+    </div>
+
+    <div class="canvas-wrap crosshair" id="canvasWrap">
+        <div class="drop-zone" id="dropZone" onclick="openFolder()">
+            <div class="drop-icon">📂</div>
+            <div class="drop-text">点击选择图片文件夹</div>
+            <div class="drop-sub">支持 JPG, PNG, BMP, WEBP 格式</div>
+        </div>
+        <canvas id="canvas" style="display:none;"></canvas>
+    </div>
+
+    <div class="statusbar">
+        <span>Shortcuts: D=Draw S=Select G=Grid Delete=Remove Left/Right=Image Ctrl+S=Save Wheel=Zoom</span>
+    </div>
+</div>
+
+<script>
+const COLORS = ['#E24B4A','#378ADD','#1D9E75','#D85A30','#639922','#D4537E','#534AB7','#BA7517'];
+function getColor(i) { return COLORS[i % COLORS.length]; }
+
+let labels = ['person','car','dog','cat','bird'];
+let currentLabel = labels[0];
+let tool = 'draw';
+let boxes = [];
+let selectedBox = -1;
+let imageFiles = [];      // 文件名数组
+let currentIdx = 0;
+let allAnnotations = {};
+let fileName = '';
+let imgEl = null;
+let imgW = 0, imgH = 0;
+let scale = 1, offX = 0, offY = 0;
+
+let drawing = false, startPt = null, curPt = null;
+let resizing = null, moving = null;
+
+let allImageSizes = {};
+let allTiltEstimates = {};
+let imageAnalysisCache = null;
+let gridReferenceSetup = {
+    enabled: false,
+    active: false,
+    step: 0,
+    refs: [],
+    backupBoxes: [],
+    backupSelected: -1
+};
+let pyReady = false;
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('canvasWrap');
+const dropZone = document.getElementById('dropZone');
+
+// ===== 等待 pywebview API 就绪 =====
+window.addEventListener('pywebviewready', () => {
+    pyReady = true;
+});
+
+// ===== 打开文件夹 =====
+async function openFolder() {
+    if (!pyReady) return;
+    const result = await window.pywebview.api.select_image_folder();
+    if (!result) return;
+    imageFiles = result.files;
+    if (imageFiles.length === 0) {
+        alert('该文件夹中没有找到图片文件');
+        return;
+    }
+    allAnnotations = {};
+    allImageSizes = {};
+    allTiltEstimates = {};
+    imageAnalysisCache = null;
+    gridReferenceSetup = {
+        enabled: gridReferenceSetup.enabled,
+        active: false,
+        step: 0,
+        refs: [],
+        backupBoxes: [],
+        backupSelected: -1
+    };
+    loadImage(0);
+}
+
+// ===== 选择输出目录 =====
+async function selectOutputDir() {
+    if (!pyReady) return;
+    const dir = await window.pywebview.api.select_output_folder();
+    if (dir) {
+        document.getElementById('outputDirPath').textContent = dir;
+    }
+}
+
+// ===== 工具切换 =====
+function setTool(t) {
+    tool = t;
+    document.getElementById('btnDraw').className = 'tool-btn' + (t === 'draw' ? ' active-draw' : '');
+    document.getElementById('btnSelect').className = 'tool-btn' + (t === 'select' ? ' active-select' : '');
+    wrap.className = 'canvas-wrap' + (t === 'draw' ? ' crosshair' : '');
+}
+
+// ===== 标签管理 =====
+function renderLabels() {
+    const el = document.getElementById('labelTags');
+    el.innerHTML = '';
+    labels.forEach((l, i) => {
+        const tag = document.createElement('div');
+        tag.className = 'label-tag';
+        const c = getColor(i);
+        if (l === currentLabel) {
+            tag.style.background = c + '30';
+            tag.style.color = c;
+            tag.style.borderColor = c;
+        }
+        tag.onclick = () => { currentLabel = l; renderLabels(); };
+        tag.textContent = l;
+        if (labels.length > 1) {
+            const rm = document.createElement('span');
+            rm.className = 'remove';
+            rm.textContent = '×';
+            rm.onclick = (e) => { e.stopPropagation(); removeLabel(l); };
+            tag.appendChild(rm);
+        }
+        el.appendChild(tag);
+    });
+}
+
+function addLabel() {
+    const input = document.getElementById('newLabelInput');
+    const l = input.value.trim();
+    if (l && !labels.includes(l)) {
+        labels.push(l);
+        currentLabel = l;
+        renderLabels();
+    }
+    input.value = '';
+}
+
+function removeLabel(l) {
+    if (labels.length <= 1) return;
+    labels = labels.filter(x => x !== l);
+    if (currentLabel === l) currentLabel = labels[0];
+    renderLabels();
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function readGridSettings() {
+    const rowsInput = document.getElementById('gridRows');
+    const colsInput = document.getElementById('gridCols');
+    const gapXInput = document.getElementById('gridGapX');
+    const gapYInput = document.getElementById('gridGapY');
+    const tiltInput = document.getElementById('gridTilt');
+
+    const rows = clamp(parseInt(rowsInput.value, 10) || 5, 1, 20);
+    const cols = clamp(parseInt(colsInput.value, 10) || 5, 1, 20);
+    const gapX = Number(gapXInput.value);
+    const gapY = Number(gapYInput.value);
+    const tilt = Number(tiltInput.value);
+
+    rowsInput.value = rows;
+    colsInput.value = cols;
+    gapXInput.value = Number.isFinite(gapX) ? gapX : 0;
+    gapYInput.value = Number.isFinite(gapY) ? gapY : 0;
+    tiltInput.value = Number.isFinite(tilt) ? tilt : 0;
+
+    return {
+        rows,
+        cols,
+        gapX: Number.isFinite(gapX) ? gapX : 0,
+        gapY: Number.isFinite(gapY) ? gapY : 0,
+        tilt: Number.isFinite(tilt) ? tilt : 0,
+        auto: document.getElementById('gridAuto').checked,
+        autoTilt: document.getElementById('gridAutoTilt').checked,
+        autoRefine: document.getElementById('gridAutoRefine').checked
+    };
+}
+
+function cloneBoxes(list) {
+    return list.map(box => ({ ...box }));
+}
+
+function resetGridReferenceSetup(keepEnabled = false) {
+    gridReferenceSetup = {
+        enabled: keepEnabled ? gridReferenceSetup.enabled : false,
+        active: false,
+        step: 0,
+        refs: [],
+        backupBoxes: [],
+        backupSelected: -1
+    };
+}
+
+function getGridReferencePrompt(step = gridReferenceSetup.step) {
+    return ['Draw top-left reference box', 'Draw top-right reference box', 'Draw bottom-left reference box'][step] || '3-point setup complete';
+}
+
+function updateGridWizardState() {
+    const status = document.getElementById('gridStatus');
+    const startBtn = document.getElementById('btnStart3Point');
+    const cancelBtn = document.getElementById('btnCancel3Point');
+    const active = gridReferenceSetup.active;
+    const enabled = gridReferenceSetup.enabled;
+
+    if (status) {
+        if (active) {
+            status.textContent = '3-point mode: ' + getGridReferencePrompt() + '.';
+        } else if (enabled) {
+            status.textContent = '3-point mode stays on across images. Click 3-Point Grid to re-run here, or Cancel to turn it off.';
+        } else {
+            status.textContent = 'Fast mode: draw the top-left box, or switch to 3-point mode for harder images.';
+        }
+    }
+
+    if (startBtn) startBtn.disabled = !imgEl || active;
+    if (cancelBtn) cancelBtn.disabled = !enabled && !active;
+}
+
+function armThreePointGridSetup() {
+    if (!imgEl) {
+        showSaveHint('Load an image first');
+        return;
+    }
+
+    gridReferenceSetup = {
+        enabled: gridReferenceSetup.enabled,
+        active: true,
+        step: 0,
+        refs: [],
+        backupBoxes: cloneBoxes(boxes),
+        backupSelected: selectedBox
+    };
+    boxes = [];
+    selectedBox = -1;
+    setTool('draw');
+    renderBoxList();
+    render();
+    updateGridWizardState();
+    showSaveHint(getGridReferencePrompt());
+}
+
+function startThreePointGridSetup() {
+    if (!imgEl) {
+        showSaveHint('Load an image first');
+        return;
+    }
+    gridReferenceSetup.enabled = true;
+    armThreePointGridSetup();
+}
+
+function cancelThreePointGridSetup(restoreBackup = true) {
+    if (!gridReferenceSetup.active && !gridReferenceSetup.enabled) return;
+
+    if (gridReferenceSetup.active && restoreBackup) {
+        boxes = cloneBoxes(gridReferenceSetup.backupBoxes || []);
+        selectedBox = gridReferenceSetup.backupSelected >= 0 ? gridReferenceSetup.backupSelected : -1;
+    }
+
+    resetGridReferenceSetup(false);
+    renderBoxList();
+    render();
+    updateGridWizardState();
+    showSaveHint('3-point mode off');
+}
+
+function normalizeLineAngle(angle) {
+    while (angle > Math.PI / 2) angle -= Math.PI;
+    while (angle <= -Math.PI / 2) angle += Math.PI;
+    return angle;
+}
+
+function estimateGridTiltAngle(force = false) {
+    if (!imgEl || !fileName) return 0;
+    if (!force && Number.isFinite(allTiltEstimates[fileName])) {
+        return allTiltEstimates[fileName];
+    }
+
+    const maxSide = 640;
+    const ratio = Math.min(1, maxSide / Math.max(imgW, imgH));
+    const sw = Math.max(96, Math.round(imgW * ratio));
+    const sh = Math.max(96, Math.round(imgH * ratio));
+    const sampleCanvas = document.createElement('canvas');
+    sampleCanvas.width = sw;
+    sampleCanvas.height = sh;
+
+    const sampleCtx = sampleCanvas.getContext('2d');
+    sampleCtx.drawImage(imgEl, 0, 0, sw, sh);
+    const pixels = sampleCtx.getImageData(0, 0, sw, sh).data;
+    const gray = new Float32Array(sw * sh);
+
+    for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+        gray[i] = pixels[p] * 0.299 + pixels[p + 1] * 0.587 + pixels[p + 2] * 0.114;
+    }
+
+    let sumSin = 0;
+    let sumCos = 0;
+    let weightTotal = 0;
+    const xStart = Math.floor(sw * 0.12);
+    const xEnd = Math.ceil(sw * 0.88);
+    const yStart = Math.floor(sh * 0.12);
+    const yEnd = Math.ceil(sh * 0.88);
+
+    for (let y = yStart + 1; y < yEnd - 1; y += 2) {
+        for (let x = xStart + 1; x < xEnd - 1; x += 2) {
+            const idx = y * sw + x;
+            const gx =
+                -gray[idx - sw - 1] - 2 * gray[idx - 1] - gray[idx + sw - 1] +
+                gray[idx - sw + 1] + 2 * gray[idx + 1] + gray[idx + sw + 1];
+            const gy =
+                gray[idx - sw - 1] + 2 * gray[idx - sw] + gray[idx - sw + 1] -
+                gray[idx + sw - 1] - 2 * gray[idx + sw] - gray[idx + sw + 1];
+            const magnitude = Math.hypot(gx, gy);
+            if (magnitude < 55) continue;
+
+            const edgeAngle = normalizeLineAngle(Math.atan2(gy, gx) + Math.PI / 2);
+            if (Math.abs(edgeAngle) > Math.PI / 6) continue;
+
+            sumSin += Math.sin(edgeAngle * 2) * magnitude;
+            sumCos += Math.cos(edgeAngle * 2) * magnitude;
+            weightTotal += magnitude;
+        }
+    }
+
+    const estimatedDeg = weightTotal > 0
+        ? clamp((normalizeLineAngle(0.5 * Math.atan2(sumSin, sumCos)) * 180) / Math.PI, -8, 8)
+        : 0;
+
+    allTiltEstimates[fileName] = estimatedDeg;
+    return estimatedDeg;
+}
+
+function estimateTiltAndSyncInput(force = false) {
+    if (!imgEl) {
+        if (force) showSaveHint('Load an image first');
+        return 0;
+    }
+    const tilt = estimateGridTiltAngle(force);
+    const tiltInput = document.getElementById('gridTilt');
+    tiltInput.value = tilt.toFixed(2);
+    if (force) {
+        showSaveHint('Tilt estimate: ' + tilt.toFixed(2) + '°');
+    }
+    return tilt;
+}
+
+function getGridSettingsForGeneration() {
+    const settings = readGridSettings();
+    if (settings.autoTilt && imgEl) {
+        settings.tilt = estimateTiltAndSyncInput(false);
+    }
+    return settings;
+}
+
+function readAdjustmentValues() {
+    const dxInput = document.getElementById('adjustDx');
+    const dyInput = document.getElementById('adjustDy');
+    const dwInput = document.getElementById('adjustDw');
+    const dhInput = document.getElementById('adjustDh');
+
+    const dx = Number(dxInput.value);
+    const dy = Number(dyInput.value);
+    const dw = Number(dwInput.value);
+    const dh = Number(dhInput.value);
+
+    dxInput.value = Number.isFinite(dx) ? dx : 0;
+    dyInput.value = Number.isFinite(dy) ? dy : 0;
+    dwInput.value = Number.isFinite(dw) ? dw : 0;
+    dhInput.value = Number.isFinite(dh) ? dh : 0;
+
+    return {
+        dx: Number.isFinite(dx) ? dx : 0,
+        dy: Number.isFinite(dy) ? dy : 0,
+        dw: Number.isFinite(dw) ? dw : 0,
+        dh: Number.isFinite(dh) ? dh : 0
+    };
+}
+
+function clampAdjustedBox(box) {
+    const next = { ...box };
+    next.w = Math.max(3, next.w);
+    next.h = Math.max(3, next.h);
+    next.x = clamp(next.x, 0, Math.max(0, imgW - next.w));
+    next.y = clamp(next.y, 0, Math.max(0, imgH - next.h));
+    next.w = Math.min(next.w, imgW - next.x);
+    next.h = Math.min(next.h, imgH - next.y);
+    return next;
+}
+
+function updateAdjustPanelState() {
+    const info = document.getElementById('adjustInfo');
+    const boxBtn = document.getElementById('btnApplyBox');
+    const rowBtn = document.getElementById('btnApplyRow');
+    const colBtn = document.getElementById('btnApplyCol');
+    const selected = selectedBox >= 0 ? boxes[selectedBox] : null;
+    const hasSelection = !!selected;
+    const hasGridMeta = hasSelection && Number.isInteger(selected.gridRow) && Number.isInteger(selected.gridCol);
+
+    if (info) {
+        if (!hasSelection) {
+            info.textContent = 'Select a box to compensate the current box, row, or column.';
+        } else if (hasGridMeta) {
+            info.textContent = 'Selected grid box: row ' + (selected.gridRow + 1) + ', col ' + (selected.gridCol + 1) + '.';
+        } else {
+            info.textContent = 'Selected manual box: box compensation is available, row/col need a grid-generated box.';
+        }
+    }
+
+    if (boxBtn) boxBtn.disabled = !hasSelection;
+    if (rowBtn) rowBtn.disabled = !hasGridMeta;
+    if (colBtn) colBtn.disabled = !hasGridMeta;
+}
+
+function applyCompensation(scope) {
+    if (selectedBox < 0 || !boxes[selectedBox]) {
+        showSaveHint('Select a box first');
+        return;
+    }
+
+    const base = boxes[selectedBox];
+    const { dx, dy, dw, dh } = readAdjustmentValues();
+    let targets = [];
+
+    if (scope === 'box') {
+        targets = [selectedBox];
+    } else if (scope === 'row') {
+        if (!Number.isInteger(base.gridRow)) {
+            showSaveHint('Row compensation needs a grid-generated box');
+            return;
+        }
+        targets = boxes
+            .map((box, index) => Number.isInteger(box.gridRow) && box.gridRow === base.gridRow ? index : -1)
+            .filter(index => index >= 0);
+    } else if (scope === 'col') {
+        if (!Number.isInteger(base.gridCol)) {
+            showSaveHint('Column compensation needs a grid-generated box');
+            return;
+        }
+        targets = boxes
+            .map((box, index) => Number.isInteger(box.gridCol) && box.gridCol === base.gridCol ? index : -1)
+            .filter(index => index >= 0);
+    }
+
+    if (!targets.length) {
+        showSaveHint('No boxes found for this compensation');
+        return;
+    }
+
+    for (const index of targets) {
+        boxes[index] = clampAdjustedBox({
+            ...boxes[index],
+            x: boxes[index].x + dx,
+            y: boxes[index].y + dy,
+            w: boxes[index].w + dw,
+            h: boxes[index].h + dh
+        });
+    }
+
+    renderBoxList();
+    render();
+    showSaveHint('Applied to ' + scope + ': ' + targets.length + ' box(es)');
+}
+
+function normalizeBoxToImage(box) {
+    const x1 = clamp(box.x, 0, imgW);
+    const y1 = clamp(box.y, 0, imgH);
+    const x2 = clamp(box.x + box.w, 0, imgW);
+    const y2 = clamp(box.y + box.h, 0, imgH);
+    const w = x2 - x1;
+    const h = y2 - y1;
+    if (w < 3 || h < 3) return null;
+    return { ...box, x: x1, y: y1, w, h };
+}
+
+function ensureImageAnalysisCache() {
+    if (!imgEl || !fileName) return null;
+    if (imageAnalysisCache && imageAnalysisCache.fileName === fileName) {
+        return imageAnalysisCache;
+    }
+
+    const analysisCanvas = document.createElement('canvas');
+    analysisCanvas.width = imgW;
+    analysisCanvas.height = imgH;
+    const analysisCtx = analysisCanvas.getContext('2d');
+    analysisCtx.drawImage(imgEl, 0, 0, imgW, imgH);
+
+    const pixels = analysisCtx.getImageData(0, 0, imgW, imgH).data;
+    const gray = new Uint8Array(imgW * imgH);
+
+    for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+        gray[i] = Math.round(pixels[p] * 0.299 + pixels[p + 1] * 0.587 + pixels[p + 2] * 0.114);
+    }
+
+    imageAnalysisCache = { fileName, gray, w: imgW, h: imgH };
+    return imageAnalysisCache;
+}
+
+function grayAt(cache, x, y) {
+    const ix = clamp(Math.round(x), 0, cache.w - 1);
+    const iy = clamp(Math.round(y), 0, cache.h - 1);
+    return cache.gray[iy * cache.w + ix];
+}
+
+function scoreBoxCandidate(cache, box, anchorBox = box) {
+    const left = Math.round(box.x);
+    const top = Math.round(box.y);
+    const right = Math.round(box.x + box.w);
+    const bottom = Math.round(box.y + box.h);
+
+    if (right - left < 8 || bottom - top < 8) return -Infinity;
+
+    const stepX = Math.max(3, Math.round((right - left) / 8));
+    const stepY = Math.max(3, Math.round((bottom - top) / 8));
+    const band = 2;
+    let score = 0;
+    let samples = 0;
+
+    for (let x = left + stepX; x <= right - stepX; x += stepX) {
+        score += Math.abs(grayAt(cache, x, top - band) - grayAt(cache, x, top + band));
+        score += Math.abs(grayAt(cache, x, bottom - band) - grayAt(cache, x, bottom + band));
+        samples += 2;
+    }
+
+    for (let y = top + stepY; y <= bottom - stepY; y += stepY) {
+        score += Math.abs(grayAt(cache, left - band, y) - grayAt(cache, left + band, y));
+        score += Math.abs(grayAt(cache, right - band, y) - grayAt(cache, right + band, y));
+        samples += 2;
+    }
+
+    const centerInside = grayAt(cache, (left + right) / 2, (top + bottom) / 2);
+    const outside = (
+        grayAt(cache, left - 5, (top + bottom) / 2) +
+        grayAt(cache, right + 5, (top + bottom) / 2) +
+        grayAt(cache, (left + right) / 2, top - 5) +
+        grayAt(cache, (left + right) / 2, bottom + 5)
+    ) / 4;
+
+    const movementPenalty =
+        Math.abs(box.x - anchorBox.x) * 0.35 +
+        Math.abs(box.y - anchorBox.y) * 0.35 +
+        Math.abs(box.w - anchorBox.w) * 0.2 +
+        Math.abs(box.h - anchorBox.h) * 0.2;
+
+    return (samples ? score / samples : 0) + Math.abs(centerInside - outside) * 0.15 - movementPenalty;
+}
+
+function refineGridBox(box, cache) {
+    let best = clampAdjustedBox(box);
+    let bestScore = scoreBoxCandidate(cache, best, box);
+
+    const shiftRangeX = Math.max(4, Math.round(best.w * 0.1));
+    const shiftRangeY = Math.max(4, Math.round(best.h * 0.1));
+    const shiftStep = Math.max(1, Math.round(Math.min(best.w, best.h) / 40));
+
+    for (let dx = -shiftRangeX; dx <= shiftRangeX; dx += shiftStep) {
+        for (let dy = -shiftRangeY; dy <= shiftRangeY; dy += shiftStep) {
+            const candidate = clampAdjustedBox({
+                ...best,
+                x: box.x + dx,
+                y: box.y + dy
+            });
+            const score = scoreBoxCandidate(cache, candidate, box);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+    }
+
+    const sizeRangeW = Math.max(3, Math.round(best.w * 0.08));
+    const sizeRangeH = Math.max(3, Math.round(best.h * 0.08));
+    const sizeStep = Math.max(1, Math.round(Math.min(best.w, best.h) / 50));
+
+    for (let dw = -sizeRangeW; dw <= sizeRangeW; dw += sizeStep) {
+        for (let dh = -sizeRangeH; dh <= sizeRangeH; dh += sizeStep) {
+            const candidate = clampAdjustedBox({
+                ...best,
+                w: best.w + dw,
+                h: best.h + dh
+            });
+            const score = scoreBoxCandidate(cache, candidate, box);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+    }
+
+    return { ...box, ...best };
+}
+
+function refineGeneratedBoxes(generatedBoxes, settings) {
+    if (!settings.autoRefine) return generatedBoxes;
+    const cache = ensureImageAnalysisCache();
+    if (!cache) return generatedBoxes;
+    return generatedBoxes.map(box => refineGridBox(box, cache));
+}
+
+function buildGridBoxes(templateBox, settings = getGridSettingsForGeneration()) {
+    const label = labels.includes(templateBox.label) ? templateBox.label : currentLabel;
+    const color = getColor(labels.indexOf(label));
+    const generated = [];
+    const tiltRad = (settings.tilt * Math.PI) / 180;
+    const colStepX = (templateBox.w + settings.gapX) * Math.cos(tiltRad);
+    const colStepY = (templateBox.w + settings.gapX) * Math.sin(tiltRad);
+    const rowStepX = -(templateBox.h + settings.gapY) * Math.sin(tiltRad);
+    const rowStepY = (templateBox.h + settings.gapY) * Math.cos(tiltRad);
+
+    for (let row = 0; row < settings.rows; row++) {
+        for (let col = 0; col < settings.cols; col++) {
+            const box = normalizeBoxToImage({
+                x: templateBox.x + col * colStepX + row * rowStepX,
+                y: templateBox.y + col * colStepY + row * rowStepY,
+                w: templateBox.w,
+                h: templateBox.h,
+                label,
+                color,
+                gridRow: row,
+                gridCol: col
+            });
+            if (box) generated.push(box);
+        }
+    }
+
+    return generated;
+}
+
+function buildGridBoxesFromReferences(referenceBoxes, settings = getGridSettingsForGeneration()) {
+    const [tl, tr, bl] = referenceBoxes;
+    const label = labels.includes(tl.label) ? tl.label : currentLabel;
+    const color = getColor(labels.indexOf(label));
+    const generated = [];
+    const colDen = Math.max(1, settings.cols - 1);
+    const rowDen = Math.max(1, settings.rows - 1);
+
+    for (let row = 0; row < settings.rows; row++) {
+        const rowMix = settings.rows === 1 ? 0 : row / rowDen;
+        for (let col = 0; col < settings.cols; col++) {
+            const colMix = settings.cols === 1 ? 0 : col / colDen;
+            const box = normalizeBoxToImage({
+                x: tl.x + (tr.x - tl.x) * colMix + (bl.x - tl.x) * rowMix,
+                y: tl.y + (tr.y - tl.y) * colMix + (bl.y - tl.y) * rowMix,
+                w: tl.w + (tr.w - tl.w) * colMix + (bl.w - tl.w) * rowMix,
+                h: tl.h + (tr.h - tl.h) * colMix + (bl.h - tl.h) * rowMix,
+                label,
+                color,
+                gridRow: row,
+                gridCol: col
+            });
+            if (box) generated.push(box);
+        }
+    }
+
+    return generated;
+}
+
+function updateGridButtonState() {
+    const btn = document.getElementById('btnGridGenerate');
+    const tiltBtn = document.getElementById('btnTiltEstimate');
+    const startBtn = document.getElementById('btnStart3Point');
+    if (btn) {
+        btn.disabled = !imgEl || gridReferenceSetup.active || boxes.length === 0 || (boxes.length > 1 && selectedBox < 0);
+    }
+    if (tiltBtn) {
+        tiltBtn.disabled = !imgEl || gridReferenceSetup.active;
+    }
+    if (startBtn) {
+        startBtn.disabled = !imgEl || gridReferenceSetup.active;
+    }
+}
+
+function finalizeGeneratedGrid(generated, settings, sourceLabel) {
+    const refined = refineGeneratedBoxes(generated, settings);
+    boxes = refined;
+    selectedBox = refined.length ? 0 : -1;
+    renderBoxList();
+    render();
+
+    let hint = sourceLabel + ': ' + refined.length + ' boxes';
+    if (sourceLabel === 'Grid ready') {
+        hint += ' | tilt ' + settings.tilt.toFixed(2) + '°';
+    }
+    if (settings.autoRefine) {
+        hint += ' | refined';
+    }
+    showSaveHint(hint);
+}
+
+function generateGridFromTemplate(templateIndex, options = {}) {
+    const template = boxes[templateIndex];
+    if (!template || !imgEl) return;
+
+    if (boxes.length > 1 && !options.skipConfirm) {
+        const ok = window.confirm('Replace current boxes with a new grid based on the selected top-left box?');
+        if (!ok) return;
+    }
+
+    const settings = getGridSettingsForGeneration();
+    const generated = buildGridBoxes(template, settings);
+    if (generated.length === 0) {
+        showSaveHint('Grid did not fit inside the image');
+        return;
+    }
+
+    finalizeGeneratedGrid(generated, settings, 'Grid ready');
+}
+
+function generateGridFromSelection() {
+    if (!imgEl) return;
+    if (gridReferenceSetup.active) {
+        showSaveHint(getGridReferencePrompt());
+        return;
+    }
+
+    if (selectedBox >= 0 && boxes[selectedBox]) {
+        generateGridFromTemplate(selectedBox);
+        return;
+    }
+
+    if (boxes.length === 1) {
+        selectedBox = 0;
+        generateGridFromTemplate(0);
+        return;
+    }
+
+    showSaveHint('Draw or select the top-left box first');
+}
+
+function generateGridFromReferenceSetup(referenceBoxes) {
+    const settings = getGridSettingsForGeneration();
+    const generated = buildGridBoxesFromReferences(referenceBoxes, settings);
+    if (generated.length === 0) {
+        showSaveHint('3-point grid did not fit inside the image');
+        return;
+    }
+
+    resetGridReferenceSetup(true);
+    updateGridWizardState();
+    finalizeGeneratedGrid(generated, settings, '3-point grid');
+}
+
+function commitReferenceBox(box) {
+    const roles = ['TL', 'TR', 'BL'];
+    const step = gridReferenceSetup.step;
+    const refBox = {
+        ...box,
+        referenceRole: roles[step],
+        isReference: true
+    };
+
+    gridReferenceSetup.refs.push(refBox);
+    boxes = cloneBoxes(gridReferenceSetup.refs);
+    selectedBox = boxes.length - 1;
+    gridReferenceSetup.step += 1;
+
+    renderBoxList();
+    render();
+
+    if (gridReferenceSetup.step >= 3) {
+        generateGridFromReferenceSetup(gridReferenceSetup.refs);
+        return;
+    }
+
+    updateGridWizardState();
+    showSaveHint(getGridReferencePrompt());
+}
+
+// ===== 标注列表 =====
+function renderBoxList() {
+    document.getElementById('boxCount').textContent = boxes.length;
+    const el = document.getElementById('boxItems');
+    el.innerHTML = '';
+    if (boxes.length === 0) {
+        el.innerHTML = '<div class="empty-hint">暂无标注</div>';
+    }
+    boxes.forEach((b, i) => {
+        const item = document.createElement('div');
+        item.className = 'box-item' + (i === selectedBox ? ' selected' : '');
+        if (i === selectedBox) item.style.borderColor = b.color + '60';
+        item.onclick = () => { selectedBox = i; renderBoxList(); render(); };
+
+        const dot = document.createElement('div');
+        dot.className = 'color-dot';
+        dot.style.background = b.color;
+
+        const sel = document.createElement('select');
+        labels.forEach(l => {
+            const opt = document.createElement('option');
+            opt.value = l; opt.textContent = l;
+            if (l === b.label) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.onchange = (e) => { e.stopPropagation(); changeBoxLabel(i, sel.value); };
+        sel.onclick = (e) => e.stopPropagation();
+
+        const sz = document.createElement('span');
+        sz.className = 'size';
+        sz.textContent = Math.round(b.w) + '×' + Math.round(b.h);
+
+        const del = document.createElement('button');
+        del.className = 'del-btn';
+        del.textContent = '×';
+        del.onclick = (e) => { e.stopPropagation(); deleteBox(i); };
+
+        item.append(dot, sel, sz, del);
+        el.appendChild(item);
+    });
+
+    const hasImages = imageFiles.length > 0;
+    document.getElementById('btnSave').disabled = !hasImages;
+    document.getElementById('exportYolo').disabled = !hasImages;
+    document.getElementById('exportVoc').disabled = !hasImages;
+    updateGridButtonState();
+    updateGridWizardState();
+    updateAdjustPanelState();
+}
+
+function deleteBox(i) {
+    boxes.splice(i, 1);
+    selectedBox = -1;
+    renderBoxList();
+    render();
+}
+
+function changeBoxLabel(i, label) {
+    boxes[i].label = label;
+    boxes[i].color = getColor(labels.indexOf(label));
+    renderBoxList();
+    render();
+}
+
+// ===== 图片加载 =====
+function fitImage(w, h) {
+    const cW = wrap.clientWidth;
+    const cH = wrap.clientHeight;
+    scale = Math.min(cW / w, cH / h, 1);
+    offX = (cW - w * scale) / 2;
+    offY = (cH - h * scale) / 2;
+}
+
+async function loadImage(idx) {
+    if (!pyReady || idx < 0 || idx >= imageFiles.length) return;
+
+    // 保存当前图片的标注
+    if (fileName) {
+        allAnnotations[fileName] = [...boxes];
+    }
+
+    const name = imageFiles[idx];
+    const dataUrl = await window.pywebview.api.load_image(name);
+    if (!dataUrl) return;
+
+    const img = new Image();
+    img.onload = () => {
+        imgEl = img;
+        imgW = img.width;
+        imgH = img.height;
+        fileName = name;
+        currentIdx = idx;
+        selectedBox = -1;
+        imageAnalysisCache = null;
+        resetGridReferenceSetup(true);
+
+        canvas.width = wrap.clientWidth;
+        canvas.height = wrap.clientHeight;
+        fitImage(imgW, imgH);
+
+        boxes = allAnnotations[name] ? [...allAnnotations[name]] : [];
+        allImageSizes[name] = { w: imgW, h: imgH };
+
+        dropZone.style.display = 'none';
+        canvas.style.display = 'block';
+
+        updateToolbar();
+        renderBoxList();
+        if (gridReferenceSetup.enabled && boxes.length === 0) {
+            armThreePointGridSetup();
+        } else {
+            updateGridWizardState();
+            render();
+        }
+    };
+    img.src = dataUrl;
+}
+
+function goImage(dir) {
+    if (imageFiles.length === 0) return;
+    if (gridReferenceSetup.active) {
+        boxes = cloneBoxes(gridReferenceSetup.backupBoxes || []);
+        selectedBox = gridReferenceSetup.backupSelected >= 0 ? gridReferenceSetup.backupSelected : -1;
+        resetGridReferenceSetup(true);
+        renderBoxList();
+        updateGridWizardState();
+    }
+    // 自动保存当前标注
+    autoSaveCurrentYOLO();
+    const next = Math.max(0, Math.min(imageFiles.length - 1, currentIdx + dir));
+    if (next !== currentIdx) loadImage(next);
+}
+
+function updateToolbar() {
+    document.getElementById('btnPrev').disabled = currentIdx === 0 || imageFiles.length === 0;
+    document.getElementById('btnNext').disabled = currentIdx >= imageFiles.length - 1 || imageFiles.length === 0;
+    document.getElementById('navInfo').textContent = imageFiles.length > 0 ? (currentIdx + 1) + ' / ' + imageFiles.length : '';
+    document.getElementById('fileInfo').textContent = fileName;
+    document.getElementById('imgInfo').textContent = imgEl ? imgW + '×' + imgH + ' | ' + Math.round(scale * 100) + '%' : '';
+}
+
+// ===== 坐标转换 =====
+function toImg(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    return {
+        x: (clientX - r.left - offX) / scale,
+        y: (clientY - r.top - offY) / scale
+    };
+}
+
+function hitBox(pt) {
+    for (let i = boxes.length - 1; i >= 0; i--) {
+        const b = boxes[i];
+        if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) return i;
+    }
+    return -1;
+}
+
+function hitHandle(pt, box) {
+    const thr = 8 / scale;
+    const corners = [
+        { id: 'tl', x: box.x, y: box.y },
+        { id: 'tr', x: box.x + box.w, y: box.y },
+        { id: 'bl', x: box.x, y: box.y + box.h },
+        { id: 'br', x: box.x + box.w, y: box.y + box.h }
+    ];
+    for (const c of corners) {
+        if (Math.abs(pt.x - c.x) < thr && Math.abs(pt.y - c.y) < thr) return c.id;
+    }
+    return null;
+}
+
+// ===== 鼠标事件 =====
+canvas.addEventListener('mousedown', (e) => {
+    if (!imgEl || e.button !== 0) return;
+    const pt = toImg(e.clientX, e.clientY);
+
+    if (gridReferenceSetup.active) {
+        drawing = true;
+        startPt = pt;
+        curPt = pt;
+        selectedBox = -1;
+        renderBoxList();
+        return;
+    }
+
+    if (selectedBox >= 0 && boxes[selectedBox]) {
+        const handle = hitHandle(pt, boxes[selectedBox]);
+        if (handle) {
+            resizing = { idx: selectedBox, handle, startBox: { ...boxes[selectedBox] }, sp: { ...pt } };
+            return;
+        }
+    }
+
+    const hit = hitBox(pt);
+    if (tool === 'select' || (hit >= 0 && tool === 'draw')) {
+        if (hit >= 0) {
+            selectedBox = hit;
+            moving = { idx: hit, startBox: { ...boxes[hit] }, sp: { ...pt } };
+        } else {
+            selectedBox = -1;
+        }
+        renderBoxList();
+        render();
+        return;
+    }
+
+    if (tool === 'draw') {
+        drawing = true;
+        startPt = pt;
+        curPt = pt;
+        selectedBox = -1;
+        renderBoxList();
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (!imgEl) return;
+    const pt = toImg(e.clientX, e.clientY);
+
+    if (resizing) {
+        const { idx, handle, startBox, sp } = resizing;
+        const dx = pt.x - sp.x, dy = pt.y - sp.y;
+        const nb = { ...startBox };
+        if (handle.includes('l')) { nb.x = startBox.x + dx; nb.w = startBox.w - dx; }
+        if (handle.includes('r')) { nb.w = startBox.w + dx; }
+        if (handle.includes('t')) { nb.y = startBox.y + dy; nb.h = startBox.h - dy; }
+        if (handle.includes('b')) { nb.h = startBox.h + dy; }
+        if (nb.w < 5 || nb.h < 5) return;
+        boxes[idx] = { ...boxes[idx], ...nb };
+        render();
+        return;
+    }
+
+    if (moving) {
+        const { idx, startBox, sp } = moving;
+        boxes[idx].x = startBox.x + pt.x - sp.x;
+        boxes[idx].y = startBox.y + pt.y - sp.y;
+        render();
+        return;
+    }
+
+    if (drawing) {
+        curPt = pt;
+        render();
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    if (resizing) { resizing = null; renderBoxList(); return; }
+    if (moving) { moving = null; renderBoxList(); return; }
+    if (!drawing || !startPt || !curPt) return;
+
+    const x = Math.min(startPt.x, curPt.x);
+    const y = Math.min(startPt.y, curPt.y);
+    const w = Math.abs(curPt.x - startPt.x);
+    const h = Math.abs(curPt.y - startPt.y);
+    const wasEmpty = boxes.length === 0;
+
+    if (w > 3 && h > 3) {
+        const newBox = { x, y, w, h, label: currentLabel, color: getColor(labels.indexOf(currentLabel)) };
+        if (gridReferenceSetup.active) {
+            drawing = false;
+            startPt = null;
+            curPt = null;
+            commitReferenceBox(newBox);
+            return;
+        }
+
+        boxes.push(newBox);
+        selectedBox = boxes.length - 1;
+        if (wasEmpty && readGridSettings().auto) {
+            drawing = false;
+            startPt = null;
+            curPt = null;
+            generateGridFromTemplate(selectedBox, { skipConfirm: true });
+            return;
+        }
+    }
+
+    drawing = false;
+    startPt = null;
+    curPt = null;
+    renderBoxList();
+    render();
+});
+
+canvas.addEventListener('mouseleave', () => {
+    if (drawing) {
+        drawing = false;
+        startPt = null;
+        curPt = null;
+        render();
+    }
+});
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.max(0.1, Math.min(5, scale * delta));
+    const r = canvas.getBoundingClientRect();
+    const mx = e.clientX - r.left;
+    const my = e.clientY - r.top;
+    offX = mx - (mx - offX) * (newScale / scale);
+    offY = my - (my - offY) * (newScale / scale);
+    scale = newScale;
+    updateToolbar();
+    render();
+}, { passive: false });
+
+// ===== 键盘事件 =====
+document.addEventListener('keydown', (e) => {
+    if (document.activeElement.tagName === 'INPUT') return;
+    if (e.key === 'Escape' && gridReferenceSetup.active) {
+        e.preventDefault();
+        cancelThreePointGridSetup();
+        return;
+    }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedBox >= 0) {
+        e.preventDefault();
+        deleteBox(selectedBox);
+    }
+    if (e.key === 'ArrowLeft') goImage(-1);
+    if (e.key === 'ArrowRight') goImage(1);
+    if (e.key === 'd' || e.key === 'D') setTool('draw');
+    if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        generateGridFromSelection();
+    }
+    if (e.key === 's' && !e.ctrlKey) setTool('select');
+    if (e.key === 's' && e.ctrlKey) {
+        e.preventDefault();
+        saveCurrentAnnotation();
+    }
+});
+
+// ===== 渲染 =====
+function render() {
+    const cW = canvas.width, cH = canvas.height;
+    ctx.clearRect(0, 0, cW, cH);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, cW, cH);
+
+    if (!imgEl) return;
+
+    ctx.save();
+    ctx.translate(offX, offY);
+    ctx.scale(scale, scale);
+    ctx.drawImage(imgEl, 0, 0);
+
+    boxes.forEach((b, i) => {
+        const c = b.color || '#E24B4A';
+        ctx.fillStyle = c + '25';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+        const fs = Math.max(12, 14 / scale);
+        ctx.font = '500 ' + fs + 'px system-ui, "Microsoft YaHei", sans-serif';
+        const tw = ctx.measureText(b.label).width;
+        const pad = 4 / scale;
+        ctx.fillStyle = c;
+        ctx.fillRect(b.x, b.y - fs - pad * 2, tw + pad * 2, fs + pad * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(b.label, b.x + pad, b.y - pad);
+
+        if (i === selectedBox) {
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1.5 / scale;
+            ctx.setLineDash([4 / scale, 4 / scale]);
+            ctx.strokeRect(b.x, b.y, b.w, b.h);
+            ctx.setLineDash([]);
+
+            const hs = 5 / scale;
+            [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]].forEach(([hx, hy]) => {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(hx - hs, hy - hs, hs * 2, hs * 2);
+                ctx.strokeStyle = c;
+                ctx.lineWidth = 1 / scale;
+                ctx.strokeRect(hx - hs, hy - hs, hs * 2, hs * 2);
+            });
+        }
+    });
+
+    if (drawing && startPt && curPt) {
+        const dx = Math.min(startPt.x, curPt.x);
+        const dy = Math.min(startPt.y, curPt.y);
+        const dw = Math.abs(curPt.x - startPt.x);
+        const dh = Math.abs(curPt.y - startPt.y);
+        const c = getColor(labels.indexOf(currentLabel));
+        ctx.fillStyle = c + '15';
+        ctx.fillRect(dx, dy, dw, dh);
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 2 / scale;
+        ctx.setLineDash([6 / scale, 3 / scale]);
+        ctx.strokeRect(dx, dy, dw, dh);
+        ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+}
+
+// ===== 保存/导出 =====
+function showSaveHint(msg) {
+    const hint = document.getElementById('saveHint');
+    hint.textContent = msg || '已保存';
+    hint.classList.add('show');
+    setTimeout(() => hint.classList.remove('show'), 1500);
+}
+
+// 自动保存当前图片的 YOLO 标注（切换图片时调用）
+async function autoSaveCurrentYOLO() {
+    if (gridReferenceSetup.active) return;
+    if (!pyReady || !fileName || boxes.length === 0) return;
+    allAnnotations[fileName] = [...boxes];
+    allImageSizes[fileName] = { w: imgW, h: imgH };
+    const txtName = fileName.replace(/\.[^.]+$/, '.txt');
+    const lines = boxes.map(b => {
+        const cx = (b.x + b.w / 2) / imgW;
+        const cy = (b.y + b.h / 2) / imgH;
+        const bw = b.w / imgW;
+        const bh = b.h / imgH;
+        return labels.indexOf(b.label) + ' ' + cx.toFixed(6) + ' ' + cy.toFixed(6) + ' ' + bw.toFixed(6) + ' ' + bh.toFixed(6);
+    }).join('\n');
+    await window.pywebview.api.save_file(txtName, lines);
+    await window.pywebview.api.save_file('classes.txt', labels.join('\n'));
+}
+
+// 手动保存当前标注
+async function saveCurrentAnnotation() {
+    if (gridReferenceSetup.active) {
+        showSaveHint('Finish or cancel 3-point setup first');
+        return;
+    }
+    if (!pyReady || !fileName) return;
+    allAnnotations[fileName] = [...boxes];
+    allImageSizes[fileName] = { w: imgW, h: imgH };
+
+    if (boxes.length === 0) {
+        showSaveHint('无标注可保存');
+        return;
+    }
+
+    const txtName = fileName.replace(/\.[^.]+$/, '.txt');
+    const lines = boxes.map(b => {
+        const cx = (b.x + b.w / 2) / imgW;
+        const cy = (b.y + b.h / 2) / imgH;
+        const bw = b.w / imgW;
+        const bh = b.h / imgH;
+        return labels.indexOf(b.label) + ' ' + cx.toFixed(6) + ' ' + cy.toFixed(6) + ' ' + bw.toFixed(6) + ' ' + bh.toFixed(6);
+    }).join('\n');
+
+    await window.pywebview.api.save_file(txtName, lines);
+    await window.pywebview.api.save_file('classes.txt', labels.join('\n'));
+    showSaveHint('已保存 ' + txtName);
+}
+
+// 导出全部 YOLO
+async function exportAllYOLO() {
+    if (gridReferenceSetup.active) {
+        showSaveHint('Finish or cancel 3-point setup first');
+        return;
+    }
+    if (!pyReady) return;
+    allAnnotations[fileName] = [...boxes];
+    allImageSizes[fileName] = { w: imgW, h: imgH };
+
+    let count = 0;
+    for (const [fn, bxs] of Object.entries(allAnnotations)) {
+        if (!bxs || !bxs.length) continue;
+        const sz = allImageSizes[fn] || { w: imgW, h: imgH };
+        const txtName = fn.replace(/\.[^.]+$/, '.txt');
+        const lines = bxs.map(b => {
+            const cx = (b.x + b.w / 2) / sz.w;
+            const cy = (b.y + b.h / 2) / sz.h;
+            const bw = b.w / sz.w;
+            const bh = b.h / sz.h;
+            return labels.indexOf(b.label) + ' ' + cx.toFixed(6) + ' ' + cy.toFixed(6) + ' ' + bw.toFixed(6) + ' ' + bh.toFixed(6);
+        }).join('\n');
+        await window.pywebview.api.save_file(txtName, lines);
+        count++;
+    }
+
+    await window.pywebview.api.save_file('classes.txt', labels.join('\n'));
+    const dir = await window.pywebview.api.get_output_folder();
+    showSaveHint('已保存 ' + count + ' 个标注到 ' + dir);
+}
+
+// 导出全部 VOC
+async function exportAllVOC() {
+    if (gridReferenceSetup.active) {
+        showSaveHint('Finish or cancel 3-point setup first');
+        return;
+    }
+    if (!pyReady) return;
+    allAnnotations[fileName] = [...boxes];
+    allImageSizes[fileName] = { w: imgW, h: imgH };
+
+    let count = 0;
+    for (const [fn, bxs] of Object.entries(allAnnotations)) {
+        if (!bxs || !bxs.length) continue;
+        const sz = allImageSizes[fn] || { w: imgW, h: imgH };
+        const xmlName = fn.replace(/\.[^.]+$/, '.xml');
+        let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<annotation>\n  <filename>' + fn + '</filename>\n  <size>\n    <width>' + sz.w + '</width>\n    <height>' + sz.h + '</height>\n    <depth>3</depth>\n  </size>\n';
+        for (const b of bxs) {
+            xml += '  <object>\n    <name>' + b.label + '</name>\n    <pose>Unspecified</pose>\n    <truncated>0</truncated>\n    <difficult>0</difficult>\n    <bndbox>\n      <xmin>' + Math.round(b.x) + '</xmin>\n      <ymin>' + Math.round(b.y) + '</ymin>\n      <xmax>' + Math.round(b.x + b.w) + '</xmax>\n      <ymax>' + Math.round(b.y + b.h) + '</ymax>\n    </bndbox>\n  </object>\n';
+        }
+        xml += '</annotation>';
+        await window.pywebview.api.save_file(xmlName, xml);
+        count++;
+    }
+
+    const dir = await window.pywebview.api.get_output_folder();
+    showSaveHint('已保存 ' + count + ' 个标注到 ' + dir);
+}
+
+// ===== 窗口变化 =====
+window.addEventListener('resize', () => {
+    if (!imgEl) return;
+    canvas.width = wrap.clientWidth;
+    canvas.height = wrap.clientHeight;
+    fitImage(imgW, imgH);
+    updateToolbar();
+    render();
+});
+
+// ===== 初始化 =====
+renderLabels();
+renderBoxList();
+</script>
+
+</body>
+</html>
