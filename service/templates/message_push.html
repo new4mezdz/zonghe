@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息推送</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #eaeaea;
+        }
+        .header {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .header h1 { font-size: 1.8rem; }
+        .header a { color: #e94560; text-decoration: none; margin-left: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
+        .main-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 22px; align-items: start; }
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .panel-title {
+            font-size: 1.1rem;
+            margin-bottom: 18px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .form-row { margin-bottom: 16px; }
+        label { display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem; }
+        input, select, textarea {
+            width: 100%;
+            padding: 11px 12px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-family: inherit;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #e94560; }
+        textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
+        .btn {
+            padding: 11px 18px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: #e94560; color: #fff; }
+        .btn-primary:hover { background: #d63850; }
+        .btn-primary:disabled { opacity: 0.65; cursor: not-allowed; }
+        .btn-secondary { background: #444; color: #fff; }
+        .btn-secondary:hover { background: #555; }
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+        .status {
+            display: none;
+            margin-top: 15px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        .status.show { display: block; }
+        .status.success { background: rgba(34,197,94,0.14); border: 1px solid rgba(34,197,94,0.35); color: #6ee7a8; }
+        .status.error { background: rgba(239,68,68,0.14); border: 1px solid rgba(239,68,68,0.35); color: #fca5a5; }
+        .table-wrap { overflow-x: auto; max-height: 560px; }
+        table { width: 100%; border-collapse: collapse; min-width: 680px; }
+        th {
+            background: rgba(0,0,0,0.3);
+            color: #aaa;
+            font-weight: normal;
+            text-align: left;
+            padding: 10px 8px;
+            position: sticky;
+            top: 0;
+        }
+        td { padding: 10px 8px; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
+        tr:hover { background: rgba(255,255,255,0.03); }
+        .machine-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 42px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(233,69,96,0.16);
+            color: #ff9aae;
+            font-weight: bold;
+        }
+        .content-cell { max-width: 360px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+        .empty-state { text-align: center; padding: 54px 20px; color: #777; }
+        @media (max-width: 860px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .header a { display: inline-block; margin-left: 0; margin-top: 8px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>消息推送</h1>
+        <a href="/">返回首页</a>
+        <a href="/message_push/docs" target="_blank">接口说明</a>
+    </div>
+    <div class="container">
+        <div class="main-grid">
+            <div class="panel">
+                <div class="panel-title">新增推送</div>
+                <form id="pushForm">
+                    <div class="form-row">
+                        <label for="pushTime">选择时间</label>
+                        <input type="datetime-local" id="pushTime" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="machineNo">机台号</label>
+                        <select id="machineNo" required></select>
+                    </div>
+                    <div class="form-row">
+                        <label for="content">自定义文本内容</label>
+                        <textarea id="content" maxlength="2000" required></textarea>
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn btn-primary" id="submitBtn" type="submit">提交</button>
+                        <button class="btn btn-secondary" type="button" id="resetBtn">清空</button>
+                    </div>
+                    <div class="status" id="statusBox"></div>
+                </form>
+            </div>
+            <div class="panel">
+                <div class="panel-title">最近提交</div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>推送时间</th>
+                                <th>机台号</th>
+                                <th>内容</th>
+                                <th>提交时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recordsBody">
+                            <tr><td colspan="5"><div class="empty-state">暂无数据</div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const machineSelect = document.getElementById('machineNo');
+        const form = document.getElementById('pushForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusBox = document.getElementById('statusBox');
+        const recordsBody = document.getElementById('recordsBody');
+
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = String(i);
+            option.textContent = i + ' 号机台';
+            machineSelect.appendChild(option);
+        }
+
+        function setDefaultTime() {
+            const now = new Date();
+            now.setSeconds(0, 0);
+            const offset = now.getTimezoneOffset() * 60000;
+            document.getElementById('pushTime').value = new Date(now.getTime() - offset).toISOString().slice(0, 16);
+        }
+
+        function showStatus(message, type) {
+            statusBox.textContent = message;
+            statusBox.className = 'status show ' + type;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
+        async function loadRecords() {
+            const res = await fetch('/api/message_push/messages?limit=50');
+            const data = await res.json();
+            const records = data.records || [];
+            if (records.length === 0) {
+                recordsBody.innerHTML = '<tr><td colspan="5"><div class="empty-state">暂无数据</div></td></tr>';
+                return;
+            }
+            recordsBody.innerHTML = records.map(item => `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${escapeHtml(item.push_time)}</td>
+                    <td><span class="machine-badge">${item.machine_no}</span></td>
+                    <td class="content-cell">${escapeHtml(item.content)}</td>
+                    <td>${escapeHtml(item.created_at)}</td>
+                </tr>
+            `).join('');
+        }
+
+        form.addEventListener('submit', async function(event) {
+            event.preventDefault();
+            submitBtn.disabled = true;
+            try {
+                const payload = {
+                    push_time: document.getElementById('pushTime').value,
+                    machine_no: machineSelect.value,
+                    content: document.getElementById('content').value
+                };
+                const res = await fetch('/api/message_push/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    showStatus(data.error || '提交失败', 'error');
+                    return;
+                }
+                showStatus('提交成功，记录已写入数据库', 'success');
+                document.getElementById('content').value = '';
+                await loadRecords();
+            } catch (error) {
+                showStatus('请求失败：' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', function() {
+            document.getElementById('content').value = '';
+            setDefaultTime();
+            statusBox.className = 'status';
+        });
+
+        setDefaultTime();
+        loadRecords();
+    </script>
+</body>
+</html>

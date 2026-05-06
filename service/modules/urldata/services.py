@@ -7,9 +7,19 @@ from datetime import datetime, timezone, timedelta
 from collections import Counter
 from config import Config
 import threading
+import sys
+
 BOX_COUNT = 9
-DB_FILE = r'E:\9#\zonghe\service\urldata.db'
-LAST_SYNC_FILE = r'E:\9#\zonghe\service\last_sync_time.json'
+
+def _app_dir():
+    """返回数据文件存放目录:打包后 = exe 所在目录,开发时 = service 目录"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    # services.py -> urldata -> modules -> service
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+DB_FILE = os.path.join(_app_dir(), 'urldata.db')
+LAST_SYNC_FILE = os.path.join(_app_dir(), 'last_sync_time.json')
 
 
 class UrlDataService:
@@ -745,6 +755,6 @@ class UrlDataService:
         t.start()
         logging.info("后台自动同步线程已启动")
 
-# 创建全局服务实例
 urldata_service = UrlDataService()
-urldata_service.start_auto_sync()
+if os.environ.get('DISABLE_AUTO_SYNC') != '1':
+    urldata_service.start_auto_sync()

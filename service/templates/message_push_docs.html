@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息推送接口说明</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #eaeaea;
+            line-height: 1.65;
+        }
+        .header {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .header h1 { font-size: 1.8rem; }
+        .header a { color: #e94560; text-decoration: none; margin-left: 18px; }
+        .container { max-width: 1180px; margin: 0 auto; padding: 28px 20px 50px; }
+        .panel {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 18px;
+        }
+        h2 {
+            font-size: 1.12rem;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        h3 { font-size: 1rem; margin: 18px 0 8px; color: #fff; }
+        p, li { color: #cfcfcf; font-size: 0.95rem; }
+        ul { padding-left: 22px; }
+        code {
+            background: rgba(0,0,0,0.32);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 5px;
+            padding: 2px 6px;
+            color: #ffd166;
+            font-family: Consolas, monospace;
+            font-size: 0.9rem;
+        }
+        pre {
+            background: rgba(0,0,0,0.36);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 14px;
+            overflow-x: auto;
+            margin: 10px 0 14px;
+            color: #e8e8e8;
+            font-family: Consolas, monospace;
+            font-size: 0.9rem;
+            line-height: 1.55;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+            font-size: 0.92rem;
+        }
+        th {
+            background: rgba(0,0,0,0.32);
+            color: #aaa;
+            font-weight: normal;
+            text-align: left;
+            padding: 10px 8px;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.07);
+            vertical-align: top;
+            color: #d8d8d8;
+        }
+        .table-wrap { overflow-x: auto; }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(233,69,96,0.18);
+            color: #ff9aae;
+            font-weight: bold;
+            font-size: 0.8rem;
+        }
+        .note {
+            background: rgba(255,170,0,0.1);
+            border: 1px solid rgba(255,170,0,0.28);
+            border-radius: 8px;
+            padding: 12px;
+            color: #ffd166;
+        }
+        .muted { color: #999; }
+        @media (max-width: 760px) {
+            .header a { display: inline-block; margin: 8px 8px 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>消息推送接口说明</h1>
+        <a href="/message_push">返回消息推送</a>
+        <a href="/api/message_push/docs" target="_blank">JSON说明</a>
+    </div>
+
+    <div class="container">
+        <div class="panel">
+            <h2>基础信息</h2>
+            <p>这些接口用于给内网其他系统查询或写入消息推送数据库数据。所有接口返回 JSON，编码为 UTF-8。</p>
+            <p>当前访问地址：<code id="baseUrl"></code></p>
+            <p class="muted">其他电脑调用时，把地址中的 <code>127.0.0.1</code> 或 <code>localhost</code> 换成这台服务器的内网 IP，例如 <code>http://192.168.31.58:5000</code>。</p>
+            <p class="note">当前接口未加登录鉴权，建议只在可信内网开放；如果后面要给外部网络调用，需要再加 token 校验。</p>
+        </div>
+
+        <div class="panel">
+            <h2>数据字段</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>字段</th><th>类型</th><th>说明</th><th>示例</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>id</code></td><td>integer</td><td>数据库自增主键</td><td><code>1</code></td></tr>
+                        <tr><td><code>push_time</code></td><td>string</td><td>选择的推送时间</td><td><code>2026-05-06 14:05:00</code></td></tr>
+                        <tr><td><code>machine_no</code></td><td>integer</td><td>机台号，只允许 1 到 12</td><td><code>5</code></td></tr>
+                        <tr><td><code>content</code></td><td>string</td><td>自定义文本内容</td><td><code>5号机台注意检查</code></td></tr>
+                        <tr><td><code>created_at</code></td><td>string</td><td>提交到数据库的时间</td><td><code>2026-05-06 14:01:23</code></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>查询列表</h2>
+            <p><span class="badge">GET</span> <code>/api/message_push/messages</code></p>
+            <p>用于分页查询消息推送记录，所有查询参数都可以不传。</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>参数</th><th>必填</th><th>说明</th><th>示例</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>machine_no</code></td><td>否</td><td>按机台号过滤，范围 1-12</td><td><code>5</code></td></tr>
+                        <tr><td><code>start_time</code></td><td>否</td><td>起始时间。只传日期时自动补 <code>00:00:00</code></td><td><code>2026-05-06</code></td></tr>
+                        <tr><td><code>end_time</code></td><td>否</td><td>结束时间。只传日期时自动补 <code>23:59:59</code></td><td><code>2026-05-06 18:00:00</code></td></tr>
+                        <tr><td><code>keyword</code></td><td>否</td><td>按内容模糊搜索</td><td><code>停机</code></td></tr>
+                        <tr><td><code>limit</code></td><td>否</td><td>每页条数，默认 50，最大 500</td><td><code>50</code></td></tr>
+                        <tr><td><code>offset</code></td><td>否</td><td>分页偏移量，第 1 页为 0，第 2 页为 limit</td><td><code>0</code></td></tr>
+                        <tr><td><code>order</code></td><td>否</td><td>排序方式：<code>desc</code> 新到旧，<code>asc</code> 旧到新</td><td><code>desc</code></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <h3>请求示例</h3>
+            <pre id="queryExample"></pre>
+            <h3>返回示例</h3>
+            <pre>{
+  "success": true,
+  "total": 1,
+  "limit": 50,
+  "offset": 0,
+  "records": [
+    {
+      "id": 1,
+      "push_time": "2026-05-06 14:05:00",
+      "machine_no": 5,
+      "content": "5号机台注意检查",
+      "created_at": "2026-05-06 14:01:23"
+    }
+  ]
+}</pre>
+        </div>
+
+        <div class="panel">
+            <h2>查询单条</h2>
+            <p><span class="badge">GET</span> <code>/api/message_push/messages/&lt;id&gt;</code></p>
+            <p>用于根据记录 ID 获取单条数据。</p>
+            <h3>请求示例</h3>
+            <pre id="detailExample"></pre>
+            <h3>不存在时返回</h3>
+            <pre>{
+  "success": false,
+  "error": "记录不存在"
+}</pre>
+        </div>
+
+        <div class="panel">
+            <h2>新增推送</h2>
+            <p><span class="badge">POST</span> <code>/api/message_push/submit</code></p>
+            <p>用于写入一条新的消息推送记录，请求头需要使用 <code>Content-Type: application/json</code>。</p>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>字段</th><th>必填</th><th>说明</th><th>示例</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>push_time</code></td><td>是</td><td>推送时间，支持 <code>YYYY-MM-DDTHH:MM</code> 或 <code>YYYY-MM-DD HH:MM:SS</code></td><td><code>2026-05-06T14:05</code></td></tr>
+                        <tr><td><code>machine_no</code></td><td>是</td><td>机台号，范围 1-12</td><td><code>5</code></td></tr>
+                        <tr><td><code>content</code></td><td>是</td><td>自定义文本内容</td><td><code>5号机台注意检查</code></td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <h3>curl 示例</h3>
+            <pre id="curlExample"></pre>
+            <h3>JavaScript fetch 示例</h3>
+            <pre id="fetchExample"></pre>
+            <h3>成功返回</h3>
+            <pre>{
+  "success": true,
+  "message": "提交成功",
+  "record": {
+    "id": 1,
+    "push_time": "2026-05-06 14:05:00",
+    "machine_no": 5,
+    "content": "5号机台注意检查",
+    "created_at": "2026-05-06 14:01:23"
+  }
+}</pre>
+        </div>
+
+        <div class="panel">
+            <h2>状态码和注意事项</h2>
+            <ul>
+                <li><code>200</code>：请求成功。</li>
+                <li><code>400</code>：新增接口参数错误，例如机台号不在 1-12、时间为空、内容为空。</li>
+                <li><code>404</code>：单条详情记录不存在。</li>
+                <li>查询接口只返回业务字段，不开放 SQLite 直连和任意 SQL 执行。</li>
+                <li>接口已允许 CORS，内网网页系统可以直接跨端口调用。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = window.location.origin;
+        document.getElementById('baseUrl').textContent = baseUrl;
+        document.getElementById('queryExample').textContent =
+`${baseUrl}/api/message_push/messages?machine_no=5&start_time=2026-05-06&end_time=2026-05-06&keyword=停机&limit=50&offset=0&order=desc`;
+        document.getElementById('detailExample').textContent =
+`${baseUrl}/api/message_push/messages/1`;
+        document.getElementById('curlExample').textContent =
+`curl -X POST "${baseUrl}/api/message_push/submit" \\
+  -H "Content-Type: application/json" \\
+  -d "{\\"push_time\\":\\"2026-05-06T14:05\\",\\"machine_no\\":5,\\"content\\":\\"5号机台注意检查\\"}"`;
+        document.getElementById('fetchExample').textContent =
+`fetch("${baseUrl}/api/message_push/messages?machine_no=5&limit=20")
+  .then(res => res.json())
+  .then(data => console.log(data.records));`;
+    </script>
+</body>
+</html>

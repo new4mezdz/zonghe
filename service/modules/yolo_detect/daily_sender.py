@@ -69,10 +69,7 @@ auto_status = {
 auto_thread = None
 
 def get_model_for_brand(brand_name):
-    model_map = {
-        '蓝时代': r'E:\BOXX\runs\detect\train_optimized41蓝时代\weights\best.pt',
-    }
-    return model_map.get(brand_name, None)
+    return r'E:\BOXX\runs\detect\train_optimized42\weights\best.pt'
 
 
 def load_model(brand_name):

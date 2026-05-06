@@ -1,5 +1,7 @@
 import sqlite3
 import sys
+import time
+import traceback
 from datetime import datetime
 
 import pymysql
@@ -17,8 +19,17 @@ MYSQL_CONFIG = {
     "read_timeout": 600,
 }
 
+# ----- 只同步这些表 -----
+SYNC_TABLES = [
+    "report_yield_output",
+    "datax_pbms_xc_print_barcode_scale",
+    "datax_pbms_xc_itg_v_jb_fl",
+]
 # ----- 本地 SQLite 路径 -----
 SQLITE_PATH = "biz_local.db"
+
+# ----- 同步间隔(秒) -----
+INTERVAL_SECONDS = 60
 
 # ----- 增量字段候选(小写匹配,按优先级)-----
 UPDATE_TIME_CANDIDATES = [
@@ -66,9 +77,6 @@ def get_columns(meta_conn, table):
 
 
 def detect_strategy(columns):
-    """返回 (strategy, cursor_field)
-    strategy: 'update_time' | 'pk' | 'full'
-    """
     name_map = {c[0].lower(): c[0] for c in columns}
     for cand in UPDATE_TIME_CANDIDATES:
         if cand in name_map:
@@ -121,7 +129,11 @@ def upsert_state(sqlite_conn, table, strategy, cursor_field, last_value, row_cou
 # ============ 建表 + 同步 ============
 
 def create_sqlite_table(sqlite_conn, table, columns):
+    pk_cols = [c[0] for c in columns if c[2] == "PRI"]
     cols_def = ", ".join(f'"{c[0]}" TEXT' for c in columns)
+    if pk_cols:
+        pk_def = ", ".join(f'"{c}"' for c in pk_cols)
+        cols_def += f", PRIMARY KEY ({pk_def})"
     sqlite_conn.execute(f'DROP TABLE IF EXISTS "{table}"')
     sqlite_conn.execute(f'CREATE TABLE "{table}" ({cols_def})')
     sqlite_conn.commit()
@@ -160,12 +172,11 @@ def sync_table(meta_conn, sqlite_conn, table, table_type):
 
     placeholders = ", ".join(["?"] * len(col_names))
     quoted_cols = ", ".join(f'"{c}"' for c in col_names)
-    insert_sql = f'INSERT INTO "{table}" ({quoted_cols}) VALUES ({placeholders})'
+    insert_sql = f'INSERT OR REPLACE INTO "{table}" ({quoted_cols}) VALUES ({placeholders})'
 
     last_cursor_value = state[2] if state else None
     total = 0
 
-    # 用流式游标拉取大表
     stream_conn = mysql_connect(SSDictCursor)
     try:
         with stream_conn.cursor() as cur:
@@ -194,21 +205,20 @@ def sync_table(meta_conn, sqlite_conn, table, table_type):
     print(f"  [{tag}] +{total} rows | total={row_count} | strategy={strategy} | cursor={cursor_field}")
 
 
-# ============ 主流程 ============
+# ============ 单次同步 ============
 
-def main():
+def sync_once():
     print(f"Connecting to MySQL {MYSQL_CONFIG['host']} ...")
     meta_conn = mysql_connect(DictCursor)
     sqlite_conn = sqlite_connect()
     init_sync_state(sqlite_conn)
 
-    tables = list_tables(meta_conn)
-    print(f"Found {len(tables)} tables/views\n")
+    tables = SYNC_TABLES
+    print(f"Tables to sync: {tables}\n")
 
     ok, fail = 0, 0
-    for i, t in enumerate(tables, 1):
-        name = t["TABLE_NAME"]
-        ttype = t["TABLE_TYPE"]
+    for i, name in enumerate(tables, 1):
+        ttype = "BASE TABLE"
         print(f"[{i}/{len(tables)}] {name} ({ttype})")
         try:
             sync_table(meta_conn, sqlite_conn, name, ttype)
@@ -222,5 +232,27 @@ def main():
     print(f"\nDone. ok={ok}, fail={fail}, sqlite={SQLITE_PATH}")
 
 
+# ============ 守护循环 ============
+
+def main():
+    print(f"Daemon started. Interval = {INTERVAL_SECONDS}s. Press Ctrl+C to stop.\n")
+    while True:
+        start = datetime.now()
+        print(f"========== Sync round start: {start:%Y-%m-%d %H:%M:%S} ==========")
+        try:
+            sync_once()
+        except Exception:
+            print("Sync round crashed:")
+            traceback.print_exc()
+        end = datetime.now()
+        print(f"========== Sync round end: {end:%Y-%m-%d %H:%M:%S} (took {(end-start).total_seconds():.1f}s) ==========")
+        print(f"Sleeping {INTERVAL_SECONDS}s ...")
+        try:
+            time.sleep(INTERVAL_SECONDS)
+        except KeyboardInterrupt:
+            print("\nDaemon stopped by user.")
+            break
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

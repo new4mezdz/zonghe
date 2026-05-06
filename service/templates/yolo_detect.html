@@ -159,8 +159,7 @@
                     <label style="font-size:12px; color:#888;">封箱机名称:</label>
                     <input type="text" id="machineName" placeholder="如: 1号封箱机" />
 
-                    <label style="font-size:12px; color:#888;">品牌:</label>
-                    <select id="brandSelect2"></select>
+
 
                     <button class="btn-detect" id="btnDetect" onclick="startDetect()" disabled>开始检测</button>
 
@@ -216,8 +215,7 @@
             <div class="panel-right">
                 <div class="control-box">
                     <h3>自动模式设置</h3>
-                    <label style="font-size:12px; color:#888;">品牌:</label>
-                    <select id="autoBrandSelect"></select>
+
 
                     <button class="btn-detect" id="btnAutoStart" onclick="toggleAutoMode()" style="background:#22c55e;">启动自动模式</button>
 
@@ -418,8 +416,7 @@
     // ===== 开始检测 =====
     async function startDetect() {
         if (!selectedFolder) { alert('请先选择文件夹'); return; }
-        var brand = document.getElementById('brandSelect2').value;
-        if (!brand) { alert('请选择品牌'); return; }
+        var brand = '默认';
         var machine = document.getElementById('machineName').value || '未知';
 
         document.getElementById('btnDetect').disabled = true;
@@ -486,8 +483,7 @@
                 if (autoPollTimer) { clearInterval(autoPollTimer); autoPollTimer = null; }
             } catch (e) { alert('停止失败: ' + e.message); }
         } else {
-            var brand = document.getElementById('autoBrandSelect').value;
-            if (!brand) { alert('请选择品牌'); return; }
+            var brand = '默认';
             try {
                 var res = await fetch('/api/yolo/auto/start', {
                     method: 'POST',

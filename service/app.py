@@ -20,12 +20,14 @@ from modules.schedule.routes import schedule_bp
 from modules.urldata.routes import urldata_bp
 from modules.bindui.routes import bindui_bp
 from modules.yolo_detect.routes import yolo_bp
+from modules.message_push.routes import message_push_bp
 
 app.register_blueprint(monitor_bp)
 app.register_blueprint(schedule_bp)
 app.register_blueprint(urldata_bp)
 app.register_blueprint(bindui_bp)
 app.register_blueprint(yolo_bp)
+app.register_blueprint(message_push_bp)
 from modules.labelimg.routes import labelimg_bp
 app.register_blueprint(labelimg_bp)
 

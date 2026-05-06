@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+build/
+dist/
+
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+uploads/
+data/
+输出文件/
