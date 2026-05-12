@@ -128,6 +128,7 @@
                         <tr><td><code>id</code></td><td>integer</td><td>数据库自增主键</td><td><code>1</code></td></tr>
                         <tr><td><code>push_time</code></td><td>string</td><td>选择的推送时间</td><td><code>2026-05-06 14:05:00</code></td></tr>
                         <tr><td><code>machine_no</code></td><td>integer</td><td>机台号，只允许 1 到 12</td><td><code>5</code></td></tr>
+                        <tr><td><code>machine_code</code></td><td>string</td><td>机台编码，由后端按机台号自动生成</td><td><code>jy05</code></td></tr>
                         <tr><td><code>content</code></td><td>string</td><td>自定义文本内容</td><td><code>5号机台注意检查</code></td></tr>
                         <tr><td><code>created_at</code></td><td>string</td><td>提交到数据库的时间</td><td><code>2026-05-06 14:01:23</code></td></tr>
                     </tbody>
@@ -146,6 +147,7 @@
                     </thead>
                     <tbody>
                         <tr><td><code>machine_no</code></td><td>否</td><td>按机台号过滤，范围 1-12</td><td><code>5</code></td></tr>
+                        <tr><td><code>machine_code</code></td><td>否</td><td>按机台编码过滤，范围 jy01-jy12</td><td><code>jy05</code></td></tr>
                         <tr><td><code>start_time</code></td><td>否</td><td>起始时间。只传日期时自动补 <code>00:00:00</code></td><td><code>2026-05-06</code></td></tr>
                         <tr><td><code>end_time</code></td><td>否</td><td>结束时间。只传日期时自动补 <code>23:59:59</code></td><td><code>2026-05-06 18:00:00</code></td></tr>
                         <tr><td><code>keyword</code></td><td>否</td><td>按内容模糊搜索</td><td><code>停机</code></td></tr>
@@ -168,6 +170,7 @@
       "id": 1,
       "push_time": "2026-05-06 14:05:00",
       "machine_no": 5,
+      "machine_code": "jy05",
       "content": "5号机台注意检查",
       "created_at": "2026-05-06 14:01:23"
     }
@@ -199,7 +202,7 @@
                     </thead>
                     <tbody>
                         <tr><td><code>push_time</code></td><td>是</td><td>推送时间，支持 <code>YYYY-MM-DDTHH:MM</code> 或 <code>YYYY-MM-DD HH:MM:SS</code></td><td><code>2026-05-06T14:05</code></td></tr>
-                        <tr><td><code>machine_no</code></td><td>是</td><td>机台号，范围 1-12</td><td><code>5</code></td></tr>
+                        <tr><td><code>machine_no</code></td><td>是</td><td>机台号，范围 1-12；后端会自动生成 <code>machine_code</code></td><td><code>5</code></td></tr>
                         <tr><td><code>content</code></td><td>是</td><td>自定义文本内容</td><td><code>5号机台注意检查</code></td></tr>
                     </tbody>
                 </table>
@@ -216,6 +219,7 @@
     "id": 1,
     "push_time": "2026-05-06 14:05:00",
     "machine_no": 5,
+    "machine_code": "jy05",
     "content": "5号机台注意检查",
     "created_at": "2026-05-06 14:01:23"
   }

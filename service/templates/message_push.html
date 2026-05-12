@@ -144,12 +144,13 @@
                                 <th>ID</th>
                                 <th>推送时间</th>
                                 <th>机台号</th>
+                                <th>机台编码</th>
                                 <th>内容</th>
                                 <th>提交时间</th>
                             </tr>
                         </thead>
                         <tbody id="recordsBody">
-                            <tr><td colspan="5"><div class="empty-state">暂无数据</div></td></tr>
+                            <tr><td colspan="6"><div class="empty-state">暂无数据</div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -193,7 +194,7 @@
             const data = await res.json();
             const records = data.records || [];
             if (records.length === 0) {
-                recordsBody.innerHTML = '<tr><td colspan="5"><div class="empty-state">暂无数据</div></td></tr>';
+                recordsBody.innerHTML = '<tr><td colspan="6"><div class="empty-state">暂无数据</div></td></tr>';
                 return;
             }
             recordsBody.innerHTML = records.map(item => `
@@ -201,6 +202,7 @@
                     <td>${item.id}</td>
                     <td>${escapeHtml(item.push_time)}</td>
                     <td><span class="machine-badge">${item.machine_no}</span></td>
+                    <td>${escapeHtml(item.machine_code || '')}</td>
                     <td class="content-cell">${escapeHtml(item.content)}</td>
                     <td>${escapeHtml(item.created_at)}</td>
                 </tr>

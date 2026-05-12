@@ -47,6 +47,7 @@ def list_message_push():
 def query_message_push():
     result = message_push_service.query_messages(
         machine_no=request.args.get("machine_no"),
+        machine_code=request.args.get("machine_code"),
         start_time=request.args.get("start_time"),
         end_time=request.args.get("end_time"),
         keyword=request.args.get("keyword"),

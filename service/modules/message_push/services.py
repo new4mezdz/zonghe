@@ -32,6 +32,7 @@ class MessagePushService:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     push_time TEXT NOT NULL,
                     machine_no INTEGER NOT NULL CHECK(machine_no BETWEEN 1 AND 12),
+                    machine_code TEXT NOT NULL,
                     content TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 )
@@ -42,6 +43,20 @@ class MessagePushService:
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_push_messages_machine ON push_messages(machine_no)"
+            )
+            try:
+                conn.execute("ALTER TABLE push_messages ADD COLUMN machine_code TEXT")
+            except sqlite3.OperationalError:
+                pass
+            conn.execute(
+                """
+                UPDATE push_messages
+                SET machine_code = printf('jy%02d', machine_no)
+                WHERE machine_code IS NULL OR machine_code = ''
+                """
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_push_messages_machine_code ON push_messages(machine_code)"
             )
 
     def create_message(self, push_time, machine_no, content):
@@ -56,14 +71,15 @@ class MessagePushService:
         if not content:
             return {"success": False, "error": "请输入推送内容"}
 
+        machine_code = self._machine_code(machine_no)
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with self._get_conn() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO push_messages (push_time, machine_no, content, created_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO push_messages (push_time, machine_no, machine_code, content, created_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (normalized_time, machine_no, content, created_at),
+                (normalized_time, machine_no, machine_code, content, created_at),
             )
 
         return {
@@ -73,6 +89,7 @@ class MessagePushService:
                 "id": cursor.lastrowid,
                 "push_time": normalized_time,
                 "machine_no": machine_no,
+                "machine_code": machine_code,
                 "content": content,
                 "created_at": created_at,
             },
@@ -84,6 +101,7 @@ class MessagePushService:
     def query_messages(
         self,
         machine_no=None,
+        machine_code=None,
         start_time=None,
         end_time=None,
         keyword=None,
@@ -102,6 +120,11 @@ class MessagePushService:
         if machine_no is not None:
             conditions.append("machine_no = ?")
             params.append(machine_no)
+
+        machine_code = self._normalize_machine_code(machine_code)
+        if machine_code:
+            conditions.append("machine_code = ?")
+            params.append(machine_code)
 
         start_time = self._normalize_query_time(start_time, "start")
         if start_time:
@@ -127,7 +150,7 @@ class MessagePushService:
             ).fetchone()["total"]
             rows = conn.execute(
                 f"""
-                SELECT id, push_time, machine_no, content, created_at
+                SELECT id, push_time, machine_no, machine_code, content, created_at
                 FROM push_messages{where_sql}
                 ORDER BY push_time {direction}, id {direction}
                 LIMIT ?
@@ -153,7 +176,7 @@ class MessagePushService:
         with self._get_conn() as conn:
             row = conn.execute(
                 """
-                SELECT id, push_time, machine_no, content, created_at
+                SELECT id, push_time, machine_no, machine_code, content, created_at
                 FROM push_messages
                 WHERE id = ?
                 """,
@@ -181,6 +204,7 @@ class MessagePushService:
                 "id": "整数，自增主键",
                 "push_time": "推送时间，格式 YYYY-MM-DD HH:MM:SS",
                 "machine_no": "机台号，整数 1-12",
+                "machine_code": "机台编码，按机台号自动生成，1号机为 jy01，2号机为 jy02，以此类推到 jy12",
                 "content": "推送文本内容",
                 "created_at": "记录提交到数据库的时间，格式 YYYY-MM-DD HH:MM:SS",
             },
@@ -196,6 +220,13 @@ class MessagePushService:
                             "range": "1-12",
                             "description": "按机台号过滤。",
                             "example": "5",
+                        },
+                        "machine_code": {
+                            "required": False,
+                            "type": "string",
+                            "format": "jy01-jy12",
+                            "description": "按机台编码过滤，和 machine_no 二选一即可。",
+                            "example": "jy05",
                         },
                         "start_time": {
                             "required": False,
@@ -251,6 +282,7 @@ class MessagePushService:
                                 "id": 1,
                                 "push_time": "2026-05-06 14:05:00",
                                 "machine_no": 5,
+                                "machine_code": "jy05",
                                 "content": "示例文本",
                                 "created_at": "2026-05-06 14:01:23",
                             }
@@ -267,6 +299,7 @@ class MessagePushService:
                             "id": 1,
                             "push_time": "2026-05-06 14:05:00",
                             "machine_no": 5,
+                            "machine_code": "jy05",
                             "content": "示例文本",
                             "created_at": "2026-05-06 14:01:23",
                         },
@@ -288,6 +321,7 @@ class MessagePushService:
                     "body_fields": {
                         "push_time": "必填，推送时间，支持 YYYY-MM-DDTHH:MM 或 YYYY-MM-DD HH:MM:SS。",
                         "machine_no": "必填，机台号，整数 1-12。",
+                        "machine_code": "不用传，后端会根据 machine_no 自动生成。",
                         "content": "必填，自定义文本内容，前后空格会自动去掉。",
                     },
                     "success_response": {
@@ -297,6 +331,7 @@ class MessagePushService:
                             "id": 1,
                             "push_time": "2026-05-06 14:05:00",
                             "machine_no": 1,
+                            "machine_code": "jy01",
                             "content": "文本内容",
                             "created_at": "2026-05-06 14:01:23",
                         },
@@ -320,6 +355,7 @@ class MessagePushService:
             "examples": {
                 "query_all": "/api/message_push/messages?limit=50",
                 "query_machine": "/api/message_push/messages?machine_no=5&limit=20",
+                "query_machine_code": "/api/message_push/messages?machine_code=jy05&limit=20",
                 "query_time_range": "/api/message_push/messages?start_time=2026-05-06&end_time=2026-05-06",
                 "query_keyword": "/api/message_push/messages?keyword=%E5%81%9C%E6%9C%BA",
                 "detail": "/api/message_push/messages/1",
@@ -376,6 +412,21 @@ class MessagePushService:
         if 1 <= machine_no <= 12:
             return machine_no
         return None
+
+    def _machine_code(self, machine_no):
+        return f"jy{machine_no:02d}"
+
+    def _normalize_machine_code(self, value):
+        value = str(value or "").strip().lower()
+        if not value:
+            return ""
+        if value.isdigit():
+            machine_no = self._normalize_machine_no(value)
+            return self._machine_code(machine_no) if machine_no is not None else ""
+        if len(value) == 4 and value.startswith("jy") and value[2:].isdigit():
+            machine_no = self._normalize_machine_no(value[2:])
+            return self._machine_code(machine_no) if machine_no is not None else ""
+        return ""
 
 
 message_push_service = MessagePushService()
