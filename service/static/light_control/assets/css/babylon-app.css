@@ -1,0 +1,396 @@
+.babylon-page {
+  background: #05070b;
+}
+
+.babylon-page #scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  touch-action: none;
+}
+
+.babylon-page #scene-wrap {
+  background:
+    radial-gradient(circle at 48% 88%, rgba(53, 230, 168, 0.08), transparent 40%),
+    linear-gradient(180deg, #1d2229 0%, #10141a 62%, #07090d 100%);
+}
+
+.babylon-page #scene-wrap::after {
+  pointer-events: none;
+}
+
+.babylon-page.view-control #panel,
+.babylon-page.view-stats #panel,
+.babylon-page.view-plan #panel,
+.babylon-page.view-modeling #control-panel,
+.babylon-page.view-stats #control-panel,
+.babylon-page.view-plan #control-panel {
+  display: none;
+}
+
+.babylon-page.view-control #control-panel,
+.babylon-page.view-modeling #panel {
+  display: flex;
+}
+
+.babylon-page.view-stats #app,
+.babylon-page.view-plan #app {
+  display: none;
+}
+
+.babylon-page #view-stats,
+.babylon-page #view-plan {
+  display: none;
+  min-height: 100vh;
+}
+
+.babylon-page #view-stats {
+  padding: 76px 28px 28px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(53, 230, 168, 0.08), transparent 28%),
+    linear-gradient(180deg, #11161d, #07090d);
+}
+
+.babylon-page.view-stats #view-stats {
+  display: block;
+}
+
+.babylon-page.view-plan #view-plan {
+  display: block;
+}
+
+.hud-source,
+.cp-subtitle,
+.stats-subtitle {
+  margin-top: 5px;
+  color: rgba(222, 230, 240, 0.62);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.hud-engine-line {
+  display: none;
+}
+
+.babylon-page .hud-top-right {
+  margin-top: 48px;
+}
+
+.babylon-page .hud-temp-main {
+  font-size: 40px;
+  font-weight: 400;
+}
+
+.babylon-page .hud-temp-cond {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.babylon-page .hud-temp-sub {
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.babylon-page.control-mode #hud-edit {
+  display: none;
+}
+
+.babylon-page.control-mode #hud-walk,
+.babylon-page.view-control #hud-walk {
+  display: flex;
+}
+
+.babylon-page #hud-walk {
+  right: 24px;
+  bottom: 24px;
+  z-index: 35;
+  border-color: rgba(53, 230, 168, 0.28);
+  background: rgba(8, 15, 22, 0.82);
+  color: rgba(236, 255, 247, 0.94);
+  pointer-events: auto;
+}
+
+.babylon-page #hud-walk::after {
+  content: 'FPS';
+  margin-left: 2px;
+  padding: 3px 6px;
+  border-radius: 7px;
+  background: rgba(53, 230, 168, 0.14);
+  color: #72f4bf;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+}
+
+.babylon-page #hud-walk.active::after {
+  background: rgba(255, 255, 255, 0.20);
+  color: #ffffff;
+}
+
+.scene-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  z-index: 30;
+  transform: translateX(-50%);
+  max-width: min(560px, calc(100% - 40px));
+  padding: 10px 14px;
+  border: 1px solid rgba(53, 230, 168, 0.26);
+  border-radius: 8px;
+  background: rgba(7, 12, 17, 0.86);
+  color: #edf6f2;
+  font-size: 12px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(14px);
+}
+
+.babylon-page .device-pop {
+  position: absolute;
+  z-index: 25;
+  min-width: 230px;
+  max-width: 280px;
+  padding: 12px;
+  border: 1px solid rgba(99, 227, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(7, 11, 17, 0.88);
+  color: #eef5ff;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+}
+
+.pop-title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.pop-meta {
+  margin-top: 5px;
+  color: #9eabb8;
+  font-size: 11px;
+}
+
+.pop-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pop-actions .btn {
+  flex: 1;
+  padding: 7px 8px;
+  font-size: 11px;
+}
+
+.babylon-page #control-panel {
+  background:
+    linear-gradient(180deg, rgba(7, 11, 17, 0.98), rgba(4, 7, 12, 0.98)),
+    radial-gradient(circle at top left, rgba(53, 230, 168, 0.07), transparent 32%);
+}
+
+.babylon-page .cp-head {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.babylon-page .cp-primary-actions {
+  padding-top: 14px;
+}
+
+.cv-body {
+  overflow-y: auto;
+  padding: 0 16px 18px;
+}
+
+.babylon-page .light-rows,
+.babylon-page .layout-list {
+  display: grid;
+  gap: 8px;
+}
+
+.stats-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.stats-subtitle {
+  margin-top: 6px;
+}
+
+.babylon-page .cv-big-btn {
+  border: 1px solid rgba(99, 227, 255, 0.16);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(18, 27, 37, 0.92), rgba(9, 14, 22, 0.96));
+  color: #edf7ff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 14px 34px rgba(0, 0, 0, 0.24);
+}
+
+.babylon-page .cv-big-btn:hover {
+  border-color: rgba(53, 230, 168, 0.36);
+  background: linear-gradient(180deg, rgba(22, 34, 45, 0.96), rgba(11, 18, 27, 0.98));
+}
+
+.babylon-page .cv-big-btn.on {
+  border-color: rgba(53, 230, 168, 0.52);
+  box-shadow: inset 0 0 0 1px rgba(53, 230, 168, 0.12), 0 0 30px rgba(53, 230, 168, 0.12);
+}
+
+.babylon-page .cv-big-btn.offline {
+  opacity: 0.48;
+}
+
+.babylon-page .cv-big-btn.mode {
+  border-style: dashed;
+  background: rgba(12, 18, 27, 0.92);
+}
+
+.babylon-page .lsw {
+  color: #dce8f4;
+}
+
+.babylon-page .lsw-pill {
+  border: 1px solid rgba(99, 227, 255, 0.16);
+  background: rgba(12, 18, 27, 0.92);
+}
+
+.babylon-page .lsw.on .lsw-pill {
+  border-color: rgba(53, 230, 168, 0.45);
+  background: rgba(53, 230, 168, 0.10);
+}
+
+.babylon-page .lsw.pending .lsw-pill {
+  border-color: rgba(255, 211, 106, 0.72);
+  background: rgba(255, 211, 106, 0.12);
+  box-shadow: 0 0 22px rgba(255, 211, 106, 0.18);
+}
+
+.babylon-page .lsw-glow {
+  background: #66717d;
+}
+
+.babylon-page .lsw.on .lsw-glow {
+  background: #35e6a8;
+  box-shadow: 0 0 20px rgba(53, 230, 168, 0.70);
+}
+
+.babylon-page .lsw.pending .lsw-glow {
+  background: #ffd36a;
+  box-shadow: 0 0 22px rgba(255, 211, 106, 0.75);
+}
+
+.babylon-page .lsw.pending .lsw-text {
+  color: #ffe3a3;
+}
+
+.babylon-page #toast-stack {
+  position: fixed;
+  top: auto;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  width: min(360px, calc(100vw - 36px));
+}
+
+.babylon-page .toast {
+  border: 1px solid rgba(99, 227, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(7, 12, 18, 0.92);
+  color: #edf6ff;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(16px);
+}
+
+.babylon-page .toast.success {
+  border-color: rgba(53, 230, 168, 0.36);
+}
+
+.babylon-page .toast.warn {
+  border-color: rgba(255, 214, 138, 0.36);
+}
+
+.babylon-page .toast.error {
+  border-color: rgba(255, 90, 90, 0.42);
+}
+
+.babylon-page .modal-bg {
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.babylon-page .modal {
+  border: 1px solid rgba(99, 227, 255, 0.18);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(53, 230, 168, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(12, 18, 27, 0.98), rgba(5, 7, 11, 0.98));
+  color: #edf6ff;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.48);
+}
+
+.babylon-page .modal input,
+.babylon-page .modal select,
+.babylon-page .modal textarea {
+  border-color: rgba(99, 227, 255, 0.16);
+  background: rgba(5, 8, 13, 0.92);
+  color: #edf6ff;
+}
+
+.babylon-page .modal-notice {
+  border-radius: 8px;
+}
+
+.babylon-page .stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.babylon-page .stats-card {
+  border: 1px solid rgba(99, 227, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(12, 18, 27, 0.78);
+}
+
+.babylon-page .stats-section {
+  border: 1px solid rgba(99, 227, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(8, 13, 20, 0.74);
+}
+
+.babylon-page .stats-canvas {
+  width: 100%;
+  height: 190px;
+  display: block;
+}
+
+.babylon-page .rank-track {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.babylon-page .rank-fill {
+  background: linear-gradient(90deg, #35e6a8, #63e3ff);
+}
+
+.babylon-page .rank-name,
+.babylon-page .rank-val,
+.babylon-page .st-row span:not(.st-name) {
+  color: #dbe7f3;
+}
+
+.babylon-page .st-head {
+  background: #0b1018;
+  color: #8ea0ad;
+}
+
+.babylon-page .st-row {
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+@media (max-width: 900px) {
+  .babylon-page .stats-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

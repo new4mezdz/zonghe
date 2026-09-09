@@ -251,6 +251,9 @@
             <option value="alert">仅异常</option>
             <option value="normal">仅正常</option>
         </select>
+        <input type="text" id="nameSearch" placeholder="🔍 搜索图片名..." oninput="applyFilter()"
+            style="background:#252830; color:#e0e0e0; border:1px solid #3a3d4a; border-radius:6px; padding:8px 12px; font-size:14px; min-width:200px;" />
+        <button onclick="clearNameSearch()" style="background:#444;">清除</button>
     </div>
 
     <div class="stats-bar" id="statsBar" style="display:none;">
@@ -635,6 +638,11 @@
         if (lastQueryData) renderResults(lastQueryData);
     }
 
+    function clearNameSearch() {
+        document.getElementById('nameSearch').value = '';
+        applyFilter();
+    }
+
     function renderResults(data) {
         var area = document.getElementById('resultArea');
         var statsBar = document.getElementById('statsBar');
@@ -643,12 +651,14 @@
 
         var filter = document.getElementById('alertFilter').value;
         var modeFilter = document.getElementById('modeFilter').value;
+        var nameKeyword = (document.getElementById('nameSearch').value || '').trim().toLowerCase();
 
         var detections = allDetections;
         if (modeFilter === 'auto') detections = detections.filter(function(d) { return d.mode === 'auto'; });
         if (modeFilter === 'manual') detections = detections.filter(function(d) { return d.mode !== 'auto'; });
         if (filter === 'alert') detections = detections.filter(function(d) { return d.is_alert; });
         if (filter === 'normal') detections = detections.filter(function(d) { return !d.is_alert; });
+        if (nameKeyword) detections = detections.filter(function(d) { return (d.filename || '').toLowerCase().indexOf(nameKeyword) !== -1; });
 
         var alertCount = allDetections.filter(function(d) { return d.is_alert; }).length;
         var normalCount = allDetections.filter(function(d) { return !d.is_alert; }).length;

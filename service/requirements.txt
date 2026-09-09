@@ -4,3 +4,4 @@ flask-socketio
 PyQt6
 PyMySQL>=1.1.0
 requests>=2.0.0
+influxdb-client

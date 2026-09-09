@@ -1,0 +1,9 @@
+Platform Trolley
+
+Source: https://3dmodelscc0.itch.io/free-cc0-industrial-3d-models
+Creator: 3DModelsCC0
+Original package: IndustrialPack.rar / Platform_Trolley.fbx
+License: Creative Commons Zero v1.0 Universal (CC0-1.0 / public domain)
+
+The original geometry was converted from FBX to GLB with FBX2glTF 0.13.1.
+The application supplies its own safety-yellow material and dark caster-wheel accents.

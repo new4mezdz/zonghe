@@ -1,0 +1,42 @@
+/*
+ * Standalone two-view entry: flat-plan control + project configuration.
+ * The shared Babylon shell is kept intact so the existing configuration tools
+ * continue to work, while control/statistics remain outside this entry.
+ */
+
+.flat-config-page .flat-config-tabs {
+  min-width: 252px;
+  justify-content: center;
+}
+
+.flat-config-page .flat-config-tabs .top-tab {
+  min-width: 112px;
+}
+
+.flat-config-page #view-stats,
+.flat-config-page #control-panel {
+  display: none !important;
+}
+
+.flat-config-page .plan-selection-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.flat-config-page #plan-selection-3d {
+  display: none !important;
+}
+
+.flat-config-page.view-modeling .hud-title {
+  letter-spacing: 2.2px;
+}
+
+@media (max-width: 820px) {
+  .flat-config-page .flat-config-tabs {
+    min-width: 0;
+    width: auto;
+  }
+
+  .flat-config-page .flat-config-tabs .top-tab {
+    min-width: 96px;
+  }
+}

@@ -102,9 +102,20 @@ def save_scheduler_config():
 def get_scheduler_status():
     return jsonify(urldata_service.get_scheduler_status())
 
+
+@urldata_bp.route('/api/urldata/initial_sync_status', methods=['GET'])
+def get_initial_sync_status():
+    return jsonify(urldata_service.get_initial_sync_status())
+
+
 @urldata_bp.route('/api/urldata/influx_status', methods=['GET'])
 def get_influx_status():
     return jsonify(urldata_service.get_influx_status())
+
+
+@urldata_bp.route('/api/urldata/influx_history_profile', methods=['GET'])
+def get_influx_history_profile():
+    return jsonify(urldata_service.get_influx_history_profile())
 
 
 @urldata_bp.route('/api/urldata/influx_sample', methods=['GET'])

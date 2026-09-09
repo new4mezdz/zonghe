@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="data:,">
+    <title>打印待处理记录</title>
+    <link rel="stylesheet" href="{{ url_for('pending_records.static', filename='print.css') }}">
+    <style id="pageSizeStyle">@page { size: 210mm 148mm; margin: 0; }</style>
+  </head>
+  <body>
+    <header class="print-toolbar">
+      <div>
+        <button id="backButton" type="button" class="secondary">← 返回</button>
+        <div class="toolbar-title"><strong>打印预览</strong><span id="toolbarNumber">正在读取…</span></div>
+      </div>
+      <div class="toolbar-actions">
+        <label>纸张
+          <select id="paperSize">
+            <option value="a5">A5 横向（默认，整页铺满）</option>
+            <option value="150x100">150 × 100 mm</option>
+            <option value="200x100">200 × 100 mm</option>
+          </select>
+        </label>
+        <label>份数 <input id="copyCount" type="number" min="1" max="20" value="1"></label>
+        <button id="printButton" type="button" class="primary">
+          <svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
+          打印
+        </button>
+      </div>
+    </header>
+
+    <main class="preview-stage">
+      <div class="loading" id="loadingState">正在生成记录单…</div>
+      <div class="print-pages hidden" id="printPages"></div>
+    </main>
+
+    <template id="labelTemplate">
+      <article class="label-sheet size-a5">
+        <div class="shift-watermark" data-field="shift_watermark" aria-hidden="true"></div>
+        <div class="label-head">
+          <div class="label-kicker" aria-hidden="true"></div>
+          <h1>待处理品记录单</h1>
+          <div class="label-number" data-field="record_no"></div>
+        </div>
+        <div class="label-body">
+          <div class="info-grid top-info">
+            <div><span>日期</span><strong data-field="record_date"></strong></div>
+            <div><span>班组</span><strong data-field="shift"></strong></div>
+            <div><span>牌号</span><strong data-field="product"></strong></div>
+          </div>
+          <div class="info-grid middle-info">
+            <div><span>机台号</span><strong data-field="machines"></strong></div>
+            <div><span>数量</span><strong data-field="quantity"></strong></div>
+            <div><span>存放人</span><strong data-field="custodian"></strong></div>
+          </div>
+          <div class="reason-block">
+            <span>待处理原因</span>
+            <div class="reason-values" data-field="reasons"></div>
+          </div>
+          <div class="disposition-block">
+            <span>处置情况</span>
+            <strong data-field="disposition"></strong>
+          </div>
+          <div class="bottom-info">
+            <div><span>处置人</span><strong data-field="disposer"></strong></div>
+            <div><span>记录时间</span><strong data-field="created_at"></strong></div>
+          </div>
+        </div>
+        <div class="label-foot">请将本单随待处理品一同存放 · 信息以电子台账为准</div>
+      </article>
+    </template>
+    <script src="{{ url_for('pending_records.static', filename='print.js') }}" defer></script>
+  </body>
+</html>

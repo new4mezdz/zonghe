@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1f3d35">
+    <link rel="icon" href="data:,">
+    <title>待处理记录</title>
+    <link rel="stylesheet" href="{{ url_for('pending_records.static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}" aria-label="返回综合数据管理系统首页">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M6 3.75h12a2 2 0 0 1 2 2v12.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5.75a2 2 0 0 1 2-2Zm2 0v3m8-3v3M4 9h16M8 13h3m2 0h3m-8 3h3"/></svg>
+          </span>
+          <span>
+            <strong>待处理记录</strong>
+            <small>录入 · 留档 · A5 打印</small>
+          </span>
+        </a>
+        <div class="top-actions">
+          <a class="home-link" href="{{ url_for('index') }}">返回综合首页</a>
+          <span class="server-state"><i></i> 网页服务已连接</span>
+          <button class="button button-primary compact" id="newRecordTop" type="button">
+            <span aria-hidden="true">＋</span> 新建记录
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div>
+            <p class="eyebrow" id="todayLabel">今日</p>
+            <h1>待处理品记录台账</h1>
+            <p>完成信息录入后保存留档，再打印并随实物存放。</p>
+          </div>
+          <div class="summary" aria-label="记录概况">
+            <div class="summary-item"><strong id="todayCount">0</strong><span>今日新增</span></div>
+            <div class="summary-item"><strong id="pendingCount">0</strong><span>待处置</span></div>
+            <div class="summary-item"><strong id="monthCount">0</strong><span>本月记录</span></div>
+          </div>
+        </section>
+
+        <nav class="tabs" aria-label="页面导航">
+          <button class="tab active" type="button" data-tab="entry">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z"/></svg>
+            记录录入
+          </button>
+          <button class="tab" type="button" data-tab="ledger">
+            <svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13ZM4 9h16M9 4v16"/></svg>
+            记录台账
+            <span class="tab-count" id="allCount">0</span>
+          </button>
+          <button class="tab" type="button" data-tab="pending-summary">
+            <svg viewBox="0 0 24 24"><path d="M5 20V10m7 10V4m7 16v-7M3 20h18"/></svg>
+            待处置统计
+            <span class="tab-count warning" id="pendingSummaryCount">0</span>
+          </button>
+        </nav>
+
+        <section class="view active" id="entryView">
+          <form id="recordForm" novalidate>
+            <div class="form-heading">
+              <div>
+                <span class="section-number">01</span>
+                <div><h2 id="formTitle">新建记录</h2><p>带 <b>*</b> 的项目为必填项</p></div>
+              </div>
+              <button class="text-button hidden" type="button" id="cancelEdit">退出编辑</button>
+            </div>
+
+            <div class="form-card">
+              <div class="card-title">
+                <span class="card-icon"><svg viewBox="0 0 24 24"><path d="M7 3v3m10-3v3M4 9h16M5.5 5h13A1.5 1.5 0 0 1 20 6.5v12a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5Z"/></svg></span>
+                <div><h3>基础信息</h3><p>记录日期、编号和产品来源</p></div>
+              </div>
+              <div class="field-grid four-columns">
+                <label class="field">
+                  <span>日期 <b>*</b></span>
+                  <input type="date" name="record_date" id="recordDate" required>
+                </label>
+                <label class="field">
+                  <span>班组 <b>*</b></span>
+                  <select name="shift" id="shiftSelect" required>
+                    <option value="">请选择班组</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>编号 <em>按月自动生成</em></span>
+                  <span class="number-preview" id="numberPreview"><i></i><strong>正在生成…</strong></span>
+                </label>
+                <label class="field">
+                  <span>牌号 <b>*</b></span>
+                  <select name="product" id="productSelect" required>
+                    <option value="">请选择牌号</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="divider"></div>
+
+              <fieldset class="field-group">
+                <legend>机台号 <b>*</b> <small>可多选</small></legend>
+                <div class="choice-grid machine-grid" id="machineOptions"></div>
+              </fieldset>
+
+              <div class="field-grid quantity-row">
+                <div class="field">
+                  <span>数量 <b>*</b></span>
+                  <div class="quantity-inputs">
+                    <label><input type="number" min="0" max="999999" step="1" inputmode="numeric" name="case_count" value="0"><span>件</span></label>
+                    <span class="quantity-plus">＋</span>
+                    <label><input type="number" min="0" max="999999" step="1" inputmode="numeric" name="strip_count" value="0"><span>条</span></label>
+                  </div>
+                  <small class="field-hint">至少填写一项，另一项可为 0</small>
+                </div>
+                <label class="field">
+                  <span>存放人 <b>*</b></span>
+                  <input type="text" name="custodian" maxlength="30" placeholder="请输入姓名" autocomplete="name" required>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-card reason-card">
+              <div class="card-title">
+                <span class="card-icon amber"><svg viewBox="0 0 24 24"><path d="M12 8v5m0 3h.01M10.3 3.9 2.5 17.4A1.7 1.7 0 0 0 4 20h16a1.7 1.7 0 0 0 1.5-2.6L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg></span>
+                <div><h3>待处理原因 <b>*</b></h3><p>可同时勾选多项，带说明的项目请补充完整</p></div>
+              </div>
+              <div class="reason-options" id="reasonOptions"></div>
+            </div>
+
+            <div class="form-footer">
+              <div class="save-note">
+                <svg viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-14v5m0 3h.01"/></svg>
+                <span>保存后编号即被占用；记录不会因打印失败而丢失。</span>
+              </div>
+              <div class="form-actions">
+                <button class="button button-secondary" type="button" id="resetForm">清空重填</button>
+                <button class="button button-primary large" type="submit" id="saveButton">
+                  <span class="button-label">保存记录</span>
+                  <span class="button-spinner" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <section class="view" id="ledgerView">
+          <div class="ledger-heading">
+            <div><span class="section-number">02</span><div><h2>记录台账</h2><p>查看首次数量，追加待处理数量，并可多次补录处理数量与结果</p></div></div>
+            <button class="button button-primary compact" type="button" id="newRecordLedger">＋ 新建记录</button>
+          </div>
+          <div class="filter-bar">
+            <label class="search-field">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+              <input id="searchInput" type="search" placeholder="搜索编号、牌号、机台或人员">
+            </label>
+            <label><span>从</span><input id="dateFrom" type="date"></label>
+            <label><span>至</span><input id="dateTo" type="date"></label>
+            <label>
+              <span>状态</span>
+              <select id="statusFilter"><option value="">全部</option><option value="pending">待处置</option><option value="completed">已处置</option></select>
+            </label>
+            <label>
+              <span>班组</span>
+              <select id="shiftFilter"><option value="">全部</option><option value="甲班">甲班</option><option value="乙班">乙班</option><option value="丙班">丙班</option></select>
+            </label>
+            <button class="button button-secondary compact" id="clearFilters" type="button">重置</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>日期 / 编号</th><th>班组</th><th>牌号</th><th>机台</th><th>待处理数量</th><th>存放人</th><th>原因</th><th>处理记录 / 剩余</th><th>状态</th><th class="action-column">操作</th></tr></thead>
+              <tbody id="recordRows"></tbody>
+            </table>
+            <div class="empty-state hidden" id="emptyState">
+              <span><svg viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13ZM8 9h8m-8 4h5"/></svg></span>
+              <h3>暂无匹配记录</h3><p>调整筛选条件，或新建第一条记录。</p>
+            </div>
+          </div>
+          <p class="table-note" id="tableNote"></p>
+        </section>
+
+        <section class="view" id="pendingSummaryView">
+          <div class="ledger-heading">
+            <div><span class="section-number">03</span><div><h2>未补录待处置统计</h2><p>按班组和牌号汇总尚未填写处置情况的件数与条数</p></div></div>
+            <button class="button button-secondary compact" type="button" id="refreshPendingSummary">刷新统计</button>
+          </div>
+          <div class="pending-stats-grid" id="pendingStatsGrid"></div>
+          <p class="table-note" id="pendingStatsNote"></p>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-region" id="toastRegion" aria-live="polite"></div>
+
+    <div class="modal-backdrop hidden" id="successModal" role="dialog" aria-modal="true" aria-labelledby="successTitle">
+      <div class="modal">
+        <div class="success-icon"><svg viewBox="0 0 24 24"><path d="m5 12.5 4.2 4.2L19.5 6.5"/></svg></div>
+        <p class="eyebrow">记录已安全保存</p>
+        <h2 id="successTitle">可以打印了</h2>
+        <p class="modal-number" id="savedNumber">—</p>
+        <p class="modal-copy">打印窗口中选择 <strong>A5、横向、实际大小</strong>；模板已按真实 A5 尺寸铺满，无需再手工调整缩放。</p>
+        <div class="modal-actions">
+          <button class="button button-primary large" type="button" id="printSaved">
+            <svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>
+            打开打印页
+          </button>
+          <button class="button button-secondary" type="button" id="finishSaved">完成并继续</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="quantityModal" role="dialog" aria-modal="true" aria-labelledby="quantityModalTitle">
+      <form class="modal workflow-modal" id="quantityAdditionForm">
+        <p class="eyebrow">增加待处理数量</p>
+        <h2 id="quantityModalTitle">补充数量</h2>
+        <p class="modal-number" id="quantityRecordNumber">—</p>
+        <p class="modal-copy">本次增加的数量会单独保存，并显示在首次数量下方。</p>
+        <div class="workflow-quantity-grid">
+          <label class="field"><span>补充件数</span><input id="supplementCaseCount" type="number" min="0" max="999999" step="1" value="0" required></label>
+          <label class="field"><span>补充条数</span><input id="supplementStripCount" type="number" min="0" max="999999" step="1" value="0" required></label>
+        </div>
+        <label class="field workflow-note"><span>补充说明 <em>选填</em></span><input id="supplementNote" type="text" maxlength="100" placeholder="例如：二次转入"></label>
+        <div class="delete-error hidden" id="quantityModalError" role="alert"></div>
+        <div class="modal-actions two-actions">
+          <button class="button button-secondary" type="button" id="cancelQuantityAddition">取消</button>
+          <button class="button button-primary" type="submit" id="confirmQuantityAddition">确认增加</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop hidden" id="dispositionModal" role="dialog" aria-modal="true" aria-labelledby="dispositionModalTitle">
+      <form class="modal workflow-modal wide" id="dispositionEntryForm">
+        <p class="eyebrow">补录处理流水</p>
+        <h2 id="dispositionModalTitle">新增处理记录</h2>
+        <p class="modal-number" id="dispositionRecordNumber">—</p>
+        <div class="remaining-panel">
+          <span>当前剩余</span>
+          <strong id="dispositionRemaining">0 件 · 0 条</strong>
+        </div>
+        <div class="workflow-quantity-grid">
+          <label class="field"><span>本次处理件数 <b>*</b></span><input id="processedCaseCount" type="number" min="0" max="999999" step="1" value="0" required></label>
+          <label class="field"><span>本次处理条数 <b>*</b></span><input id="processedStripCount" type="number" min="0" max="999999" step="1" value="0" required></label>
+        </div>
+        <label class="field workflow-note"><span>处置情况 <b>*</b></span><textarea id="dispositionText" rows="3" maxlength="300" placeholder="请输入本次处置过程或结果" required></textarea></label>
+        <label class="field workflow-note"><span>处置人 <b>*</b></span><input id="dispositionPerson" type="text" maxlength="30" placeholder="请输入姓名" required></label>
+        <div class="workflow-history hidden" id="existingDispositionHistory"></div>
+        <div class="delete-error hidden" id="dispositionModalError" role="alert"></div>
+        <div class="modal-actions two-actions">
+          <button class="button button-secondary" type="button" id="cancelDispositionEntry">取消</button>
+          <button class="button button-primary" type="submit" id="confirmDispositionEntry">保存处理记录</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="modal-backdrop hidden" id="deleteModal" role="dialog" aria-modal="true" aria-labelledby="deleteTitle">
+      <form class="modal delete-modal" id="deleteForm">
+        <div class="danger-icon" aria-hidden="true">!</div>
+        <p class="eyebrow danger-text">危险操作</p>
+        <h2 id="deleteTitle">确认删除记录</h2>
+        <p class="modal-copy">即将永久删除 <strong id="deleteRecordNumber">—</strong>。请输入删除密码确认。</p>
+        <label class="delete-password-field">
+          <span>删除密码</span>
+          <input id="deletePassword" type="password" autocomplete="current-password" required placeholder="请输入密码">
+        </label>
+        <div class="delete-error hidden" id="deleteError" role="alert"></div>
+        <div class="modal-actions two-actions">
+          <button class="button button-secondary" type="button" id="cancelDelete">取消</button>
+          <button class="button button-danger" type="submit" id="confirmDelete">确认删除</button>
+        </div>
+      </form>
+    </div>
+
+    <script src="{{ url_for('pending_records.static', filename='app.js') }}" defer></script>
+  </body>
+</html>

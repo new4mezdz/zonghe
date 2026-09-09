@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>辅料领退料明细</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eaeaea;
+            min-height: 100vh;
+        }
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 18px 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 1.7rem; margin-bottom: 8px; }
+        .header a {
+            color: #e94560;
+            text-decoration: none;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+        .panel-title {
+            font-size: 1.05rem;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+        .row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            margin-bottom: 10px;
+        }
+        .field {
+            min-width: 170px;
+            flex: 1;
+        }
+        label {
+            display: block;
+            color: #9ca3af;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        input, select, button {
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid #374151;
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.35);
+            color: #fff;
+            font-size: 14px;
+        }
+        select[multiple] { min-height: 110px; }
+        input:focus, select:focus, button:focus {
+            outline: none;
+            border-color: #e94560;
+            box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            width: auto;
+            border: none;
+            background: #2563eb;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .btn-alt {
+            background: #374151;
+        }
+        .btn-alt:hover { background: #4b5563; }
+        .status {
+            min-height: 28px;
+            color: #f8fafc;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #cbd5e1;
+        }
+        .table-wrap { overflow: auto; max-height: 64vh; border-top: 1px solid rgba(255,255,255,0.15); margin-top: 12px; }
+        table {
+            width: 100%;
+            min-width: 900px;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 7px 8px;
+            border: 1px solid rgba(255,255,255,0.16);
+            font-size: 13px;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            background: #111827;
+            color: #d1d5db;
+        }
+        tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+        .empty {
+            color: #9ca3af;
+            text-align: center;
+            padding: 24px;
+        }
+        @media (max-width: 900px) {
+            .row { gap: 8px; }
+            .field { min-width: 150px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>辅料领退料明细</h1>
+        <a href="/">返回主页</a>
+    </div>
+    <div class="container">
+        <div class="panel">
+            <div class="panel-title">查询条件</div>
+            <div class="row">
+                <div class="field">
+                    <label for="startDate">开始日期</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="field">
+                    <label for="endDate">结束日期</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="field">
+                    <label for="orderSelect">排序</label>
+                    <select id="orderSelect">
+                        <option value="desc">倒序</option>
+                        <option value="asc">正序</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="limitInput">返回条数</label>
+                    <input type="number" id="limitInput" min="1" max="500" value="200">
+                </div>
+            </div>
+            <div class="row">
+                <div class="field">
+                    <label for="typeSelect">类型（多选）</label>
+                    <select id="typeSelect" multiple></select>
+                </div>
+                <div class="field">
+                    <label for="keywordInput">关键词（可选）</label>
+                    <input id="keywordInput" type="text" placeholder="可按类型关键词筛选">
+                </div>
+                <div class="field">
+                    <label style="visibility: hidden;">操作</label>
+                    <div class="actions">
+                        <button class="btn" id="allTypesBtn" type="button">全部类型</button>
+                        <button class="btn" id="queryBtn" type="button">查询</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label style="visibility: hidden;">操作2</label>
+                    <div class="actions">
+                        <button class="btn btn-alt" id="resetBtn" type="button">重置</button>
+                        <button class="btn btn-alt" id="exportBtn" type="button">导出CSV</button>
+                    </div>
+                </div>
+            </div>
+            <div class="status" id="statusText">尚未查询</div>
+        </div>
+        <div class="panel">
+            <div class="table-wrap">
+                <table>
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const startDateEl = document.getElementById("startDate");
+        const endDateEl = document.getElementById("endDate");
+        const orderSelect = document.getElementById("orderSelect");
+        const limitInput = document.getElementById("limitInput");
+        const typeSelect = document.getElementById("typeSelect");
+        const keywordInput = document.getElementById("keywordInput");
+        const statusText = document.getElementById("statusText");
+        const tableHead = document.getElementById("tableHead");
+        const tableBody = document.getElementById("tableBody");
+        const queryBtn = document.getElementById("queryBtn");
+        const resetBtn = document.getElementById("resetBtn");
+        const allTypesBtn = document.getElementById("allTypesBtn");
+        const exportBtn = document.getElementById("exportBtn");
+
+        let currentRows = [];
+
+        function today() {
+            const now = new Date();
+            const m = String(now.getMonth() + 1).padStart(2, "0");
+            const d = String(now.getDate()).padStart(2, "0");
+            return `${now.getFullYear()}-${m}-${d}`;
+        }
+
+        function setDefaultDates() {
+            startDateEl.value = today();
+            endDateEl.value = today();
+        }
+
+        function escapeHtml(value) {
+            const div = document.createElement("div");
+            div.textContent = value == null ? "" : String(value);
+            return div.innerHTML;
+        }
+
+        function setStatus(text) {
+            statusText.textContent = text || "";
+        }
+
+        function showNoData() {
+            tableHead.innerHTML = "";
+            tableBody.innerHTML = '<tr><td colspan="99" class="empty">暂无数据</td></tr>';
+        }
+
+        function collectTypes() {
+            return Array.from(typeSelect.selectedOptions).map((option) => option.value).filter(Boolean);
+        }
+
+        function renderTable(rows) {
+            if (!rows.length) {
+                showNoData();
+                return;
+            }
+            const allKeysSet = new Set();
+            rows.forEach((item) => Object.keys(item).forEach((k) => allKeysSet.add(k)));
+            const keys = Array.from(allKeysSet).sort();
+
+            tableHead.innerHTML = `<tr>${keys.map((k) => `<th>${escapeHtml(k)}</th>`).join("")}</tr>`;
+            tableBody.innerHTML = rows.map((row) => {
+                const tds = keys.map((key) => `<td>${escapeHtml(row[key])}</td>`).join("");
+                return `<tr>${tds}</tr>`;
+            }).join("");
+        }
+
+        async function loadTypes() {
+            const res = await fetch("/api/material_transfer/types");
+            const data = await res.json();
+            if (!data.success) {
+                typeSelect.innerHTML = `<option value=\"\">${escapeHtml(data.error || "无法读取类型")}</option>`;
+                return;
+            }
+            if (!data.types || !data.types.length) {
+                typeSelect.innerHTML = '<option value="">无可用类型</option>';
+                return;
+            }
+            typeSelect.innerHTML = data.types.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
+            // 默认选中“辅料出库”（如果存在）
+            const defaultItem = Array.from(typeSelect.options).find((o) => o.value.includes("辅料出库"));
+            if (defaultItem) {
+                defaultItem.selected = true;
+            }
+        }
+
+        async function queryRows() {
+            const types = collectTypes();
+            const payload = {
+                start_date: startDateEl.value || "",
+                end_date: endDateEl.value || "",
+                types: types,
+                all_types: !types.length,
+                keyword: keywordInput.value || "",
+                limit: parseInt(limitInput.value, 10) || 200,
+                order: orderSelect.value || "desc"
+            };
+
+            const res = await fetch("/api/material_transfer/query", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (!data.success) {
+                setStatus(data.error || "查询失败");
+                showNoData();
+                return;
+            }
+
+            currentRows = data.rows || [];
+            renderTable(currentRows);
+            setStatus(
+                `查询到 ${data.total === null ? currentRows.length : data.total} 条，` +
+                `已返回 ${data.returned} 条` +
+                (data.truncated ? "，有更多数据请缩小查询范围" : "")
+            );
+        }
+
+        async function checkStatus() {
+            const res = await fetch("/api/material_transfer/status");
+            const data = await res.json();
+            if (data.success) {
+                if (data.driver_ready === false) {
+                    setStatus(`已加载页面：${data.error}`);
+                } else {
+                    setStatus(`驱动已就绪。默认类型：${data.default_type || "未设置"}，最大返回：${data.max_rows}`);
+                }
+            } else {
+                setStatus(data.error || "服务未就绪");
+            }
+        }
+
+        function resetFilters() {
+            setDefaultDates();
+            limitInput.value = 200;
+            orderSelect.value = "desc";
+            keywordInput.value = "";
+            Array.from(typeSelect.options).forEach((item) => item.selected = false);
+            queryRows();
+        }
+
+        function selectAllTypes() {
+            const shouldSelectAll = true;
+            Array.from(typeSelect.options).forEach((item) => item.selected = shouldSelectAll);
+            queryRows();
+        }
+
+        function exportCsv() {
+            if (!currentRows.length) {
+                alert("当前没有可导出的数据");
+                return;
+            }
+            const keys = Array.from(document.querySelectorAll("#tableHead th")).map((cell) => cell.textContent);
+            if (!keys.length) {
+                return;
+            }
+            const lines = [];
+            lines.push(keys.map(k => `"${k}"`).join(","));
+            currentRows.forEach((row) => {
+                const values = keys.map((key) => {
+                    const text = row[key];
+                    return `"${String(text == null ? "" : text).replace(/"/g, '""')}"`;
+                });
+                lines.push(values.join(","));
+            });
+            const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `material_transfer_${today()}.csv`;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        setDefaultDates();
+        checkStatus();
+        loadTypes();
+        queryRows();
+
+        queryBtn.addEventListener("click", queryRows);
+        resetBtn.addEventListener("click", resetFilters);
+        allTypesBtn.addEventListener("click", selectAllTypes);
+        exportBtn.addEventListener("click", exportCsv);
+        [startDateEl, endDateEl, orderSelect, keywordInput].forEach((el) => {
+            el.addEventListener("change", queryRows);
+        });
+        limitInput.addEventListener("change", queryRows);
+    </script>
+</body>
+</html>

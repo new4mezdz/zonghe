@@ -20,6 +20,18 @@ def _app_dir():
 
 DB_FILE = os.path.join(_app_dir(), 'urldata.db')
 LAST_SYNC_FILE = os.path.join(_app_dir(), 'last_sync_time.json')
+INITIAL_SYNC_STATE_FILE = os.path.join(_app_dir(), 'initial_sync_state.json')
+
+
+def _runtime_path(path):
+    """把配置中的相对数据路径固定到程序目录。"""
+    if os.path.isabs(path):
+        return path
+    return os.path.join(_app_dir(), path)
+
+
+def _now_text():
+    return datetime.now().astimezone().isoformat(timespec='seconds')
 
 
 class UrlDataService:
@@ -28,6 +40,7 @@ class UrlDataService:
     def __init__(self):
         self.config = Config.load_json_config()
         self.last_process_logs = []
+        self._initial_sync_lock = threading.Lock()
         self.influx_config = {
             'url': 'http://10.164.62.253:8086/',
             'token': 'u31cmj6sXb8CjYO1r0TcBbSNToKHXVsqbgMn-KBq7zvnmAEemTtYlN8ZwX7wXydgRr6VkdjuwwbiD0YgS6lq0A==',
@@ -79,9 +92,7 @@ class UrlDataService:
 
     def _save_config(self, config):
         try:
-            with open('config.json', 'w', encoding='utf-8') as f:
-                json.dump(config, f, ensure_ascii=False, indent=4)
-            self._reload_config()
+            self.config = Config.save_json_config(config)
             return True
         except Exception as e:
             logging.error("保存配置失败: %s", e)
@@ -89,7 +100,13 @@ class UrlDataService:
 
     # ========== 数据处理 ==========
 
-    def process_data(self, start_time='-1h', stop_time=None):
+    def process_data(
+        self,
+        start_time='-1h',
+        stop_time=None,
+        reset_numbers=False,
+        write_output=True,
+    ):
         logs = []
 
         def log(msg, level='info', content=None, time_str=None):
@@ -103,7 +120,7 @@ class UrlDataService:
         try:
             self._reload_config()
             config = self.config
-            output_dir = config.get('输出目录', '输出文件')
+            output_dir = _runtime_path(config.get('输出目录', '输出文件'))
             min_numbers = config.get('编号下限列表', [1] * BOX_COUNT)
             max_numbers = config.get('编号上限列表', [1000] * BOX_COUNT)
             enable_verification = config.get('错误处理', {}).get('启用校验', True)
@@ -124,13 +141,18 @@ class UrlDataService:
                 verification_records = self._load_verification_from_influx(start_time, stop_time)
                 log("从 jbcj03 读取到 {} 条校验数据".format(len(verification_records)))
 
-            if not os.path.exists(output_dir):
+            if write_output and not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
-            last_numbers, cycle_count = self._get_last_numbers()
+            if reset_numbers:
+                last_numbers = [m - 1 for m in min_numbers]
+                cycle_count = 0
+            else:
+                last_numbers, cycle_count = self._get_last_numbers()
             log("读取的上次最后编号: {}，循环轮数: {}".format(last_numbers, cycle_count))
 
-            numbered_data, current_numbers = [], list(last_numbers)
+            numbered_data = [] if write_output else None
+            current_numbers = list(last_numbers)
             verification_errors = []
             db_rows = []
 
@@ -178,9 +200,10 @@ class UrlDataService:
                 dtype = "失败" if content_val.upper() == "FAIL" else \
                     "URL" if content_val.upper().startswith(("HTTP:", "HTTPS:")) else "其他"
 
-                numbered_data.append("{}. {} | 校验位: {} | 时间: {}".format(
-                    ','.join(map(str, current_numbers)), content_val, verification_value, time_str
-                ))
+                if write_output:
+                    numbered_data.append("{}. {} | 校验位: {} | 时间: {}".format(
+                        ','.join(map(str, current_numbers)), content_val, verification_value, time_str
+                    ))
 
                 date_only = time_str[:10] if len(time_str) >= 10 else datetime.now().strftime('%Y-%m-%d')
                 db_rows.append((
@@ -198,30 +221,45 @@ class UrlDataService:
             conn = self._get_conn()
             c = conn.cursor()
             new_count = 0
+            updated_count = 0
             for row in db_rows:
                 c.execute('SELECT id FROM records WHERE record_time=? AND content=?', (row[11], row[9]))
-                if not c.fetchone():
+                existing = c.fetchone()
+                if existing and reset_numbers:
+                    c.execute('''UPDATE records SET
+                        transport=?,num1=?,num2=?,num3=?,num4=?,num5=?,num6=?,num7=?,num8=?,
+                        content=?,verification=?,record_time=?,date_str=?,type=?,corrected=?
+                        WHERE id=?''', row + (existing['id'],))
+                    updated_count += 1
+                elif not existing:
                     c.execute('''INSERT INTO records
                         (transport,num1,num2,num3,num4,num5,num6,num7,num8,content,verification,record_time,date_str,type,corrected)
                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''', row)
                     new_count += 1
             conn.commit()
             conn.close()
-            log("写入数据库 {} 条新记录（跳过 {} 条重复）".format(new_count, len(db_rows) - new_count), "success")
+            skipped_count = len(db_rows) - new_count - updated_count
+            log(
+                "写入数据库 {} 条新记录，校正 {} 条已有记录（跳过 {} 条重复）".format(
+                    new_count, updated_count, skipped_count
+                ),
+                "success",
+            )
 
             # 记录本次处理的最新数据时间
             if db_rows:
                 self._save_last_sync_time(db_rows[-1][11])  # record_time
 
-            try:
-                file_date = start_time[:10].replace('-', '')
-            except:
-                file_date = datetime.now().strftime('%Y%m%d')
-            output_file = os.path.join(output_dir, "{}{}.txt".format(
-                config.get('输出文件前缀', '排序数据_'), file_date
-            ))
-            with open(output_file, 'w', encoding=config.get('文件编码', 'utf-8')) as f:
-                f.write('\n'.join(numbered_data))
+            if write_output:
+                try:
+                    file_date = start_time[:10].replace('-', '')
+                except:
+                    file_date = datetime.now().strftime('%Y%m%d')
+                output_file = os.path.join(output_dir, "{}{}.txt".format(
+                    config.get('输出文件前缀', '排序数据_'), file_date
+                ))
+                with open(output_file, 'w', encoding=config.get('文件编码', 'utf-8')) as f:
+                    f.write('\n'.join(numbered_data))
 
             msg = "处理了 {} 条数据".format(len(data_records))
             log("处理完成！" + msg, "success")
@@ -388,7 +426,7 @@ class UrlDataService:
     # ========== 辅助方法 ==========
 
     def _get_last_numbers(self):
-        number_file = self.config.get('序号记录文件', 'last_numbers.json')
+        number_file = _runtime_path(self.config.get('序号记录文件', 'last_numbers.json'))
         min_numbers = self.config.get('编号下限列表', [1] * BOX_COUNT)
         default = [m - 1 for m in min_numbers]
         if not os.path.exists(number_file):
@@ -415,7 +453,7 @@ class UrlDataService:
             return default, 0
 
     def _save_last_numbers_raw(self, numbers, cycle_count=0):
-        number_file = self.config.get('序号记录文件', 'last_numbers.json')
+        number_file = _runtime_path(self.config.get('序号记录文件', 'last_numbers.json'))
         try:
             with open(number_file, 'w', encoding='utf-8') as f:
                 json.dump({'numbers': numbers, 'cycle_count': cycle_count}, f, indent=4)
@@ -424,7 +462,7 @@ class UrlDataService:
             return False
 
     def _load_verification_data(self):
-        verification_file = self.config.get('校验文件', '校验文件.txt')
+        verification_file = _runtime_path(self.config.get('校验文件', '校验文件.txt'))
         if not os.path.exists(verification_file):
             return []
         try:
@@ -447,10 +485,186 @@ class UrlDataService:
     def _save_last_sync_time(self, time_str):
         """保存本次同步成功的时间"""
         try:
-            with open(LAST_SYNC_FILE, 'w') as f:
+            temp_file = LAST_SYNC_FILE + '.tmp'
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump({'last_sync_time': time_str}, f)
+            os.replace(temp_file, LAST_SYNC_FILE)
         except:
             pass
+
+    def _database_summary(self):
+        """返回本地轨迹库是否已有可用数据。"""
+        conn = self._get_conn()
+        try:
+            row = conn.execute(
+                'SELECT COUNT(*) AS total, MIN(record_time) AS first_time, '
+                'MAX(record_time) AS last_time FROM records'
+            ).fetchone()
+            return {
+                'record_count': int(row['total'] or 0),
+                'first_record_time': row['first_time'],
+                'last_record_time': row['last_time'],
+            }
+        finally:
+            conn.close()
+
+    def _write_initial_sync_state(self, state):
+        payload = {
+            **state,
+            'schema_version': 2,
+            'database_file': DB_FILE,
+        }
+        temp_file = INITIAL_SYNC_STATE_FILE + '.tmp'
+        try:
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, ensure_ascii=False, indent=4)
+            os.replace(temp_file, INITIAL_SYNC_STATE_FILE)
+        except Exception as exc:
+            logging.error("写入首次同步状态失败: %s", exc)
+        return payload
+
+    def _read_initial_sync_state(self):
+        try:
+            if os.path.exists(INITIAL_SYNC_STATE_FILE):
+                with open(INITIAL_SYNC_STATE_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except (OSError, ValueError, TypeError):
+            pass
+        return None
+
+    def get_initial_sync_status(self):
+        current = self._read_initial_sync_state()
+        if current:
+            return current
+        return self._write_initial_sync_state({
+            'status': 'pending',
+            'checked_at': _now_text(),
+            'requires_manual_action': False,
+            **self._database_summary(),
+        })
+
+    def ensure_initial_sync(self):
+        """
+        首次启动自检：
+        - 本地库已有记录时从最后时间继续增量同步，不再回补历史。
+        - 新环境默认只回溯最近 24 小时；可在 config.json 中显式开启全量历史。
+        """
+        with self._initial_sync_lock:
+            summary = self._database_summary()
+            previous_state = self._read_initial_sync_state() or {}
+
+            if summary['record_count'] > 0:
+                if summary['last_record_time'] and not self._get_last_sync_time():
+                    self._save_last_sync_time(summary['last_record_time'])
+                state = self._write_initial_sync_state({
+                    **previous_state,
+                    'status': 'completed',
+                    'source': previous_state.get('source', 'existing_database'),
+                    'checked_at': _now_text(),
+                    'completed_at': previous_state.get('completed_at', _now_text()),
+                    'historical_backfill_enabled': False,
+                    'requires_manual_action': False,
+                    **summary,
+                })
+                logging.info(
+                    "首次同步自检：本地已有 %d 条记录，跳过历史回补",
+                    summary['record_count'],
+                )
+                return {'success': True, 'action': 'existing_database', 'state': state}
+
+            started_at = _now_text()
+            self._reload_config()
+            initial_config = self.config.get('首次同步', {})
+            full_history = initial_config.get('拉取全部历史', False) is True
+            try:
+                lookback_hours = max(1, int(initial_config.get('回溯小时', 24)))
+            except (TypeError, ValueError):
+                lookback_hours = 24
+            source = 'influxdb_full_sync' if full_history else 'influxdb_recent_sync'
+            self._write_initial_sync_state({
+                'status': 'running',
+                'source': source,
+                'checked_at': started_at,
+                'started_at': started_at,
+                'historical_backfill_enabled': full_history,
+                'initial_lookback_hours': None if full_history else lookback_hours,
+                'full_history_verified': False,
+                'requires_manual_action': False,
+                **summary,
+            })
+            if full_history:
+                logging.info("首次同步自检：本地数据库为空，开始自动全量初始化")
+            else:
+                logging.info(
+                    "首次同步自检：本地数据库为空，先同步最近 %d 小时",
+                    lookback_hours,
+                )
+
+            remote_earliest_time = None
+            try:
+                if full_history:
+                    earliest = self._get_earliest_influx_time()
+                    if earliest is None:
+                        raise RuntimeError("InfluxDB 主数据桶中没有可读取的数据")
+                    if hasattr(earliest, 'astimezone'):
+                        remote_earliest_time = (
+                            earliest.astimezone(timezone.utc)
+                            .isoformat()
+                            .replace('+00:00', 'Z')
+                        )
+                    else:
+                        remote_earliest_time = str(earliest)
+                    start_time = remote_earliest_time
+                else:
+                    start_time = '-{}h'.format(lookback_hours)
+
+                result = self.process_data(
+                    start_time,
+                    reset_numbers=True,
+                    write_output=False,
+                )
+                summary = self._database_summary()
+                if result.get('success') and summary['record_count'] > 0:
+                    state = self._write_initial_sync_state({
+                        'status': 'completed',
+                        'source': source,
+                        'checked_at': started_at,
+                        'started_at': started_at,
+                        'completed_at': _now_text(),
+                        'remote_earliest_time': remote_earliest_time,
+                        'historical_backfill_enabled': full_history,
+                        'initial_lookback_hours': None if full_history else lookback_hours,
+                        'full_history_verified': full_history,
+                        'requires_manual_action': False,
+                        **summary,
+                    })
+                    logging.info(
+                        "首次数据初始化完成，共 %d 条记录",
+                        summary['record_count'],
+                    )
+                    return {'success': True, 'action': 'initialized', 'state': state}
+
+                error = result.get('message') or '全量同步结束后本地数据库仍为空'
+            except Exception as exc:
+                error = str(exc)
+                summary = self._database_summary()
+
+            state = self._write_initial_sync_state({
+                'status': 'failed',
+                'source': source,
+                'checked_at': started_at,
+                'started_at': started_at,
+                'failed_at': _now_text(),
+                'remote_earliest_time': remote_earliest_time,
+                'historical_backfill_enabled': full_history,
+                'initial_lookback_hours': None if full_history else lookback_hours,
+                'full_history_verified': False,
+                'requires_manual_action': True,
+                'last_error': error,
+                **summary,
+            })
+            logging.error("首次全量初始化失败: %s", error)
+            return {'success': False, 'action': 'failed', 'error': error, 'state': state}
 
     # ========== 设置相关 ==========
 
@@ -482,7 +696,7 @@ class UrlDataService:
 
     def reset_last_numbers(self):
         self._reload_config()
-        number_file = self.config.get('序号记录文件', 'last_numbers.json')
+        number_file = _runtime_path(self.config.get('序号记录文件', 'last_numbers.json'))
         try:
             if os.path.exists(number_file):
                 os.remove(number_file)
@@ -493,7 +707,7 @@ class UrlDataService:
     def get_error_settings(self):
         self._reload_config()
         error_config = self.config.get('错误处理', {})
-        verify_file = self.config.get('校验文件', '校验文件.txt')
+        verify_file = _runtime_path(self.config.get('校验文件', '校验文件.txt'))
         if os.path.exists(verify_file):
             try:
                 with open(verify_file, 'r', encoding=self.config.get('文件编码', 'utf-8')) as f:
@@ -523,7 +737,7 @@ class UrlDataService:
         tc = self.config.get('定时处理', {})
         return {
             'enabled': tc.get('启用', False),
-            'hours': tc.get('间隔小时', 1),
+            'hours': tc.get('间隔小时', 0),
             'minutes': tc.get('间隔分钟', 30),
             'seconds': tc.get('间隔秒', 0),
             'retry': tc.get('失败重试', True),
@@ -536,7 +750,7 @@ class UrlDataService:
             config = self.config.copy()
             config['定时处理'] = {
                 '启用': data.get('enabled', False),
-                '间隔小时': data.get('hours', 1),
+                '间隔小时': data.get('hours', 0),
                 '间隔分钟': data.get('minutes', 30),
                 '间隔秒': data.get('seconds', 0),
                 '失败重试': data.get('retry', True),
@@ -551,7 +765,7 @@ class UrlDataService:
         tc = self.config.get('定时处理', {})
         if tc.get('启用', False):
             return {
-                'status': "⏰ 定时处理已启用 | 间隔: {}小时 {}分钟 {}秒".format(tc.get('间隔小时', 1),
+                'status': "⏰ 定时处理已启用 | 间隔: {}小时 {}分钟 {}秒".format(tc.get('间隔小时', 0),
                                                                                tc.get('间隔分钟', 30),
                                                                                tc.get('间隔秒', 0))}
         return {'status': '⏸️ 定时处理未启用'}
@@ -560,6 +774,79 @@ class UrlDataService:
         return self.last_process_logs
 
     # ========== InfluxDB ==========
+
+    def _get_earliest_influx_time(self):
+        """查询主数据桶当前可读取到的最早记录时间。"""
+        from influxdb_client import InfluxDBClient
+
+        client = InfluxDBClient(
+            url=self.influx_config['url'],
+            token=self.influx_config['token'],
+            org=self.influx_config['org'],
+        )
+        try:
+            bucket = self.influx_config['bucket_data']
+            query = f'''from(bucket: "{bucket}")
+                |> range(start: 0)
+                |> filter(fn: (r) => r["_field"] == "code")
+                |> first()
+                |> group()
+                |> sort(columns: ["_time"])
+                |> limit(n: 1)'''
+            tables = client.query_api().query(query, org=self.influx_config['org'])
+            for table in tables:
+                for record in table.records:
+                    return record.get_time()
+            return None
+        finally:
+            client.close()
+
+    def get_influx_history_profile(self):
+        """列出主数据桶中各 measurement/field 当前可读取到的最早时间。"""
+        try:
+            from influxdb_client import InfluxDBClient
+
+            client = InfluxDBClient(
+                url=self.influx_config['url'],
+                token=self.influx_config['token'],
+                org=self.influx_config['org'],
+            )
+            try:
+                bucket = self.influx_config['bucket_data']
+                query = f'''from(bucket: "{bucket}")
+                    |> range(start: 0)
+                    |> first()
+                    |> group(columns: ["_measurement", "_field"])
+                    |> sort(columns: ["_time"])
+                    |> limit(n: 1)'''
+                tables = client.query_api().query(
+                    query,
+                    org=self.influx_config['org'],
+                )
+                fields = []
+                for table in tables:
+                    for record in table.records:
+                        fields.append({
+                            'measurement': record.get_measurement(),
+                            'field': record.get_field(),
+                            'earliest_time': str(record.get_time()),
+                        })
+                fields.sort(
+                    key=lambda item: (
+                        item['earliest_time'],
+                        item['measurement'] or '',
+                        item['field'] or '',
+                    )
+                )
+                return {
+                    'success': True,
+                    'bucket': bucket,
+                    'fields': fields,
+                }
+            finally:
+                client.close()
+        except Exception as exc:
+            return {'success': False, 'error': str(exc)}
 
     def _load_data_from_influx(self, start_time, stop_time=None):
         try:
@@ -724,6 +1011,25 @@ class UrlDataService:
 
     def start_auto_sync(self):
         def _sync_loop():
+            initial_result = None
+            while not initial_result or not initial_result.get('success'):
+                initial_result = self.ensure_initial_sync()
+                if initial_result.get('success'):
+                    break
+                self._reload_config()
+                retry_config = self.config.get('定时处理', {})
+                retry_seconds = retry_config.get('重试间隔', 60)
+                try:
+                    retry_seconds = max(10, int(retry_seconds))
+                except (TypeError, ValueError):
+                    retry_seconds = 60
+                logging.info("首次同步将在 %d 秒后重试", retry_seconds)
+                threading.Event().wait(retry_seconds)
+
+            skip_immediate_sync = initial_result.get('action') in {
+                'initialized',
+                'reconciled',
+            }
             while True:
                 try:
                     self._reload_config()
@@ -732,18 +1038,29 @@ class UrlDataService:
                         hours = tc.get('间隔小时', 0)
                         minutes = tc.get('间隔分钟', 30)
                         seconds = tc.get('间隔秒', 0)
-                        interval = hours * 3600 + minutes * 60 + seconds
+                        try:
+                            interval = int(
+                                float(hours) * 3600
+                                + float(minutes) * 60
+                                + float(seconds)
+                            )
+                        except (TypeError, ValueError):
+                            interval = 24 * 3600
                         if interval < 10:
                             interval = 10
-                        logging.info("自动同步：开始处理...")
-                        last_sync = self._get_last_sync_time()
-                        if last_sync:
-                            start_time = last_sync.replace(' ', 'T') + '+08:00'
+                        if skip_immediate_sync:
+                            skip_immediate_sync = False
+                            logging.info("首次全量同步刚完成，%d 秒后开始增量同步", interval)
                         else:
-                            start_time = '-{}s'.format(interval + 60)
-                        result = self.process_data(start_time)
-                        self.last_process_logs = result.get('logs', [])
-                        logging.info("自动同步：处理完成，等待 %d 秒", interval)
+                            logging.info("自动同步：开始处理...")
+                            last_sync = self._get_last_sync_time()
+                            if last_sync:
+                                start_time = last_sync.replace(' ', 'T') + '+08:00'
+                            else:
+                                start_time = '-{}s'.format(interval + 60)
+                            result = self.process_data(start_time)
+                            self.last_process_logs = result.get('logs', [])
+                            logging.info("自动同步：处理完成，等待 %d 秒", interval)
                         threading.Event().wait(interval)
                     else:
                         threading.Event().wait(30)

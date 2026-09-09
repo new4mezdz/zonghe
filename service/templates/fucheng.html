@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>复称</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", Arial, sans-serif;
+            background: #f3f4f6;
+            min-height: 100vh;
+            color: #111827;
+        }
+        .topbar {
+            height: 64px;
+            background: #111827;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            border-bottom: 4px solid #2563eb;
+        }
+        .topbar h1 { font-size: 22px; font-weight: 700; }
+        .topbar a { color: #bfdbfe; text-decoration: none; font-size: 14px; }
+        .layout { width: min(1500px, calc(100vw - 32px)); margin: 18px auto 28px; }
+        .toolbar {
+            background: #fff;
+            border: 1px solid #d1d5db;
+            padding: 14px;
+            display: grid;
+            grid-template-columns: repeat(7, minmax(112px, 1fr));
+            gap: 10px;
+            align-items: end;
+        }
+        .field { display: flex; flex-direction: column; gap: 5px; }
+        .field label { font-size: 13px; color: #4b5563; }
+        input, select {
+            height: 36px;
+            border: 1px solid #9ca3af;
+            border-radius: 3px;
+            padding: 0 9px;
+            font-size: 14px;
+            background: #fff;
+            color: #111827;
+        }
+        input:focus, select:focus { outline: 2px solid rgba(37, 99, 235, 0.25); border-color: #2563eb; }
+        .type-picker { position: relative; }
+        .type-picker-button {
+            width: 100%;
+            height: 36px;
+            border: 1px solid #9ca3af;
+            border-radius: 3px;
+            padding: 0 9px;
+            background: #fff;
+            color: #111827;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 400;
+        }
+        .type-picker-button:hover { filter: none; border-color: #2563eb; }
+        .type-menu {
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            right: 0;
+            z-index: 20;
+            display: none;
+            max-height: 250px;
+            overflow-y: auto;
+            border: 1px solid #9ca3af;
+            border-radius: 4px;
+            background: #fff;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+            padding: 6px;
+        }
+        .type-menu.show { display: block; }
+        .type-picker-arrow { color: #6b7280; font-size: 12px; }
+        .checkbox-row {
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            color: #111827;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .checkbox-row:hover { background: #eff6ff; }
+        .checkbox-row input {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: #2563eb;
+        }
+        .actions { display: flex; gap: 8px; }
+        button {
+            height: 36px;
+            border: 1px solid #1d4ed8;
+            background: #2563eb;
+            color: #fff;
+            border-radius: 3px;
+            padding: 0 14px;
+            cursor: pointer;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        button.secondary { background: #fff; color: #1f2937; border-color: #9ca3af; }
+        button:hover { filter: brightness(0.96); }
+        .status-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 2px;
+            color: #374151;
+            font-size: 13px;
+        }
+        .status-row strong { color: #111827; }
+        .stats { display: flex; gap: 14px; flex-wrap: wrap; }
+        .summary-controls {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 22px;
+            margin: 0 0 12px;
+        }
+        .weight-totals {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 22px;
+            min-height: 32px;
+            color: #374151;
+            font-size: 14px;
+        }
+        .weight-totals-label { color: #6b7280; }
+        .weight-total-item { white-space: nowrap; }
+        .weight-total-item strong {
+            color: #111827;
+            font-family: Consolas, "Microsoft YaHei", monospace;
+            font-size: 17px;
+        }
+        .view-toggle {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+            margin: 0;
+        }
+        .view-toggle button {
+            height: 32px;
+            background: #fff;
+            color: #374151;
+            border-color: #9ca3af;
+            padding: 0 12px;
+        }
+        .view-toggle button.active {
+            background: #2563eb;
+            color: #fff;
+            border-color: #1d4ed8;
+        }
+        .hidden { display: none !important; }
+        .chart-panel {
+            background: #fff;
+            border: 1px solid #d1d5db;
+            margin-bottom: 12px;
+            padding: 12px 14px 10px;
+        }
+        .chart-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+            color: #374151;
+            font-size: 13px;
+        }
+        .chart-title { font-size: 15px; font-weight: 700; color: #111827; }
+        .chart-tools {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .chart-scale-toggle {
+            display: inline-flex;
+            align-items: center;
+        }
+        .chart-scale-toggle button {
+            height: 30px;
+            padding: 0 10px;
+            border: 1px solid #9ca3af;
+            border-radius: 0;
+            background: #fff;
+            color: #374151;
+            font-size: 12px;
+        }
+        .chart-scale-toggle button:first-child { border-radius: 3px 0 0 3px; }
+        .chart-scale-toggle button:last-child { border-radius: 0 3px 3px 0; margin-left: -1px; }
+        .chart-scale-toggle button.active {
+            position: relative;
+            z-index: 1;
+            border-color: #1d4ed8;
+            background: #2563eb;
+            color: #fff;
+        }
+        .legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .legend-red { background: #dc2626; }
+        .legend-green { background: #16a34a; }
+        .legend-line { width: 22px; height: 0; border-top: 2px dashed #dc2626; display: inline-block; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 12px;
+        }
+        .chart-card {
+            border: 1px solid #d1d5db;
+            background: #fff;
+            padding: 10px 12px 8px;
+        }
+        .chart-card-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            color: #4b5563;
+        }
+        .chart-card-title strong { color: #111827; font-size: 15px; }
+        .chart-card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .chart-clipped-count { color: #b45309; font-weight: 700; }
+        .chart-reset-zoom {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            border-color: #9ca3af;
+            background: #fff;
+            color: #374151;
+            font-size: 18px;
+            line-height: 1;
+        }
+        .chart-reset-zoom.show { display: inline-flex; }
+        .chart-wrap { position: relative; height: 260px; width: 100%; }
+        .diff-chart { width: 100%; height: 260px; display: block; cursor: crosshair; }
+        .charts-grid.overview { grid-template-columns: 1fr; }
+        .charts-grid.overview .chart-wrap,
+        .charts-grid.overview .diff-chart { height: 340px; }
+        .chart-tooltip {
+            position: fixed;
+            display: none;
+            min-width: 150px;
+            padding: 7px 9px;
+            border: 1px solid #9ca3af;
+            background: rgba(255, 255, 255, 0.96);
+            color: #111827;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.55;
+            pointer-events: none;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+            z-index: 5;
+        }
+        .report {
+            background: #fff;
+            border: 1px solid #111;
+            overflow: auto;
+            max-height: calc(100vh - 500px);
+            min-height: 260px;
+        }
+        table {
+            width: 100%;
+            min-width: 1100px;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 16px;
+        }
+        th, td {
+            border: 1px solid #111;
+            padding: 6px 8px;
+            text-align: center;
+            vertical-align: middle;
+            background: #fff;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            font-weight: 700;
+            background: #f9fafb;
+            font-size: 17px;
+        }
+        .type-cell {
+            width: 112px;
+            font-size: 17px;
+            font-weight: 500;
+            background: #fff;
+        }
+        .brand-cell { width: 210px; }
+        .num-cell { font-family: Consolas, "Microsoft YaHei", monospace; }
+        .time-cell { font-family: Consolas, monospace; font-size: 15px; }
+        tr.row-over td { background: #fee2e2; }
+        tr.row-ok td { background: #dcfce7; }
+        tr.row-over:hover td { background: #fecaca; }
+        tr.row-ok:hover td { background: #bbf7d0; }
+        .diff-over { color: #b91c1c; font-weight: 800; }
+        .diff-ok { color: #047857; font-weight: 800; }
+        .empty {
+            padding: 44px;
+            color: #6b7280;
+            font-size: 15px;
+            text-align: center;
+        }
+        .path {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        @media (max-width: 1000px) {
+            .toolbar { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+            .actions { grid-column: span 2; }
+            .topbar { padding: 0 16px; }
+            .status-row { flex-direction: column; align-items: flex-start; }
+            .summary-controls { align-items: stretch; flex-direction: column; gap: 8px; }
+            .weight-totals { justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+            .chart-head { align-items: flex-start; flex-direction: column; }
+            .chart-tools { width: 100%; justify-content: space-between; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .charts-grid.overview .chart-wrap,
+            .charts-grid.overview .diff-chart { height: 300px; }
+            .report { max-height: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>复称</h1>
+        <a href="/">返回首页</a>
+    </div>
+
+    <main class="layout">
+        <section class="toolbar">
+            <div class="field">
+                <label for="startDate">开始日期</label>
+                <input id="startDate" type="date">
+            </div>
+            <div class="field">
+                <label for="endDate">结束日期</label>
+                <input id="endDate" type="date">
+            </div>
+            <div class="field">
+                <label for="typePickerButton">类型</label>
+                <div class="type-picker" id="typePicker">
+                    <button type="button" class="type-picker-button" id="typePickerButton" onclick="toggleTypeMenu()">
+                        <span id="typePickerText">全部</span>
+                        <span class="type-picker-arrow">▼</span>
+                    </button>
+                    <div class="type-menu" id="typeMenu">
+                        <label class="checkbox-row">
+                            <input type="checkbox" id="typeAllCheckbox" checked onchange="selectAllTypes()">
+                            <span>全部</span>
+                        </label>
+                        <div id="typeCheckboxList"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="field">
+                <label for="brandSelect">牌号</label>
+                <select id="brandSelect"><option value="">全部</option></select>
+            </div>
+            <div class="field">
+                <label for="keywordInput">关键字</label>
+                <input id="keywordInput" type="text" placeholder="类型、牌号、时间">
+            </div>
+            <div class="field">
+                <label for="thresholdInput">差值阈值 (±)</label>
+                <input id="thresholdInput" type="number" value="0.1" min="0" step="0.01">
+            </div>
+            <div class="actions">
+                <button type="button" onclick="loadRows()">查询</button>
+                <button class="secondary" type="button" onclick="resetFilters()">重置</button>
+                <button class="secondary" type="button" onclick="exportCsv()">导出</button>
+            </div>
+        </section>
+
+        <div class="status-row">
+            <div class="stats" id="statsText">就绪</div>
+        </div>
+
+        <div class="summary-controls">
+            <div class="weight-totals" id="weightTotals">
+                <span class="weight-totals-label">查询区间合计</span>
+                <span class="weight-total-item">打码重量：<strong id="packWeightTotal">0.00</strong></span>
+                <span class="weight-total-item">复称重量：<strong id="rescaleWeightTotal">0.00</strong></span>
+            </div>
+            <div class="view-toggle">
+                <button type="button" id="viewAllBtn" class="active" onclick="setViewMode('all')">全部</button>
+                <button type="button" id="viewDataBtn" onclick="setViewMode('data')">只看数据</button>
+                <button type="button" id="viewChartBtn" onclick="setViewMode('chart')">只看图表</button>
+            </div>
+        </div>
+
+        <section class="chart-panel" id="chartsSection">
+            <div class="chart-head">
+                <div>
+                    <div class="chart-title">复称差值趋势</div>
+                    <div id="chartSummary">等待查询数据</div>
+                </div>
+                <div class="chart-tools">
+                    <div class="chart-scale-toggle" aria-label="纵轴显示范围">
+                        <button type="button" id="chartFocusBtn" class="active" aria-pressed="true" onclick="setChartScaleMode('focus')">聚焦阈值</button>
+                        <button type="button" id="chartFullBtn" aria-pressed="false" onclick="setChartScaleMode('full')">完整范围</button>
+                    </div>
+                    <div class="legend">
+                        <span class="legend-item"><span class="legend-dot legend-red"></span>超出 <span id="thresholdLegend">±0.1</span></span>
+                        <span class="legend-item"><span class="legend-dot legend-green"></span>正常范围</span>
+                        <span class="legend-item"><span class="legend-line"></span>阈值线</span>
+                    </div>
+                </div>
+            </div>
+            <div class="charts-grid" id="chartsContainer"></div>
+            <div class="chart-tooltip" id="chartTooltip"></div>
+        </section>
+
+        <section class="report" id="tableSection">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:112px;">类型</th>
+                        <th style="width:210px;">牌号</th>
+                        <th style="width:130px;">卷包打码重量</th>
+                        <th style="width:220px;">打码时间</th>
+                        <th style="width:140px;">制丝复称重量</th>
+                        <th style="width:220px;">复称时间</th>
+                        <th style="width:130px;">复称差值</th>
+                    </tr>
+                </thead>
+                <tbody id="rowsBody">
+                    <tr><td colspan="7"><div class="empty">正在加载...</div></td></tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const DEFAULT_DIFF_THRESHOLD = 0.1;
+        const PRIMARY_CHART_TYPE = "废烟支";
+        const CHART_MARGIN = { left: 58, right: 18, top: 18, bottom: 34 };
+        let currentRows = [];
+        let currentStats = {};
+        let currentThreshold = DEFAULT_DIFF_THRESHOLD;
+        let viewMode = "all";
+        let chartScaleMode = "focus";
+        let chartPointsByCanvas = {};
+        let chartRowsByCanvas = {};
+        let chartViewports = {};
+
+        function escapeHtml(value) {
+            const div = document.createElement("div");
+            div.textContent = value == null ? "" : String(value);
+            return div.innerHTML;
+        }
+
+        function formatNumber(value) {
+            if (value === null || value === undefined || value === "") return "";
+            const n = Number(value);
+            if (!Number.isFinite(n)) return escapeHtml(value);
+            return n.toFixed(2).replace(/\.?0+$/, "");
+        }
+
+        function formatPercent(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return "0%";
+            return `${n.toFixed(2).replace(/\.?0+$/, "")}%`;
+        }
+
+        function formatWeightTotal(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return "0.00";
+            return n.toLocaleString("zh-CN", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function normalizeThreshold(value) {
+            if (value === null || value === undefined || String(value).trim() === "") {
+                return DEFAULT_DIFF_THRESHOLD;
+            }
+            const n = Math.abs(Number(value));
+            return Number.isFinite(n) ? n : DEFAULT_DIFF_THRESHOLD;
+        }
+
+        function displayTypeName(type) {
+            return type === PRIMARY_CHART_TYPE ? "机台废烟支" : type;
+        }
+
+        function updateThresholdLegend() {
+            document.getElementById("thresholdLegend").textContent = `±${formatNumber(currentThreshold)}`;
+        }
+
+        function isOverThreshold(value) {
+            const n = Number(value);
+            return Number.isFinite(n) && Math.abs(n) - currentThreshold > 1e-9;
+        }
+
+        function diffClass(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n)) return "";
+            return isOverThreshold(n) ? "diff-over" : "diff-ok";
+        }
+
+        function rowClass(row) {
+            return isOverThreshold(row.weight_diff) ? "row-over" : "row-ok";
+        }
+
+        function rowTimeLabel(row) {
+            return row.rescale_time || row.rescale_query_date || row.pack_code_time || `第 ${row.id || ""} 条`;
+        }
+
+        function appendOptions(selectId, values, includeAll = true) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = "";
+            if (includeAll) {
+                const allOpt = document.createElement("option");
+                allOpt.value = "";
+                allOpt.textContent = "全部";
+                select.appendChild(allOpt);
+            }
+            values.forEach(value => {
+                const opt = document.createElement("option");
+                opt.value = value;
+                opt.textContent = value;
+                select.appendChild(opt);
+            });
+        }
+
+        function renderTypeOptions(values) {
+            const list = document.getElementById("typeCheckboxList");
+            list.innerHTML = "";
+            values.forEach(value => {
+                const label = document.createElement("label");
+                label.className = "checkbox-row";
+
+                const input = document.createElement("input");
+                input.type = "checkbox";
+                input.className = "type-check";
+                input.value = value;
+                input.addEventListener("change", onTypeChanged);
+
+                const text = document.createElement("span");
+                text.textContent = value;
+
+                label.appendChild(input);
+                label.appendChild(text);
+                list.appendChild(label);
+            });
+            updateTypePickerText();
+        }
+
+        function toggleTypeMenu() {
+            const menu = document.getElementById("typeMenu");
+            const button = document.getElementById("typePickerButton");
+            const opened = !menu.classList.contains("show");
+            menu.classList.toggle("show", opened);
+            button.setAttribute("aria-expanded", opened ? "true" : "false");
+        }
+
+        function closeTypeMenu() {
+            document.getElementById("typeMenu").classList.remove("show");
+            document.getElementById("typePickerButton").setAttribute("aria-expanded", "false");
+        }
+
+        function selectAllTypes() {
+            if (!document.getElementById("typeAllCheckbox").checked) {
+                document.getElementById("typeAllCheckbox").checked = true;
+            }
+            document.querySelectorAll(".type-check").forEach(input => {
+                input.checked = false;
+            });
+            updateTypePickerText();
+        }
+
+        function onTypeChanged() {
+            const selected = selectedTypeValues();
+            document.getElementById("typeAllCheckbox").checked = selected.length === 0;
+            updateTypePickerText();
+        }
+
+        function updateTypePickerText() {
+            const selected = selectedTypeValues();
+            const text = document.getElementById("typePickerText");
+            if (selected.length === 0) {
+                text.textContent = "全部";
+            } else if (selected.length === 1) {
+                text.textContent = selected[0];
+            } else {
+                text.textContent = `已选 ${selected.length} 个`;
+            }
+        }
+
+        async function loadFilters() {
+            try {
+                const res = await fetch("/api/fucheng/filters");
+                const data = await res.json();
+                if (data.success) {
+                    renderTypeOptions(data.types || []);
+                    appendOptions("brandSelect", data.brands || []);
+                }
+            } catch (err) {}
+        }
+
+        function selectedTypeValues() {
+            return Array.from(document.querySelectorAll(".type-check:checked"))
+                .map(input => input.value)
+                .filter(Boolean);
+        }
+
+        function collectParams() {
+            return {
+                start_date: document.getElementById("startDate").value,
+                end_date: document.getElementById("endDate").value,
+                record_types: selectedTypeValues(),
+                brand: document.getElementById("brandSelect").value,
+                keyword: document.getElementById("keywordInput").value.trim(),
+                threshold: normalizeThreshold(document.getElementById("thresholdInput").value),
+                limit: 1000,
+                order: "asc"
+            };
+        }
+
+        async function loadRows() {
+            const tbody = document.getElementById("rowsBody");
+            tbody.innerHTML = `<tr><td colspan="7"><div class="empty">正在查询...</div></td></tr>`;
+            chartViewports = {};
+            try {
+                const res = await fetch("/api/fucheng/query", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(collectParams())
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    tbody.innerHTML = `<tr><td colspan="7"><div class="empty">${escapeHtml(data.error || "查询失败")}</div></td></tr>`;
+                    document.getElementById("statsText").textContent = "查询失败";
+                    currentRows = [];
+                    currentStats = {};
+                    updateWeightTotals({});
+                    drawGroupedCharts([], {});
+                    return;
+                }
+                currentRows = data.rows || [];
+                currentStats = data.stats || {};
+                chartViewports = {};
+                currentThreshold = normalizeThreshold(currentStats.threshold);
+                document.getElementById("thresholdInput").value = formatNumber(currentThreshold);
+                updateThresholdLegend();
+                renderRows(currentRows);
+                updateStats(data);
+                drawGroupedCharts(currentRows, currentStats);
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="7"><div class="empty">请求失败：${escapeHtml(err.message)}</div></td></tr>`;
+                document.getElementById("statsText").textContent = "请求失败";
+                currentRows = [];
+                currentStats = {};
+                updateWeightTotals({});
+                drawGroupedCharts([], {});
+            }
+        }
+
+        function renderRows(rows) {
+            const tbody = document.getElementById("rowsBody");
+            if (!rows.length) {
+                tbody.innerHTML = `<tr><td colspan="7"><div class="empty">没有找到匹配的数据</div></td></tr>`;
+                return;
+            }
+
+            const tableRows = groupRowsByType(rows).flatMap(group => group.rows);
+            const spans = new Array(tableRows.length).fill(0);
+            for (let i = 0; i < tableRows.length; i++) {
+                if (i > 0 && tableRows[i].record_type === tableRows[i - 1].record_type) continue;
+                let span = 1;
+                while (i + span < tableRows.length && tableRows[i + span].record_type === tableRows[i].record_type) span++;
+                spans[i] = span;
+            }
+
+            tbody.innerHTML = tableRows.map((row, idx) => {
+                const typeCell = spans[idx] > 0
+                    ? `<td class="type-cell" rowspan="${spans[idx]}">${escapeHtml(row.record_type)}</td>`
+                    : "";
+                return `<tr class="${rowClass(row)}">
+                    ${typeCell}
+                    <td class="brand-cell">${escapeHtml(row.brand)}</td>
+                    <td class="num-cell">${formatNumber(row.pack_code_weight)}</td>
+                    <td class="time-cell">${escapeHtml(row.pack_code_time)}</td>
+                    <td class="num-cell">${formatNumber(row.rescale_weight)}</td>
+                    <td class="time-cell">${escapeHtml(row.rescale_time)}</td>
+                    <td class="num-cell ${diffClass(row.weight_diff)}">${formatNumber(row.weight_diff)}</td>
+                </tr>`;
+            }).join("");
+        }
+
+        function updateStats(data) {
+            const stats = data.stats || {};
+            const over = stats.over_threshold || 0;
+            const rate = formatPercent(stats.over_threshold_rate || 0);
+            const parts = [
+                `总计: <strong>${stats.total || 0}</strong>`,
+                `标红: <strong class="diff-over">${over}</strong>`,
+                `标红占比: <strong class="diff-over">${rate}</strong>`,
+                `标绿: <strong class="diff-ok">${stats.in_threshold || 0}</strong>`,
+                `正差: <strong>${stats.positive || 0}</strong>`,
+                `负差: <strong>${stats.negative || 0}</strong>`,
+                `零差: <strong>${stats.zero || 0}</strong>`,
+                `最大绝对差: <strong>${formatNumber(stats.max_abs_diff || 0)}</strong>`
+            ];
+            if (data.truncated) parts.push(`已显示: <strong>${data.returned}</strong>`);
+            document.getElementById("statsText").innerHTML = parts.join(" | ");
+            updateWeightTotals(stats);
+        }
+
+        function updateWeightTotals(stats) {
+            document.getElementById("packWeightTotal").textContent = formatWeightTotal(stats.pack_code_weight_total);
+            document.getElementById("rescaleWeightTotal").textContent = formatWeightTotal(stats.rescale_weight_total);
+        }
+
+        function setupCanvas(canvas) {
+            const rect = canvas.getBoundingClientRect();
+            const ratio = window.devicePixelRatio || 1;
+            canvas.width = Math.max(1, Math.round(rect.width * ratio));
+            canvas.height = Math.max(1, Math.round(rect.height * ratio));
+            const ctx = canvas.getContext("2d");
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            return { ctx, width: rect.width, height: rect.height };
+        }
+
+        function drawText(ctx, text, x, y, color = "#374151", align = "left") {
+            ctx.fillStyle = color;
+            ctx.textAlign = align;
+            ctx.textBaseline = "middle";
+            ctx.fillText(text, x, y);
+        }
+
+        function drawDashedLine(ctx, x1, y1, x2, y2, color) {
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([6, 5]);
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function percentile(sortedValues, ratio) {
+            if (!sortedValues.length) return 0;
+            const position = (sortedValues.length - 1) * ratio;
+            const lower = Math.floor(position);
+            const upper = Math.ceil(position);
+            if (lower === upper) return sortedValues[lower];
+            const weight = position - lower;
+            return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
+        }
+
+        function getChartScale(values, mode = chartScaleMode) {
+            const threshold = Math.max(0, currentThreshold);
+            const rawMin = Math.min(...values, -threshold);
+            const rawMax = Math.max(...values, threshold);
+
+            if (mode === "focus") {
+                const absoluteValues = values.map(value => Math.abs(value)).sort((a, b) => a - b);
+                const typicalHigh = percentile(absoluteValues, 0.95);
+                const base = threshold > 0 ? threshold : Math.max(0.02, percentile(absoluteValues, 0.5));
+                const minimumBound = Math.max(0.05, base * 2.5);
+                const maximumBound = threshold > 0 ? Math.max(minimumBound, threshold * 6) : Infinity;
+                const bound = Math.min(maximumBound, Math.max(minimumBound, typicalHigh * 1.15));
+                return {
+                    yMin: -bound,
+                    yMax: bound,
+                    clippedCount: values.filter(value => value < -bound || value > bound).length
+                };
+            }
+
+            const padding = Math.max(0.04, threshold * 0.25, (rawMax - rawMin) * 0.18);
+            return { yMin: rawMin - padding, yMax: rawMax + padding, clippedCount: 0 };
+        }
+
+        function getChartViewport(canvasId, data) {
+            const values = data.map(item => item.value);
+            const baseScale = getChartScale(values);
+            const fullScale = getChartScale(values, "full");
+            const limits = {
+                xMin: 0,
+                xMax: Math.max(0, data.length - 1),
+                yMin: Math.min(baseScale.yMin, fullScale.yMin),
+                yMax: Math.max(baseScale.yMax, fullScale.yMax)
+            };
+            let viewport = chartViewports[canvasId];
+            if (!viewport || viewport.dataLength !== data.length || viewport.scaleMode !== chartScaleMode) {
+                viewport = {
+                    xMin: limits.xMin,
+                    xMax: limits.xMax,
+                    yMin: baseScale.yMin,
+                    yMax: baseScale.yMax,
+                    dataLength: data.length,
+                    scaleMode: chartScaleMode,
+                    zoomed: false
+                };
+                chartViewports[canvasId] = viewport;
+            }
+            return { viewport, limits, baseScale };
+        }
+
+        function anchoredRange(anchor, anchorRatio, span, limitMin, limitMax) {
+            const limitSpan = Math.max(0, limitMax - limitMin);
+            const nextSpan = Math.min(Math.max(0, span), limitSpan);
+            if (limitSpan === 0) return { min: limitMin, max: limitMax };
+            let min = anchor - anchorRatio * nextSpan;
+            let max = min + nextSpan;
+            if (min < limitMin) {
+                max += limitMin - min;
+                min = limitMin;
+            }
+            if (max > limitMax) {
+                min -= max - limitMax;
+                max = limitMax;
+            }
+            return { min: Math.max(limitMin, min), max: Math.min(limitMax, max) };
+        }
+
+        function rangesNearlyEqual(aMin, aMax, bMin, bMax) {
+            const span = Math.max(1, Math.abs(bMax - bMin));
+            return Math.abs(aMin - bMin) < span * 1e-6 && Math.abs(aMax - bMax) < span * 1e-6;
+        }
+
+        function groupRowsByType(rows) {
+            const groups = [];
+            const indexByType = new Map();
+            rows.forEach(row => {
+                const type = row.record_type || "未分类";
+                if (!indexByType.has(type)) {
+                    indexByType.set(type, groups.length);
+                    groups.push({ type, rows: [] });
+                }
+                groups[indexByType.get(type)].rows.push(row);
+            });
+            return groups;
+        }
+
+        function buildLocalStats(rows) {
+            const total = rows.length;
+            const over = rows.filter(row => isOverThreshold(row.weight_diff)).length;
+            return {
+                total,
+                over_threshold: over,
+                in_threshold: total - over,
+                over_threshold_rate: total ? over / total * 100 : 0
+            };
+        }
+
+        function drawGroupedCharts(rows, stats) {
+            const container = document.getElementById("chartsContainer");
+            const summary = document.getElementById("chartSummary");
+            const tooltip = document.getElementById("chartTooltip");
+            tooltip.style.display = "none";
+            chartPointsByCanvas = {};
+            chartRowsByCanvas = {};
+
+            if (!rows.length) {
+                summary.textContent = "当前查询没有可绘制的复称差值";
+                container.innerHTML = `<div class="empty" style="grid-column:1/-1;">没有可绘制的数据</div>`;
+                return;
+            }
+
+            const allGroups = groupRowsByType(rows);
+            const primaryGroup = allGroups.find(group => group.type === PRIMARY_CHART_TYPE) || allGroups[0];
+            const groups = viewMode === "chart" ? allGroups : [primaryGroup];
+            const total = stats.total || rows.length;
+            const overCount = stats.over_threshold ?? rows.filter(row => isOverThreshold(row.weight_diff)).length;
+            const rate = stats.over_threshold_rate ?? (total ? overCount / total * 100 : 0);
+            summary.innerHTML = `当前查询 <strong>${total}</strong> 条，类型 <strong>${allGroups.length}</strong> 个，阈值 <strong>±${formatNumber(currentThreshold)}</strong>，标红 <strong class="diff-over">${overCount}</strong> 条，占比 <strong class="diff-over">${formatPercent(rate)}</strong>`;
+            container.classList.toggle("overview", viewMode !== "chart");
+
+            container.innerHTML = groups.map((group, index) => {
+                const groupStats = buildLocalStats(group.rows);
+                const chartId = `diffChart_${index}`;
+                const values = group.rows.map(row => Number(row.weight_diff)).filter(value => Number.isFinite(value));
+                const scale = values.length ? getChartScale(values) : { clippedCount: 0 };
+                const clippedClass = scale.clippedCount ? "" : " hidden";
+                return `<article class="chart-card">
+                    <div class="chart-card-title">
+                        <strong>${escapeHtml(displayTypeName(group.type))}</strong>
+                        <div class="chart-card-meta">
+                            <span>总计 ${groupStats.total} | 标红 ${groupStats.over_threshold} | 占比 ${formatPercent(groupStats.over_threshold_rate)}<span id="${chartId}_clipped" class="chart-clipped-count${clippedClass}"> | 边界外 ${scale.clippedCount}</span></span>
+                            <button type="button" id="${chartId}_reset" class="chart-reset-zoom" title="重置图表缩放" aria-label="重置图表缩放" onclick="resetChartZoom('${chartId}')">↺</button>
+                        </div>
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="${chartId}" class="diff-chart" data-group-index="${index}"></canvas>
+                    </div>
+                </article>`;
+            }).join("");
+
+            if (viewMode === "data") return;
+
+            requestAnimationFrame(() => {
+                groups.forEach((group, index) => {
+                    const canvas = document.getElementById(`diffChart_${index}`);
+                    if (!canvas) return;
+                    chartRowsByCanvas[canvas.id] = group.rows;
+                    canvas.addEventListener("mousemove", showChartTooltip);
+                    canvas.addEventListener("mouseleave", () => {
+                        document.getElementById("chartTooltip").style.display = "none";
+                    });
+                    canvas.addEventListener("wheel", event => zoomChartAtPointer(event, canvas, group.rows), { passive: false });
+                    canvas.addEventListener("dblclick", () => resetChartZoom(canvas.id));
+                    drawSingleChart(canvas, group.rows);
+                });
+            });
+        }
+
+        function drawSingleChart(canvas, rows) {
+            const { ctx, width, height } = setupCanvas(canvas);
+            const points = [];
+            chartPointsByCanvas[canvas.id] = points;
+            ctx.clearRect(0, 0, width, height);
+            ctx.font = "12px Microsoft YaHei, Arial, sans-serif";
+
+            const data = rows
+                .map((row, index) => ({ row, index, value: Number(row.weight_diff) }))
+                .filter(item => Number.isFinite(item.value));
+
+            if (!data.length) {
+                drawText(ctx, "没有可绘制的数据", width / 2, height / 2, "#6b7280", "center");
+                return;
+            }
+
+            const plotLeft = CHART_MARGIN.left;
+            const plotRight = width - CHART_MARGIN.right;
+            const plotTop = CHART_MARGIN.top;
+            const plotBottom = height - CHART_MARGIN.bottom;
+            const plotWidth = Math.max(1, plotRight - plotLeft);
+            const plotHeight = Math.max(1, plotBottom - plotTop);
+            const { viewport } = getChartViewport(canvas.id, data);
+            const xMin = viewport.xMin;
+            const xMax = viewport.xMax;
+            const yMin = viewport.yMin;
+            const yMax = viewport.yMax;
+            const xSpan = Math.max(0, xMax - xMin);
+            const visibleStart = Math.max(0, Math.ceil(xMin - 1e-9));
+            const visibleEnd = Math.min(data.length - 1, Math.floor(xMax + 1e-9));
+            const lineStart = Math.max(0, Math.floor(xMin) - 1);
+            const lineEnd = Math.min(data.length - 1, Math.ceil(xMax) + 1);
+            const toX = i => xSpan === 0 ? plotLeft + plotWidth / 2 : plotLeft + ((i - xMin) / xSpan) * plotWidth;
+            const clampValue = value => Math.max(yMin, Math.min(yMax, value));
+            const toY = value => plotBottom - ((clampValue(value) - yMin) / (yMax - yMin)) * plotHeight;
+
+            const clippedCount = data
+                .slice(visibleStart, visibleEnd + 1)
+                .filter(item => item.value < yMin || item.value > yMax)
+                .length;
+            const clippedElement = document.getElementById(`${canvas.id}_clipped`);
+            if (clippedElement) {
+                clippedElement.textContent = ` | 边界外 ${clippedCount}`;
+                clippedElement.classList.toggle("hidden", clippedCount === 0);
+            }
+            const resetButton = document.getElementById(`${canvas.id}_reset`);
+            if (resetButton) resetButton.classList.toggle("show", viewport.zoomed);
+            canvas.dataset.zoomed = viewport.zoomed ? "true" : "false";
+
+            ctx.strokeStyle = "#d1d5db";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(plotLeft, plotTop);
+            ctx.lineTo(plotLeft, plotBottom);
+            ctx.lineTo(plotRight, plotBottom);
+            ctx.stroke();
+
+            const ticks = chartScaleMode === "focus" ? 4 : 5;
+            for (let i = 0; i <= ticks; i++) {
+                const value = yMin + (i / ticks) * (yMax - yMin);
+                const y = toY(value);
+                ctx.strokeStyle = Math.abs(value) < 1e-9 ? "#cbd5e1" : "#e5e7eb";
+                ctx.lineWidth = Math.abs(value) < 1e-9 ? 1.25 : 1;
+                ctx.beginPath();
+                ctx.moveTo(plotLeft, y);
+                ctx.lineTo(plotRight, y);
+                ctx.stroke();
+                drawText(ctx, formatNumber(value), plotLeft - 8, y, "#6b7280", "right");
+            }
+
+            if (currentThreshold === 0) {
+                if (yMin <= 0 && yMax >= 0) {
+                    drawDashedLine(ctx, plotLeft, toY(0), plotRight, toY(0), "#dc2626");
+                    drawText(ctx, "0", plotRight - 2, toY(0) - 10, "#dc2626", "right");
+                }
+            } else {
+                if (yMin <= currentThreshold && yMax >= currentThreshold) {
+                    drawDashedLine(ctx, plotLeft, toY(currentThreshold), plotRight, toY(currentThreshold), "#dc2626");
+                    drawText(ctx, `+${formatNumber(currentThreshold)}`, plotRight - 2, toY(currentThreshold) - 10, "#dc2626", "right");
+                }
+                if (yMin <= -currentThreshold && yMax >= -currentThreshold) {
+                    drawDashedLine(ctx, plotLeft, toY(-currentThreshold), plotRight, toY(-currentThreshold), "#dc2626");
+                    drawText(ctx, `-${formatNumber(currentThreshold)}`, plotRight - 2, toY(-currentThreshold) + 10, "#dc2626", "right");
+                }
+            }
+
+            const pointSpacing = xSpan === 0 ? plotWidth : plotWidth / xSpan;
+            const dense = pointSpacing < 7;
+            const normalMarkerStep = dense ? Math.max(1, Math.ceil(5 / Math.max(pointSpacing, 0.1))) : 1;
+
+            ctx.strokeStyle = dense ? "rgba(75, 85, 99, 0.48)" : "#6b7280";
+            ctx.lineWidth = dense ? 1 : 1.5;
+            ctx.beginPath();
+            for (let i = lineStart; i <= lineEnd; i++) {
+                const item = data[i];
+                const x = toX(i);
+                const y = toY(item.value);
+                if (i === lineStart) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            for (let i = visibleStart; i <= visibleEnd; i++) {
+                const item = data[i];
+                const x = toX(i);
+                const y = toY(item.value);
+                const over = isOverThreshold(item.value);
+                const clippedTop = item.value > yMax;
+                const clippedBottom = item.value < yMin;
+                const clipped = clippedTop || clippedBottom;
+                const markerY = clippedTop ? plotTop + 4 : clippedBottom ? plotBottom - 4 : y;
+                points.push({ x, y: markerY, item });
+
+                if (!over && dense && (i - visibleStart) % normalMarkerStep !== 0 && i !== visibleEnd) continue;
+
+                ctx.beginPath();
+                ctx.fillStyle = over ? "#dc2626" : "#16a34a";
+                ctx.strokeStyle = "#fff";
+                ctx.lineWidth = dense ? 0.8 : 1.5;
+                if (clipped) {
+                    if (clippedTop) {
+                        ctx.moveTo(x, plotTop + 1);
+                        ctx.lineTo(x - 4, plotTop + 8);
+                        ctx.lineTo(x + 4, plotTop + 8);
+                    } else {
+                        ctx.moveTo(x, plotBottom - 1);
+                        ctx.lineTo(x - 4, plotBottom - 8);
+                        ctx.lineTo(x + 4, plotBottom - 8);
+                    }
+                    ctx.closePath();
+                } else {
+                    ctx.arc(x, y, dense ? (over ? 3.2 : 1.7) : (over ? 5 : 4), 0, Math.PI * 2);
+                }
+                ctx.fill();
+                if (!dense || over || clipped) ctx.stroke();
+            }
+
+            const narrowedX = !rangesNearlyEqual(xMin, xMax, 0, Math.max(0, data.length - 1));
+            const axisLabel = narrowedX
+                ? `记录 ${visibleStart + 1}-${visibleEnd + 1} / ${data.length}`
+                : "当前类型记录顺序";
+            drawText(ctx, axisLabel, (plotLeft + plotRight) / 2, height - 12, "#6b7280", "center");
+            drawText(ctx, "差值", 4, 8, "#6b7280", "left");
+        }
+
+        function zoomChartAtPointer(event, canvas, rows) {
+            if (!event.deltaY) return;
+            const rect = canvas.getBoundingClientRect();
+            const pointerX = event.clientX - rect.left;
+            const pointerY = event.clientY - rect.top;
+            const plotLeft = CHART_MARGIN.left;
+            const plotRight = rect.width - CHART_MARGIN.right;
+            const plotTop = CHART_MARGIN.top;
+            const plotBottom = rect.height - CHART_MARGIN.bottom;
+            if (pointerX < plotLeft || pointerX > plotRight || pointerY < plotTop || pointerY > plotBottom) return;
+
+            const data = rows
+                .map((row, index) => ({ row, index, value: Number(row.weight_diff) }))
+                .filter(item => Number.isFinite(item.value));
+            if (!data.length) return;
+
+            const { viewport, limits, baseScale } = getChartViewport(canvas.id, data);
+            const zoomingIn = event.deltaY < 0;
+            const xLimitSpan = Math.max(0, limits.xMax - limits.xMin);
+            const yLimitSpan = Math.max(0, limits.yMax - limits.yMin);
+            const atMaximumX = rangesNearlyEqual(viewport.xMin, viewport.xMax, limits.xMin, limits.xMax);
+            const atMaximumY = rangesNearlyEqual(viewport.yMin, viewport.yMax, limits.yMin, limits.yMax);
+            if (!zoomingIn && atMaximumX && atMaximumY) return;
+
+            event.preventDefault();
+            document.getElementById("chartTooltip").style.display = "none";
+
+            const factor = zoomingIn ? 0.82 : 1.22;
+            const currentXSpan = Math.max(0, viewport.xMax - viewport.xMin);
+            const currentYSpan = Math.max(0, viewport.yMax - viewport.yMin);
+            const minimumXSpan = Math.min(xLimitSpan, 8);
+            const minimumYSpan = Math.min(yLimitSpan, Math.max(0.01, currentThreshold * 0.2));
+            const nextXSpan = Math.min(xLimitSpan, Math.max(minimumXSpan, currentXSpan * factor));
+            const nextYSpan = Math.min(yLimitSpan, Math.max(minimumYSpan, currentYSpan * factor));
+            const xRatio = Math.max(0, Math.min(1, (pointerX - plotLeft) / Math.max(1, plotRight - plotLeft)));
+            const yRatio = Math.max(0, Math.min(1, (plotBottom - pointerY) / Math.max(1, plotBottom - plotTop)));
+            const xAnchor = viewport.xMin + xRatio * currentXSpan;
+            const yAnchor = viewport.yMin + yRatio * currentYSpan;
+            const nextX = anchoredRange(xAnchor, xRatio, nextXSpan, limits.xMin, limits.xMax);
+            const nextY = anchoredRange(yAnchor, yRatio, nextYSpan, limits.yMin, limits.yMax);
+
+            viewport.xMin = nextX.min;
+            viewport.xMax = nextX.max;
+            viewport.yMin = nextY.min;
+            viewport.yMax = nextY.max;
+            viewport.zoomed = !(
+                rangesNearlyEqual(viewport.xMin, viewport.xMax, limits.xMin, limits.xMax)
+                && rangesNearlyEqual(viewport.yMin, viewport.yMax, baseScale.yMin, baseScale.yMax)
+            );
+            drawSingleChart(canvas, rows);
+        }
+
+        function resetChartZoom(canvasId) {
+            delete chartViewports[canvasId];
+            document.getElementById("chartTooltip").style.display = "none";
+            const canvas = document.getElementById(canvasId);
+            const rows = chartRowsByCanvas[canvasId] || [];
+            if (canvas && rows.length) drawSingleChart(canvas, rows);
+        }
+
+        function showChartTooltip(event) {
+            const canvas = event.currentTarget;
+            const tooltip = document.getElementById("chartTooltip");
+            const points = chartPointsByCanvas[canvas.id] || [];
+            if (!points.length) {
+                tooltip.style.display = "none";
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            let nearest = null;
+            let distance = Infinity;
+            points.forEach(point => {
+                const d = Math.hypot(point.x - x, point.y - y);
+                if (d < distance) {
+                    distance = d;
+                    nearest = point;
+                }
+            });
+            if (!nearest || distance > 14) {
+                tooltip.style.display = "none";
+                return;
+            }
+            const row = nearest.item.row;
+            const status = isOverThreshold(nearest.item.value) ? "超出阈值" : "正常范围";
+            tooltip.innerHTML = `
+                <strong>${escapeHtml(status)}</strong><br>
+                差值: ${formatNumber(nearest.item.value)}<br>
+                时间: ${escapeHtml(rowTimeLabel(row))}<br>
+                类型: ${escapeHtml(displayTypeName(row.record_type))}<br>
+                牌号: ${escapeHtml(row.brand)}
+            `;
+            tooltip.style.left = `${Math.min(event.clientX + 12, window.innerWidth - 180)}px`;
+            tooltip.style.top = `${Math.max(6, event.clientY - 72)}px`;
+            tooltip.style.display = "block";
+        }
+
+        function setViewMode(mode) {
+            viewMode = mode;
+            document.getElementById("tableSection").classList.toggle("hidden", mode === "chart");
+            document.getElementById("chartsSection").classList.toggle("hidden", mode === "data");
+            document.getElementById("viewAllBtn").classList.toggle("active", mode === "all");
+            document.getElementById("viewDataBtn").classList.toggle("active", mode === "data");
+            document.getElementById("viewChartBtn").classList.toggle("active", mode === "chart");
+            document.getElementById("chartTooltip").style.display = "none";
+            if (mode !== "data") {
+                drawGroupedCharts(currentRows, currentStats);
+            }
+        }
+
+        function setChartScaleMode(mode) {
+            chartScaleMode = mode === "full" ? "full" : "focus";
+            chartViewports = {};
+            const focusButton = document.getElementById("chartFocusBtn");
+            const fullButton = document.getElementById("chartFullBtn");
+            focusButton.classList.toggle("active", chartScaleMode === "focus");
+            fullButton.classList.toggle("active", chartScaleMode === "full");
+            focusButton.setAttribute("aria-pressed", chartScaleMode === "focus" ? "true" : "false");
+            fullButton.setAttribute("aria-pressed", chartScaleMode === "full" ? "true" : "false");
+            document.getElementById("chartTooltip").style.display = "none";
+            if (viewMode !== "data") drawGroupedCharts(currentRows, currentStats);
+        }
+
+        function localTodayValue() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, "0");
+            const day = String(now.getDate()).padStart(2, "0");
+            return `${year}-${month}-${day}`;
+        }
+
+        function setDefaultQueryDates() {
+            const today = localTodayValue();
+            document.getElementById("startDate").value = today;
+            document.getElementById("endDate").value = today;
+        }
+
+        function resetFilters() {
+            setDefaultQueryDates();
+            selectAllTypes();
+            closeTypeMenu();
+            document.getElementById("brandSelect").value = "";
+            document.getElementById("keywordInput").value = "";
+            document.getElementById("thresholdInput").value = formatNumber(DEFAULT_DIFF_THRESHOLD);
+            loadRows();
+        }
+
+        function exportCsv() {
+            if (!currentRows.length) return;
+            const headers = ["类型", "牌号", "卷包打码重量", "打码时间", "制丝复称重量", "复称时间", "复称差值"];
+            const lines = [headers.join(",")];
+            currentRows.forEach(row => {
+                const values = [
+                    row.record_type,
+                    row.brand,
+                    formatNumber(row.pack_code_weight),
+                    row.pack_code_time,
+                    formatNumber(row.rescale_weight),
+                    row.rescale_time,
+                    formatNumber(row.weight_diff)
+                ].map(value => `"${String(value || "").replace(/"/g, '""')}"`);
+                lines.push(values.join(","));
+            });
+            const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "复称数据.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById("keywordInput").addEventListener("keydown", event => {
+            if (event.key === "Enter") loadRows();
+        });
+        document.addEventListener("click", event => {
+            const picker = document.getElementById("typePicker");
+            if (picker && !picker.contains(event.target)) closeTypeMenu();
+        });
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape") closeTypeMenu();
+        });
+        window.addEventListener("resize", () => {
+            if (viewMode !== "data") drawGroupedCharts(currentRows, currentStats);
+        });
+
+        setDefaultQueryDates();
+        updateThresholdLegend();
+        loadFilters();
+        loadRows();
+    </script>
+</body>
+</html>

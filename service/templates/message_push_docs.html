@@ -111,10 +111,42 @@
     <div class="container">
         <div class="panel">
             <h2>基础信息</h2>
-            <p>这些接口用于给内网其他系统查询或写入消息推送数据库数据。所有接口返回 JSON，编码为 UTF-8。</p>
+            <p>这些接口用于给内网其他系统查询或写入消息推送数据。当前后端存储使用 MySQL，接口统一返回 JSON，编码为 UTF-8。</p>
             <p>当前访问地址：<code id="baseUrl"></code></p>
-            <p class="muted">其他电脑调用时，把地址中的 <code>127.0.0.1</code> 或 <code>localhost</code> 换成这台服务器的内网 IP，例如 <code>http://192.168.31.58:5000</code>。</p>
+            <p class="muted">其他电脑调用时，把地址中的 <code>127.0.0.1</code> 或 <code>localhost</code> 换成这台服务器的内网 IP，例如 <code>http://10.164.62.212:5000</code>。</p>
             <p class="note">当前接口未加登录鉴权，建议只在可信内网开放；如果后面要给外部网络调用，需要再加 token 校验。</p>
+        </div>
+
+        <div class="panel">
+            <h2>MySQL 存储信息</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr><th>项目</th><th>当前值</th><th>说明</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>数据库类型</td><td><code>MySQL</code></td><td>消息推送模块已经不再写入 SQLite。</td></tr>
+                        <tr><td>Host</td><td><code>127.0.0.1</code></td><td>MySQL 和当前 Flask 服务在同一台机器时使用本机地址。</td></tr>
+                        <tr><td>Port</td><td><code>3306</code></td><td>MySQL 默认端口。</td></tr>
+                        <tr><td>User</td><td><code>th</code></td><td>项目连接 MySQL 使用的账号。</td></tr>
+                        <tr><td>Database</td><td><code>zonghe_service</code></td><td>程序启动时会尝试自动创建该数据库。</td></tr>
+                        <tr><td>Table</td><td><code>push_messages</code></td><td>消息推送记录表。</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <h3>MySQL 表结构</h3>
+            <pre>CREATE TABLE IF NOT EXISTS push_messages (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  push_time DATETIME NOT NULL,
+  machine_no INT NOT NULL,
+  machine_code VARCHAR(8) NOT NULL,
+  content TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  INDEX idx_push_messages_time (push_time),
+  INDEX idx_push_messages_machine (machine_no),
+  INDEX idx_push_messages_machine_code (machine_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;</pre>
+            <p class="muted">如果 MySQL 账号没有建库权限，可以先手动执行 <code>CREATE DATABASE zonghe_service DEFAULT CHARACTER SET utf8mb4;</code>，再启动服务。</p>
         </div>
 
         <div class="panel">
@@ -232,8 +264,9 @@
                 <li><code>200</code>：请求成功。</li>
                 <li><code>400</code>：新增接口参数错误，例如机台号不在 1-12、时间为空、内容为空。</li>
                 <li><code>404</code>：单条详情记录不存在。</li>
-                <li>查询接口只返回业务字段，不开放 SQLite 直连和任意 SQL 执行。</li>
+                <li>查询接口只返回业务字段，不开放 MySQL 直连和任意 SQL 执行。</li>
                 <li>接口已允许 CORS，内网网页系统可以直接跨端口调用。</li>
+                <li><code>machine_code</code> 不需要调用方传入，后端会根据 <code>machine_no</code> 自动生成，例如 1 号机为 <code>jy01</code>，2 号机为 <code>jy02</code>。</li>
             </ul>
         </div>
     </div>

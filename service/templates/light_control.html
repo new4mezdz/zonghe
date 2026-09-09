@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JV-DAM3200 3D控制中心 · Babylon</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="./assets/css/app.css?v=20260813-04">
+  <link rel="stylesheet" href="./assets/css/plan-layout-20260813-04.css">
+  <link rel="stylesheet" href="./assets/css/babylon-app.css?v=20260813-04">
+</head>
+<body class="babylon-page view-control">
+<!-- ============================================================
+  迁移步骤 1: HTML 骨架 (app.html 全量内容并入 babylon 页)
+  - 结构/ID 与 app.html 保持一致, 供步骤 2 的运行时 JS 直接接管
+  - 现版 babylon-app.js 依赖的 id 全部保留, 现有功能不受影响
+  - 标注「兼容占位」的节点在 JS 迁移完成后删除
+============================================================ -->
+
+  <div id="top-tabs">
+    <!-- 视图切换沿用 babylon 方案: bindUI 绑定 data-view, 切换 body class -->
+    <button class="top-tab active" data-view="control" type="button">操控</button>
+    <button class="top-tab" data-view="plan" type="button">平面灯控</button>
+    <button class="top-tab" data-view="stats" type="button">统计</button>
+    <button class="btn btn-ghost" id="light-control-unlock-button" type="button" onclick="toggleLightControlLock()">🔒 解锁控制</button>
+  </div>
+
+  <!-- ===== 统计视图 (迁移自 app.html 完整版) ===== -->
+  <div id="view-stats">
+    <div class="stats-shell">
+      <div class="stats-top">
+        <div class="stats-title">使用统计</div>
+        <div class="stats-ctrls">
+          <div class="seg" id="stats-range-seg">
+            <button class="seg-btn" data-range="1" onclick="setStatsRange(1)">今日</button>
+            <button class="seg-btn active" data-range="7" onclick="setStatsRange(7)">近7天</button>
+            <button class="seg-btn" data-range="30" onclick="setStatsRange(30)">近30天</button>
+          </div>
+          <div class="seg" id="stats-dim-seg">
+            <button class="seg-btn active" data-dim="light" onclick="setStatsDim('light')">按灯</button>
+            <button class="seg-btn" data-dim="group" onclick="setStatsDim('group')">按分组</button>
+            <button class="seg-btn" data-dim="device" onclick="setStatsDim('device')">按继电器</button>
+          </div>
+          <button class="btn btn-ghost" onclick="refreshStatsData()">刷新</button>
+          <button class="btn btn-ghost" onclick="exportStatsCsv()">导出 CSV</button>
+        </div>
+      </div>
+      <div class="stats-msg" id="stats-msg" hidden></div>
+      <div class="stats-cards" id="stats-cards"></div>
+      <div class="stats-section">
+        <div class="stats-sec-title" id="stats-trend-title">每日单灯最长点亮时长趋势</div>
+        <canvas id="stats-trend" class="stats-canvas"></canvas>
+      </div>
+      <div class="stats-grid2">
+        <div class="stats-section">
+          <div class="stats-sec-title">使用时长排行 (Top 10)</div>
+          <div id="stats-rank"></div>
+        </div>
+        <div class="stats-section">
+          <div class="stats-sec-title">明细</div>
+          <div id="stats-table" class="stats-table"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="view-plan" aria-label="车间平面灯光操控">
+    <div class="plan-shell">
+      <header class="plan-header">
+        <div class="plan-heading">
+          <div class="plan-kicker">WORKSHOP 2D LIGHT CONTROL</div>
+          <div class="plan-title-row">
+            <h1>车间平面灯控</h1>
+            <span class="plan-build-badge">版本 2026.08.13-04</span>
+          </div>
+        </div>
+        <div class="plan-header-actions">
+          <button class="btn btn-ghost" type="button" onclick="refreshStatus()">刷新状态</button>
+          <button class="btn btn-primary" type="button" onclick="setFlatPlanAllLights(true)">全部打开</button>
+          <button class="btn btn-danger" type="button" onclick="setFlatPlanAllLights(false)">全部关闭</button>
+        </div>
+      </header>
+
+      <section class="plan-mode-panel" aria-label="上下班与节能灯光模式">
+        <div class="plan-mode-copy">
+          <span class="plan-mode-kicker">快捷模式</span>
+          <strong>灯光运行方案</strong>
+          <small>使用客户现场已经保存的灯光运行方案。</small>
+        </div>
+        <div class="plan-mode-cards">
+          <div class="plan-mode-card" data-plan-mode-card="work">
+            <span>上班模式</span>
+            <b id="plan-mode-work-status">未保存</b>
+            <button id="plan-mode-work-apply" type="button" onclick="applyFlatPlanMode('work')">应用</button>
+          </div>
+          <div class="plan-mode-card" data-plan-mode-card="off">
+            <span>下班模式</span>
+            <b id="plan-mode-off-status">未保存</b>
+            <button id="plan-mode-off-apply" type="button" onclick="applyFlatPlanMode('off')">应用</button>
+          </div>
+          <div class="plan-mode-card energy" data-plan-mode-card="energy">
+            <span>节能模式</span>
+            <b id="plan-mode-energy-status">计算中</b>
+            <button id="plan-mode-energy-apply" type="button" onclick="applyFlatPlanMode('energy')">应用</button>
+            <button id="plan-mode-energy-preview" type="button" onclick="previewFlatPlanEnergyMode()">预览</button>
+          </div>
+        </div>
+        <div class="plan-mode-editor" id="plan-mode-editor" hidden>
+          <div>
+            <span id="plan-mode-editor-kicker">正在配置</span>
+            <strong id="plan-mode-editor-title">上班模式</strong>
+            <small id="plan-mode-editor-count">已选 0 个回路</small>
+          </div>
+          <div class="plan-mode-editor-body">
+            <p id="plan-mode-editor-help">点击平面图中的灯带，选择此模式下需要点亮的回路；未选回路会在应用模式时关闭。</p>
+            <div class="plan-auto-period-controls" id="plan-auto-period-controls" hidden>
+              <label>时间段
+                <select id="plan-auto-period-select" onchange="selectFlatPlanAutomaticPeriod(this.value)"></select>
+              </label>
+              <label>开始<input id="plan-auto-period-start" type="time" step="60" onchange="updateFlatPlanAutomaticPeriodTime('start', this.value)"></label>
+              <span>至</span>
+              <label>结束<input id="plan-auto-period-end" type="time" step="60" onchange="updateFlatPlanAutomaticPeriodTime('end', this.value)"></label>
+              <button type="button" onclick="addFlatPlanAutomaticPeriod()">新增时段</button>
+              <button id="plan-auto-period-delete" type="button" onclick="deleteFlatPlanAutomaticPeriod()">删除</button>
+            </div>
+          </div>
+          <div class="plan-mode-editor-actions">
+            <button type="button" data-plan-mode-selection-action onclick="setFlatPlanModeSelection(true)">全选</button>
+            <button type="button" data-plan-mode-selection-action onclick="setFlatPlanModeSelection(false)">清空</button>
+            <button id="plan-mode-cancel" type="button" onclick="cancelFlatPlanModeEdit()">取消</button>
+            <button id="plan-mode-save" class="primary" type="button" onclick="saveFlatPlanMode()">保存模式</button>
+          </div>
+        </div>
+      </section>
+
+      <div class="plan-summary" aria-label="平面灯控状态摘要">
+        <div class="plan-summary-card">
+          <span class="plan-summary-label">物理灯板</span>
+          <strong id="plan-total-panels">900</strong>
+          <small id="plan-total-detail">主车间 12×75</small>
+        </div>
+        <div class="plan-summary-card on">
+          <span class="plan-summary-label">当前点亮</span>
+          <div class="plan-summary-value"><strong id="plan-on-panels">0</strong><span class="plan-summary-percent" id="plan-on-percent">0.0%</span></div>
+          <small>块灯板</small>
+        </div>
+        <div class="plan-summary-card off">
+          <span class="plan-summary-label">当前熄灭</span>
+          <strong id="plan-off-panels">900</strong>
+          <small>块灯板</small>
+        </div>
+        <div class="plan-summary-card unknown">
+          <span class="plan-summary-label">状态未知</span>
+          <strong id="plan-offline-panels">0</strong>
+          <small>离线或未配置</small>
+        </div>
+        <div class="plan-summary-card">
+          <span class="plan-summary-label">控制回路</span>
+          <strong id="plan-circuit-count">37</strong>
+          <small>连续区段</small>
+        </div>
+      </div>
+
+      <div class="plan-content">
+        <aside class="plan-inspector" aria-label="选中回路信息">
+          <div class="plan-inspector-card selected">
+            <div class="plan-inspector-kicker">当前回路</div>
+            <div id="plan-selection-title" class="plan-selection-title">请选择图中的灯光区段</div>
+            <div id="plan-selection-meta" class="plan-selection-meta">点击灯格即可查看并操控对应开关。</div>
+            <div id="plan-selection-state" class="plan-selection-state offline">未选择</div>
+            <div class="plan-selection-actions">
+              <button id="plan-selection-toggle" class="btn btn-primary" type="button" onclick="toggleFlatPlanSelected()" disabled>切换此回路</button>
+              <button id="plan-selection-3d" class="btn btn-ghost" type="button" onclick="showFlatPlanSelectionIn3D()" disabled>在3D中查看</button>
+            </div>
+          </div>
+
+          <div class="plan-inspector-card">
+            <div class="plan-inspector-kicker">状态图例</div>
+            <div class="plan-legend">
+              <span><i class="plan-legend-dot on"></i>已打开</span>
+              <span><i class="plan-legend-dot off"></i>已关闭</span>
+              <span><i class="plan-legend-dot pending"></i>等待设备确认</span>
+              <span><i class="plan-legend-dot offline"></i>继电器离线</span>
+            </div>
+          </div>
+
+          <div class="plan-inspector-card orientation">
+            <div class="plan-inspector-kicker">方向与编号</div>
+            <div class="plan-orientation-row"><span>主入口端</span><b>75号灯</b></div>
+            <div class="plan-orientation-line"><i></i></div>
+            <div class="plan-orientation-row"><span>车间远端</span><b>1号灯</b></div>
+            <p>列号严格沿用3D坐标：横向图从上到下依次为第12列至第1列。</p>
+          </div>
+        </aside>
+
+        <section class="plan-map-card" aria-labelledby="plan-map-title">
+          <div class="plan-map-head">
+            <div>
+              <div class="plan-map-kicker">主入口在左 · 横向平面</div>
+              <h2 id="plan-map-title">灯位布局</h2>
+            </div>
+            <div class="plan-map-help">点击任意灯格，切换其所属的连续控制回路</div>
+          </div>
+          <div class="plan-map-scroll" id="plan-map-scroll">
+            <svg id="flat-plan-svg" class="flat-plan-svg" role="group" aria-label="12列75灯车间平面控制图"></svg>
+          </div>
+          <div class="plan-map-foot">
+            <strong>主入口</strong>
+            <span class="plan-direction-arrow" aria-hidden="true">→</span>
+            <span>从左向右进入车间</span>
+          </div>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <div id="app">
+    <div id="scene-wrap">
+      <canvas id="scene"></canvas>
+
+      <div class="hud-top">
+        <div class="hud-top-left">
+          <div class="hud-clock" id="hud-clock">--:--</div>
+          <div>
+            <div class="hud-title">WORKSHOP LIVE VIEW · BABYLON</div>
+            <div class="hud-subtitle">场景实时监控</div>
+            <div class="hud-source" id="hud-source">正在加载工程数据...</div>
+          </div>
+        </div>
+        <div class="hud-top-right">
+          <div class="hud-temp">
+            <div class="hud-temp-main" id="hud-temp-main">— °C</div>
+            <div class="hud-temp-cond" id="hud-weather-text">西昌 · --</div>
+            <div class="hud-temp-sub">
+              <span class="high" id="hud-temp-high">— °C</span>
+              <span style="margin: 0 6px; opacity: 0.5;">·</span>
+              <span class="low" id="hud-temp-low">— °C</span>
+            </div>
+            <div class="hud-engine-line"><span id="hud-style">冷白工业</span> · <span id="hud-fps">-- FPS</span></div>
+          </div>
+          <div class="hud-stats">
+            <div class="stat stat-on">
+              <div class="stat-val" id="stat-on">0</div>
+              <div class="stat-lbl">已亮灯板</div>
+            </div>
+            <div class="stat">
+              <div class="stat-val" id="stat-off">0</div>
+              <div class="stat-lbl">熄灭灯板</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-hint" id="scene-hint">左键拖动旋转 · 滚轮缩放 · 俯瞰模式 W/A/S/D 平移 · 点击灯具切换</div>
+
+      <button class="hud-edit hud-walk" id="hud-walk" type="button">
+        <div class="edit-dot"></div>
+        <span id="walk-label">第一人称: 关</span>
+      </button>
+      <div class="walk-reticle" id="walk-reticle" aria-hidden="true"></div>
+      <div class="device-pop" id="device-pop" hidden></div>
+      <div class="scene-toast" id="scene-toast" hidden></div>
+    </div>
+
+    <!-- ===== 操控右栏 (迁移自 app.html: 继电器大按钮 + 模式按钮 + 通道/电器两种视图) ===== -->
+    <div id="control-panel">
+      <div class="cp-head">
+        <div>
+          <div class="cp-title">操控</div>
+          <div class="cp-subtitle">Babylon 渲染 · 当前工程布局</div>
+        </div>
+        <div class="cv-modes">
+          <button class="cv-mode active" type="button" data-mode="channel" onclick="setControlMode('channel')">按通道</button>
+          <button class="cv-mode" type="button" data-mode="appliance" onclick="setControlMode('appliance')">按电器</button>
+        </div>
+      </div>
+      <div class="cp-actions cp-primary-actions" id="cv-main-actions"></div>
+      <details class="cv-advanced-actions">
+        <summary>分组 / 场景快捷</summary>
+        <div class="cv-quick">
+          <div class="cv-quick-col"><div class="cv-quick-title">分组</div><div class="cv-quick-list" id="cv-groups"></div></div>
+          <div class="cv-quick-col"><div class="cv-quick-title">场景</div><div class="cv-quick-list" id="cv-scenes"></div></div>
+        </div>
+      </details>
+      <div class="cv-body" id="cv-body"></div>
+    </div>
+
+    <!-- ===== 配置侧栏 (迁移自 app.html 完整版) ===== -->
+    <div id="panel">
+      <!-- 折叠按钮由现版 babylon-app.js bindUI 绑定, 不加内联 onclick; 步骤 2 改路由到 toggleMainPanel -->
+      <button type="button" id="panel-toggle" aria-expanded="true" aria-controls="panel-main" title="收起控制面板">
+        <span class="panel-toggle-glyph" id="panel-toggle-glyph">&gt;</span>
+      </button>
+
+      <div class="panel-mini" id="panel-mini" aria-hidden="true">
+        <button type="button" class="panel-mini-open" id="panel-mini-open-btn">展开</button>
+        <div class="panel-mini-label">控制</div>
+        <button type="button" class="panel-mini-chip" data-section="devices" onclick="openPanelSection('devices')">
+          <span class="panel-mini-chip-kicker">设</span>
+          <span class="panel-mini-chip-value" id="mini-devices">0</span>
+        </button>
+        <button type="button" class="panel-mini-chip" data-section="appliances" onclick="openPanelSection('appliances')">
+          <span class="panel-mini-chip-kicker">亮</span>
+          <span class="panel-mini-chip-value" id="mini-appliances">0</span>
+        </button>
+        <div class="panel-mini-tip">点数字可展开到对应分区</div>
+      </div>
+
+      <div class="panel-main" id="panel-main">
+        <div class="card head-card">
+          <div class="head-top">
+            <div class="head-copy">
+              <div class="head-title">JV-DAM3200</div>
+              <div class="head-sub">多设备灯光控制 · Babylon 渲染</div>
+            </div>
+            <button type="button" class="panel-visibility-btn" id="panel-visibility-btn">收起侧栏</button>
+          </div>
+          <div class="head-row">
+            <button class="btn btn-primary" onclick="connectAll()">连接全部</button>
+            <button class="btn btn-ghost" onclick="disconnectAll()">断开全部</button>
+          </div>
+          <div class="head-row head-row-secondary">
+            <button class="btn btn-ghost" onclick="openSetupWizard()">接入向导</button>
+          </div>
+          <div class="head-row head-row-secondary">
+            <button class="btn btn-ghost" onclick="openProjectImportDialog()">导入工程</button>
+            <button class="btn btn-ghost" onclick="exportProjectConfig()">导出工程</button>
+          </div>
+          <div class="head-row head-row-secondary">
+            <!-- babylon 页原有能力, id 由现版 babylon-app.js 绑定, 保留 -->
+            <button class="btn btn-ghost" id="reload-config" type="button">重新加载</button>
+            <button class="btn btn-ghost" id="fit-camera" type="button">适配视角</button>
+          </div>
+          <div class="head-inline-status" id="runtime-summary">等待工程数据...</div>
+        </div>
+
+        <div class="card setup-card" id="setup-card" hidden>
+          <div class="sec-label">快速开始</div>
+          <div class="setup-title">完成客户交付配置</div>
+          <div class="setup-copy">在这个面板里完成首次连接和电器绑定。</div>
+          <div class="setup-checklist" id="setup-checklist"></div>
+          <div class="card-foot">
+            <button class="btn btn-primary" onclick="openSetupWizard()">打开接入向导</button>
+          </div>
+        </div>
+
+        <div class="card collapsible-card" id="section-devices">
+          <div class="collapse-bar">
+            <button type="button" class="collapse-head" data-section-toggle="devices">
+              <div class="collapse-copy">
+                <div class="sec-label collapse-title">设备</div>
+                <div class="collapse-meta" id="meta-devices">0 台设备</div>
+              </div>
+              <div class="collapse-chevron">v</div>
+            </button>
+          </div>
+          <div class="collapse-body" id="body-devices" aria-hidden="true">
+            <div class="dev-list" id="dev-list"></div>
+            <div class="card-foot">
+              <button class="btn btn-ghost" onclick="showDeviceModal()">+ 添加设备</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card light-card collapsible-card open" id="section-appliances">
+          <div class="collapse-bar">
+            <button type="button" class="collapse-head" data-section-toggle="appliances">
+              <div class="collapse-copy">
+                <div class="sec-label collapse-title">电器</div>
+                <div class="collapse-meta" id="meta-appliances">0 个电器</div>
+              </div>
+              <div class="collapse-chevron">v</div>
+            </button>
+            <div class="section-toolbar">
+              <div class="mini-toggle-wrap">
+                <span>标签常显</span>
+                <button class="mini-toggle" id="label-toggle-btn" onclick="toggleLabelPins()" title="切换标签常显"></button>
+              </div>
+              <button class="btn btn-ghost" style="padding: 5px 10px; font-size: 11px;" onclick="showUsageModal()">用量报表</button>
+              <button class="btn btn-ghost" style="padding: 5px 10px; font-size: 11px;" onclick="showLightsModal()">设备管理</button>
+            </div>
+          </div>
+          <div class="collapse-body" id="body-appliances" aria-hidden="false">
+            <div class="flow-hub">
+              <div class="flow-column">
+                <div class="flow-head">
+                  <span>分组控制</span>
+                  <button type="button" class="flow-link" onclick="showLightsModal()">编辑分组</button>
+                </div>
+                <div class="group-list" id="group-list"></div>
+              </div>
+            </div>
+            <div class="status-strip" id="status-strip"></div>
+            <div class="light-rows" id="light-rows"></div>
+          </div>
+        </div>
+
+        <div class="card bot-card">
+          <button class="btn btn-ghost" onclick="refreshStatus()">🔄 刷新</button>
+          <button class="btn btn-primary" onclick="batchAll(true)">全部打开</button>
+          <button class="btn btn-danger" onclick="batchAll(false)">全部关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全局 toast 容器 + 工程导入 input (迁移自 app.html) -->
+  <div id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+  <input id="project-import-input" type="file" accept=".json,application/json" hidden onchange="handleProjectFileSelection(event)">
+
+  <!-- ===== 添加设备弹窗 ===== -->
+  <div class="modal-bg" id="dev-modal">
+    <div class="modal">
+      <h3>添加新设备</h3>
+      <div class="sub">填写设备信息以开始远程控制</div>
+      <div class="modal-notice" id="dev-modal-notice" hidden></div>
+      <div class="form">
+        <div class="form-item"><label>设备名称</label><input id="in-name" value="新设备"></div>
+        <div class="form-item"><label id="in-endpoint-label">设备 IP 地址(用作唯一标识)</label><input id="in-ip" value="192.168.1.100"></div>
+        <div class="form-item"><label>端口</label><input id="in-port" value="502"></div>
+        <div class="form-item"><label>通道数量</label><input id="in-channel-count" type="number" min="1" max="128" value="32"></div>
+        <div class="form-item"><label>站号</label><input id="in-unit" value="254"></div>
+        <div class="form-item">
+          <label>协议</label>
+          <select id="in-protocol" onchange="onDeviceProtocolChange()">
+            <option value="modbus_tcp">Modbus TCP</option>
+            <option value="siemens_s7">Siemens S7-1200</option>
+          </select>
+        </div>
+        <div class="form-item" data-device-protocol="siemens_s7" hidden><label>机架</label><input id="in-rack" value="0"></div>
+        <div class="form-item" data-device-protocol="siemens_s7" hidden><label>槽号</label><input id="in-slot" value="1"></div>
+        <div class="form-item" data-device-protocol="siemens_s7" hidden><label>数据块编号</label><input id="in-db-number" value="1"></div>
+        <div class="form-item" data-device-protocol="siemens_s7" hidden><label>起始字节</label><input id="in-start-byte" value="0"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="hideDeviceModal()">取消</button>
+        <button class="btn btn-ghost" onclick="testDeviceModal()">测试连接</button>
+        <button class="btn btn-primary" onclick="saveDevice()">确认添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 电器管理弹窗 ===== -->
+  <div class="modal-bg" id="lights-modal">
+    <div class="modal wide">
+      <h3 id="lights-modal-title">电器管理</h3>
+      <div class="sub" id="lights-modal-sub">每个电器绑定到一个设备通道，JV-DAM3200 支持 32 路，可选择图标类型、自定义名称，并单独设置模型大小</div>
+      <div class="lc-grid-explainer" id="lc-grid-explainer" hidden></div>
+      <div class="modal-notice" id="lights-modal-notice" hidden></div>
+      <datalist id="light-group-options"></datalist>
+      <div class="lc-map-tool" id="lc-map-tool" hidden>
+        <div class="lc-map-head">
+          <div>
+            <div class="lc-map-kicker">推荐配置方式</div>
+            <div class="lc-map-title" id="lc-map-title">直接在 2D / 3D 图上划分开关回路</div>
+          </div>
+          <span class="lc-map-badge">每路点两下</span>
+        </div>
+        <div class="lc-map-fields">
+          <label class="lc-map-field lc-map-device">起始继电器<select id="lc-map-device" onchange="refreshLightingGridMapTool()"></select></label>
+          <label class="lc-map-field">起始通道<input id="lc-map-channel" type="number" min="1" value="1" oninput="refreshLightingGridMapTool()"></label>
+          <label class="lc-map-field lc-map-group">分组<input id="lc-map-group" type="text" list="light-group-options" placeholder="例如：车间顶灯"></label>
+          <div class="lc-map-surface-actions">
+            <button type="button" class="lc-map-surface-btn" id="lc-map-start-2d" onclick="beginLightingGridMapMode('2d')">进入 2D 平面配置</button>
+            <button type="button" class="lc-map-start secondary" id="lc-map-start-3d" onclick="beginLightingGridMapMode('3d')">进入 3D 场景配置</button>
+          </div>
+        </div>
+        <div class="lc-map-summary" id="lc-map-summary"></div>
+        <div class="lc-map-hint">2D 与 3D 共用同一份配置。进入后先点一段灯板的起点，再点同一列的终点，中间灯板会自动归入当前开关；完成一段后自动切换到下一个通道。</div>
+      </div>
+      <div class="lc-batch" id="lc-batch-layout-tool">
+        <div class="lc-batch-title">批量排布灯具 · 自动对齐 · 均匀间隔</div>
+        <div class="lc-batch-fields">
+          <label class="lc-batch-field">灯具总数<input id="lc-batch-count" type="number" min="1" max="1000" value="8"></label>
+          <label class="lc-batch-field">每排数量<input id="lc-batch-percol" type="number" min="1" max="200" placeholder="自动"></label>
+          <label class="lc-batch-field">类型<select id="lc-batch-type"></select></label>
+          <label class="lc-batch-field lc-batch-group">分组<input id="lc-batch-group" type="text" list="light-group-options" placeholder="可选"></label>
+          <button type="button" class="lc-place lc-batch-go" onclick="addLightRow()">批量生成</button>
+        </div>
+        <div class="lc-batch-hint">填总数即可, 系统按车间比例自动排成对齐方格、均匀间隔(几百个也不会乱)。每排数量留空=自动; 想要整齐一排就把它填成总数。</div>
+      </div>
+      <button type="button" class="lc-grid-details-toggle" id="lc-grid-details-toggle" onclick="toggleLightingGridDetails()" hidden></button>
+      <div class="lc-grid-details" id="lc-grid-details">
+      <div class="lc-batch lc-bind" id="lc-bind-tool">
+        <div class="lc-batch-title" id="lc-bind-title">按编号顺序绑定继电器</div>
+        <div class="lc-batch-fields">
+          <label class="lc-batch-field">起始编号<input id="lc-bind-from" type="number" min="1" value="1"></label>
+          <label class="lc-batch-field">结束编号<input id="lc-bind-to" type="number" min="1"></label>
+          <label class="lc-batch-field lc-batch-group">目标继电器<select id="lc-bind-device"></select></label>
+          <label class="lc-batch-field">起始通道<input id="lc-bind-start" type="number" min="1" value="1"></label>
+          <button type="button" class="lc-place lc-batch-go" onclick="bindLightRange()">顺序绑定</button>
+        </div>
+        <div class="lc-batch-hint" id="lc-bind-hint">把"起始–结束编号"的电器按顺序绑定到所选继电器, 从"起始通道"开始依次 +1; 超出该板通道数的部分会提示, 改绑到下一块板即可。编号见下方每行左侧的 # 号。</div>
+      </div>
+      <div class="lc-list" id="lc-list"></div>
+      <button class="lc-add" id="lc-add-light" onclick="addLight()">+ 添加一个电器</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="hideLightsModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveLights()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-map-bar" id="grid-map-bar" hidden>
+    <div class="grid-map-main">
+      <div class="grid-map-kicker" id="grid-map-kicker">图上配置</div>
+      <div class="grid-map-target-controls" id="grid-map-target">
+        <label class="grid-map-target-field">继电器
+          <select id="grid-map-device-select" aria-label="快速切换继电器" onchange="onLightingGridMapDeviceChange()"></select>
+        </label>
+        <span class="grid-map-target-separator">·</span>
+        <label class="grid-map-target-field">通道
+          <select id="grid-map-channel-select" aria-label="快速切换通道" onchange="onLightingGridMapChannelChange()"></select>
+        </label>
+      </div>
+      <div class="grid-map-instruction" id="grid-map-instruction">点击第一盏灯板</div>
+      <div class="grid-map-progress" id="grid-map-progress"></div>
+    </div>
+    <div class="grid-map-actions">
+      <button type="button" class="btn btn-ghost" id="grid-map-undo" onclick="undoLightingGridMapStep()">撤销上一段</button>
+      <button type="button" class="btn btn-ghost" onclick="cancelLightingGridMapMode()">取消</button>
+      <button type="button" class="btn btn-primary" onclick="finishLightingGridMapMode()">完成并返回</button>
+    </div>
+  </div>
+
+  <!-- ===== 场景预设弹窗 ===== -->
+  <div class="modal-bg" id="scenes-modal">
+    <div class="modal wide">
+      <h3>场景预设</h3>
+      <div class="sub">把分组开关状态保存成一键可复用的客户场景。</div>
+      <div class="modal-notice" id="scenes-modal-notice" hidden></div>
+      <div class="scene-config-list" id="scene-config-list"></div>
+      <button class="lc-add" onclick="addScene()">+ 添加场景预设</button>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="hideScenesModal()">取消</button>
+        <button class="btn btn-primary" onclick="saveScenes()">保存场景</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 灯具用量报表弹窗 ===== -->
+  <div class="modal-bg" id="usage-modal">
+    <div class="modal wide">
+      <h3>灯具用量报表</h3>
+      <div class="sub">统计每盏灯的今日/累计点亮时长与开关次数, 数据由后端按继电器状态自动记录。</div>
+      <div class="usage-summary" id="usage-summary"></div>
+      <div class="usage-toolbar">
+        <select id="usage-sort" onchange="renderUsageReport()">
+          <option value="num">按编号</option>
+          <option value="today">按今日时长</option>
+          <option value="total">按累计时长</option>
+          <option value="count">按开关次数</option>
+        </select>
+        <button class="btn btn-ghost" onclick="refreshUsageReport()">刷新</button>
+        <button class="btn btn-ghost" onclick="exportUsageCsv()">导出 CSV</button>
+        <button class="btn btn-primary" style="margin-left:auto;" onclick="hideUsageModal()">关闭</button>
+      </div>
+      <div class="usage-list" id="usage-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== 接入向导弹窗 ===== -->
+  <div class="modal-bg" id="setup-modal">
+    <div class="modal wide setup-modal-shell">
+      <h3>接入向导</h3>
+      <div class="sub">按步骤完成首次接入，补齐设备和电器分组。</div>
+      <div class="setup-stepper" id="setup-stepper"></div>
+      <div class="setup-stage">
+        <section class="setup-pane" id="setup-pane-device">
+          <div class="modal-notice" id="setup-device-notice" hidden></div>
+          <div class="form">
+            <div class="form-item"><label>设备名称</label><input id="setup-device-name" value="主控器"></div>
+            <div class="form-item"><label id="setup-device-endpoint-label">设备 IP 地址</label><input id="setup-device-ip" value="192.168.1.100"></div>
+            <div class="form-item"><label>端口</label><input id="setup-device-port" value="502"></div>
+            <div class="form-item"><label>通道数量</label><input id="setup-device-channel-count" type="number" min="1" max="128" value="32"></div>
+            <div class="form-item"><label>站号</label><input id="setup-device-unit" value="254"></div>
+            <div class="form-item">
+              <label>协议</label>
+              <select id="setup-device-protocol" onchange="onSetupDeviceProtocolChange()">
+                <option value="modbus_tcp">Modbus TCP</option>
+                <option value="siemens_s7">Siemens S7-1200</option>
+              </select>
+            </div>
+            <div class="form-item" data-device-protocol="setup-device:siemens_s7" hidden><label>机架</label><input id="setup-device-rack" value="0"></div>
+            <div class="form-item" data-device-protocol="setup-device:siemens_s7" hidden><label>槽号</label><input id="setup-device-slot" value="1"></div>
+            <div class="form-item" data-device-protocol="setup-device:siemens_s7" hidden><label>数据块编号</label><input id="setup-device-db-number" value="1"></div>
+            <div class="form-item" data-device-protocol="setup-device:siemens_s7" hidden><label>起始字节</label><input id="setup-device-start-byte" value="0"></div>
+          </div>
+          <div class="setup-note">先测试连接，再保存设备，客户看到的失败原因会更清楚。</div>
+        </section>
+
+        <section class="setup-pane" id="setup-pane-appliances" hidden>
+          <div class="modal-notice" id="setup-appliance-notice" hidden></div>
+          <div class="form">
+            <div class="form-item">
+              <label>目标设备</label>
+              <div class="static-field" id="setup-device-summary">还没有保存设备</div>
+            </div>
+            <div class="form-item"><label>电器数量</label><input id="setup-appliance-count" type="number" min="1" max="128" value="4"></div>
+            <div class="form-item">
+              <label>默认类型</label>
+              <select id="setup-appliance-type">
+                <option value="lamp">灯</option>
+                <option value="printer">打印机</option>
+                <option value="smoke_machine">产烟机</option>
+                <option value="fan">风扇</option>
+                <option value="socket">插座</option>
+                <option value="camera">摄像头</option>
+                <option value="alarm">报警器</option>
+              </select>
+            </div>
+            <div class="form-item"><label>名称前缀</label><input id="setup-appliance-prefix" value="区域"></div>
+            <div class="form-item"><label>分组名称</label><input id="setup-appliance-group" value="主区域"></div>
+          </div>
+          <div class="setup-preview" id="setup-appliance-preview"></div>
+        </section>
+
+      </div>
+      <div class="modal-actions setup-actions">
+        <button class="btn btn-ghost" id="setup-back-btn" onclick="setupWizardBack()">上一步</button>
+        <button class="btn btn-ghost" id="setup-test-btn" onclick="setupWizardTestDevice()">测试连接</button>
+        <button class="btn btn-primary" id="setup-next-btn" onclick="setupWizardNext()">保存并继续</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="light-control-unlock-modal">
+    <div class="modal">
+      <h3>解锁灯光控制</h3>
+      <div class="sub">状态与统计可以直接查看，开关灯操作需要密码授权。</div>
+      <div class="modal-notice error" id="light-control-unlock-notice" hidden></div>
+      <div class="form">
+        <div class="form-item"><label>控制密码</label><input id="light-control-password" type="password" autocomplete="current-password"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" type="button" onclick="hideLightControlUnlock()">取消</button>
+        <button class="btn btn-primary" id="light-control-unlock-submit" type="button" onclick="submitLightControlUnlock()">解锁</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./libs/babylon.js"></script>
+  <script src="./libs/babylonjs.loaders.min.js"></script>
+  <script src="./assets/js/light-control-auth.js?v=1"></script>
+<script src="./assets/js/babylon-app.js?v=20260813-04-live-circuits"></script>
+  <script src="./assets/js/babylon-adapter.js?v=20260813-04"></script>
+  <script src="./assets/js/app-runtime-main.js?v=20260813-04"></script>
+  <script src="./assets/js/app-ui-main.js?v=20260813-04"></script>
+  <script src="./assets/js/babylon-overrides.js?v=20260813-04"></script>
+  <script>
+    (function verifyCustomerBuild() {
+      var expected = '2026.08.13-04';
+      var badge = document.querySelector('.plan-build-badge');
+      if (!badge) return;
+      var layoutRelease = getComputedStyle(document.documentElement)
+        .getPropertyValue('--plan-layout-release').trim();
+      if (layoutRelease !== 'layout-20260813-04') {
+        badge.classList.add('build-mismatch');
+        badge.textContent = '布局样式未加载';
+        return;
+      }
+      fetch('/api/build-info?_=' + Date.now(), { cache: 'no-store' })
+        .then(function (response) { return response.json(); })
+        .then(function (info) {
+          if (!info || info.version !== expected) {
+            badge.classList.add('build-mismatch');
+            badge.textContent = '页面 ' + expected + ' / 服务 ' + ((info && info.version) || '未知');
+          }
+        })
+        .catch(function () {
+          badge.classList.add('build-mismatch');
+          badge.textContent = '服务版本校验失败';
+        });
+    }());
+  </script>
+</body>
+</html>

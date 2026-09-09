@@ -1,6 +1,11 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.env
+config.json
+initial_sync_state.json
+last_sync_time.json
+last_numbers.json
 
 build/
 dist/

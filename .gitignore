@@ -1,0 +1,23 @@
+# Python environments and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local settings and credentials
+.idea/
+.env
+.env.*
+!.env.example
+
+# Build artifacts and working files
+build/
+dist/
+*.rar
+*.log
+*.err
+/fucheng_exe_release_20260720/
+/output/
+/tmp/
+/service/$log
