@@ -1,0 +1,35 @@
+.wheel-diagram { display: block; width: 100%; min-width: 900px; height: auto; overflow: visible; }
+.wheel-diagram .wheel-shadow { fill: #63779e; opacity: .14; filter: url(#platter-shadow); }
+.wheel-diagram .wheel-side { fill: url(#platter-edge); stroke: #b6c4df; stroke-width: 1; }
+.wheel-diagram .wheel-bottom-line { fill: none; stroke: #d7e1f4; stroke-width: 1; }
+.wheel-diagram .wheel-body { fill: url(#platter-surface); stroke: #fff; stroke-width: 2; }
+.wheel-diagram .wheel-track { fill: none; stroke: #d8e1f3; stroke-width: 17; }
+.wheel-diagram .wheel-inner { fill: #f9fbff; stroke: #dce4f5; stroke-width: 1; }
+.wheel-diagram .wheel-tick { stroke: #b6c5e1; stroke-width: 1; }
+.wheel-diagram .wheel-spoke { stroke: #d1dcf5; stroke-width: 1; }
+.wheel-diagram .wheel-arrow { fill: none; stroke: #8496b6; stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; }
+.wheel-diagram .wheel-hub { fill: #eef2fb; stroke: #d2ddf7; stroke-width: 1; }
+.wheel-diagram .wheel-callout { fill: none; stroke: #aebedf; stroke-width: 1; }
+.wheel-diagram .wheel-name { fill: var(--ink); font-size: 17px; font-weight: 500; text-anchor: middle; letter-spacing: 1px; }
+.wheel-diagram .wheel-number { fill: #2d4260; font-size: 21px; font-weight: 500; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.wheel-diagram .wheel-detail { fill: #7e8fae; font-size: 9px; text-anchor: middle; }
+.wheel-diagram .wheel-trail { fill: none; stroke: #7184e6; stroke-width: 3; stroke-linecap: round; }
+.wheel-diagram .wheel-group[data-state="located"] .wheel-number, .wheel-diagram .wheel-group[data-state="moving"] .wheel-number { fill: #4056ba; }
+.wheel-diagram .wheel-group[data-state="out-of-range"] .wheel-number, .wheel-diagram .wheel-group[data-state="unconfigured"] .wheel-number { fill: var(--warning); }
+.wheel-diagram .wheel-group[data-state="missing"] .wheel-number { fill: var(--muted); }
+.wheel-diagram .wheel-group[data-wheel="1"] .wheel-number { font-size: 20px; }
+.wheel-diagram .mold-shadow { fill: #7287af; opacity: .14; }
+.wheel-diagram .mold-side { fill: #b2c2de; }
+.wheel-diagram .mold-face { fill: #fafcff; stroke: #ccd7ef; stroke-width: 1; }
+.wheel-diagram .mold-edge { fill: none; stroke: #dde5f6; stroke-width: 1.5; stroke-linecap: round; }
+.wheel-diagram .mold-label { fill: #587092; font-size: 10px; font-weight: 500; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.wheel-diagram .mold-active .mold-side { fill: #8c9ce6; }
+.wheel-diagram .mold-active .mold-face, .wheel-diagram .mold-ghost .mold-face { fill: #4c60cf; stroke: #586eda; }
+.wheel-diagram .mold-active .mold-edge, .wheel-diagram .mold-ghost .mold-edge { stroke: #98a6f3; }
+.wheel-diagram .mold-active .mold-label { fill: #fff; }
+.wheel-diagram .mold-ghost .mold-side { fill: #92a3e7; }
+.wheel-diagram .mold-ghost .mold-shadow { display: none; }
+.wheel-diagram .ghost-0 { opacity: .22; }
+.wheel-diagram .ghost-1 { opacity: .15; }
+.wheel-diagram .ghost-2 { opacity: .09; }
+.wheel-diagram .ghost-3 { opacity: .04; }

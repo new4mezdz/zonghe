@@ -15,7 +15,8 @@ if hasattr(sys, '_MEIPASS'):
 from flask import Flask, redirect
 from config import Config
 
-app = Flask(__name__, template_folder=resource_path('templates'))
+app = Flask(__name__, template_folder=resource_path('templates'),
+            static_folder=resource_path('static'))
 app.config.from_object(Config)
 Config.init_folders()
 

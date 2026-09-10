@@ -88,6 +88,11 @@
         .box-check-item.checked { border-color: #e94560; background: rgba(233,69,96,0.1); color: #fff; }
         tr.highlight-row { background: rgba(233,69,96,0.25) !important; transition: background 0.3s; }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/trajectory-view.css') }}?v=20260910-linked">
+    <link rel="stylesheet" href="{{ url_for('static', filename='urldata/record-trajectory.css') }}?v=20260910-linked">
+    <script defer src="{{ url_for('static', filename='boxquery/trajectory.js') }}?v=20260910-linked"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/trajectory-view.js') }}?v=20260910-linked"></script>
+    <script defer src="{{ url_for('static', filename='urldata/record-trajectory.js') }}?v=20260910-linked"></script>
 </head>
 <body>
     <div class="header">
@@ -115,6 +120,7 @@
                 <button class="btn btn-primary" onclick="queryByContent()">查询</button>
                 <button class="btn btn-danger" onclick="document.getElementById('contentInput').value=''">清空</button>
             </div>
+            <div id="queryStatus" role="status" aria-live="polite" style="color:#aaa;font-size:0.85rem;">按时间查询时会先更新最新轨迹数据。</div>
         </div>
 
         <!-- InfluxDB 调试面板 -->
@@ -134,6 +140,24 @@
             <div id="influxStatus" style="margin-bottom: 10px;"></div>
             <div class="log-box" id="influxLog" style="height: 200px; font-size: 0.8rem;"></div>
         </div>
+
+        <section class="record-trajectory" aria-labelledby="recordTrajectoryTitle">
+            <header class="record-trajectory-header">
+                <div class="record-trajectory-brand"><span class="record-trajectory-icon" aria-hidden="true">◎</span><div><h2 id="recordTrajectoryTitle">轮模盒 · 记录轨迹</h2><p>MOLD MOTION · 点击下方记录，查看七轮模盒位置</p></div></div>
+                <button type="button" class="record-trajectory-reset" id="resetRecordTrajectory">重置高亮</button>
+            </header>
+            <div class="record-trajectory-summary">
+                <div><span class="record-trajectory-label">当前记录<span id="recordSelectedIndex"></span></span><strong id="recordSelectedCode">尚未选择</strong><span id="recordSelectedTime">点击表格中的任意记录，查看对应轨迹</span></div>
+                <span id="recordLocationStatus" role="status" aria-live="polite">请选择下方记录</span>
+            </div>
+            <div class="record-trajectory-scroll" role="region" aria-label="七轮模盒轨迹，小屏幕可横向滚动" tabindex="0">
+                <svg id="recordWheelDiagram" class="wheel-diagram" viewBox="0 35 1000 380" role="img" aria-labelledby="recordDiagramTitle recordDiagramDescription">
+                    <title id="recordDiagramTitle">所选记录的七轮模盒位置</title>
+                    <desc id="recordDiagramDescription">一号轮在左侧倾斜放置，二、三号轮在左下，四、五号轮在上方，六号轮在右下，八号轮在右上。工位固定，点击表格记录后，高亮沿轨迹移动到该记录的对应模盒。</desc>
+                </svg>
+            </div>
+            <footer class="record-trajectory-footer"><span class="record-trajectory-legend">工位固定 · 蓝色模盒为当前记录定位</span><span id="recordLayoutStatus">一至八号轮（不含七号轮）</span></footer>
+        </section>
 
         <!-- 统计栏 -->
         <div class="stats-bar">
@@ -316,11 +340,12 @@
         let sortOrder = 'asc';
         let lastQueryParams = null;
         let lastQueryResults = [];
+        let querySequence = 0;
 
         function toggleSort() {
             sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
             document.getElementById('sortBtn').textContent = sortOrder === 'desc' ? '🔽 时间倒序' : '🔼 时间正序';
-            if (lastQueryParams) doQuery({...lastQueryParams, sort_order: sortOrder});
+            if (lastQueryParams) doQuery({...lastQueryParams, sort_order: sortOrder, refresh: false});
         }
 
         function addLog(msg, level='info', content=null, timeStr=null) {
@@ -456,11 +481,16 @@
         async function queryByDate() {
             const dateVal = document.getElementById('processDate').value;
             if (!dateVal) { alert('请选择日期'); return; }
+            const start = document.getElementById('processStartTime').value;
+            const stop = document.getElementById('processStopTime').value;
+            if (!start || !stop) { alert('请设置起止时间'); return; }
+            if (start > stop) { alert('开始时间不能晚于结束时间，请按日期分别查询'); return; }
             await doQuery({
                 type: 'date',
                 date: dateVal,
-                start_time: document.getElementById('processStartTime').value,
-                stop_time: document.getElementById('processStopTime').value
+                start_time: start,
+                stop_time: stop,
+                refresh: true,
             });
         }
 
@@ -502,22 +532,51 @@
             });
         }
 
-       async function doQuery(params) {
+        async function doQuery(params) {
             if (!params.sort_order) params.sort_order = sortOrder;
             lastQueryParams = {...params};
-            const res = await fetch('/api/urldata/query', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(params)
-            });
-            const data = await res.json();
-            lastQueryResults = data.results || [];
-            displayResults(data.results);
-            updateStats(data.stats, params.type);
+            const sequence = ++querySequence;
+            const status = document.getElementById('queryStatus');
+            status.style.color = '#aaa';
+            status.textContent = params.refresh ? '正在更新轨迹数据并查询，请稍候…' : '正在查询…';
+            if (params.refresh) addLog(`正在更新数据并查询：${params.date} ${params.start_time} ~ ${params.stop_time}`);
+            try {
+                const res = await fetch('/api/urldata/query', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                if (!res.ok) throw new Error(`查询请求失败（HTTP ${res.status}）`);
+                const data = await res.json();
+                if (sequence !== querySequence) return;
+                if (!Array.isArray(data.results) || !data.stats) throw new Error(data.error || '查询返回的数据不完整');
+                lastQueryResults = data.results;
+                displayResults(data.results);
+                updateStats(data.stats, params.type);
+                const latest = data.latest_record_time ? `本地最新记录：${data.latest_record_time}` : '本地暂无轨迹记录';
+                if (data.sync) {
+                    (data.sync.logs || []).forEach(l => addLog(l.msg, l.level, l.content || null, l.time_str || null));
+                    if (!data.sync.success) {
+                        status.style.color = '#ffae00';
+                        status.textContent = `数据更新未完成，当前仅显示本地查询结果。${data.sync.message} ${latest}`;
+                    } else {
+                        status.textContent = `查询完成，共 ${data.results.length} 条。${latest}`;
+                    }
+                } else {
+                    status.textContent = `本地查询完成，共 ${data.results.length} 条。`;
+                }
+            } catch (e) {
+                if (sequence !== querySequence) return;
+                status.style.color = '#e94560';
+                status.textContent = `查询失败：${e.message}`;
+                addLog(status.textContent, 'error');
+            }
         }
         function displayResults(results) {
             const tbody = document.getElementById('resultsBody');
             if (!results || results.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state"><div class="icon">🔍</div><div>没有找到匹配的数据</div></div></td></tr>';
+                checkDuplicates([]);
+                RecordTrajectory.setRecords([]);
                 return;
             }
             tbody.innerHTML = results.map((item, idx) => {
@@ -526,22 +585,23 @@
                 const correctedStyle = item.corrected ? 'background:rgba(255,170,0,0.15);' : '';
                 const correctedTag = item.corrected ? ' <span style="color:#ffaa00;font-size:0.75rem;">⚠纠正</span>' : '';
                 return `<tr data-content="${safeContent}" data-idx="${idx}" style="${correctedStyle}">
-                    ${item.numbers.map(n => `<td class="number-cell">${n}</td>`).join('')}
-                    <td>${item.verification || 'N/A'}${correctedTag}</td>
-                    <td>${item.date}</td>
-                    <td class="${typeClass}">${item.type}</td>
+                    ${Array.from({length:BOX_COUNT},(_,i) => `<td class="number-cell">${escapeHtml(item.numbers?.[i] ?? '—')}</td>`).join('')}
+                    <td>${escapeHtml(item.verification ?? 'N/A')}${correctedTag}</td>
+                    <td>${escapeHtml(item.date)}</td>
+                    <td class="${typeClass}">${escapeHtml(item.type)}</td>
                     <td class="content-cell">
-                        <span class="content-text" title="${safeContent}">${safeContent}</span>
+                        <button type="button" class="content-text record-select" title="${safeContent}" aria-label="查看第 ${idx+1} 条记录轨迹：${safeContent}，${escapeHtml(item.date)}" aria-pressed="false">${safeContent}</button>
                         <button class="copy-btn" onclick="copyContent(this)">复制</button>
                     </td>
                 </tr>`;
             }).join('');
             checkDuplicates(results);
+            RecordTrajectory.setRecords(results);
         }
 
         function escapeHtml(text) {
             const div = document.createElement('div');
-            div.textContent = text; return div.innerHTML;
+            div.textContent = text ?? ''; return div.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
         }
 
         function updateStats(stats, queryType) {
@@ -561,9 +621,15 @@
         }
 
         function clearResults() {
+            querySequence++;
+            lastQueryParams=null;
+            lastQueryResults=[];
             document.getElementById('resultsBody').innerHTML = '<tr><td colspan="13"><div class="empty-state"><div class="icon">📋</div><div>请选择查询条件</div></div></td></tr>';
             document.getElementById('statsText').textContent = '就绪';
             document.getElementById('duplicatesInfo').classList.remove('show');
+            document.getElementById('queryStatus').textContent='结果已清空，请重新查询。';
+            document.getElementById('queryStatus').style.color='#aaa';
+            RecordTrajectory.setRecords([]);
         }
 
         // ===== 定时器状态 =====
@@ -690,7 +756,7 @@
                 body: JSON.stringify({ mins, maxs })
             });
             const data = await res.json();
-            if (data.success) { addLog('上下限设置已保存', 'success'); closeModal('settingsModal'); }
+            if (data.success) { addLog('上下限设置已保存', 'success'); closeModal('settingsModal'); RecordTrajectory.refreshLayout(); }
             else alert(data.error || '保存失败');
         }
 

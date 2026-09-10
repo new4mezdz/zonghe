@@ -41,6 +41,7 @@ class UrlDataService:
         self.config = Config.load_json_config()
         self.last_process_logs = []
         self._initial_sync_lock = threading.Lock()
+        self._process_lock = threading.RLock()
         self.influx_config = {
             'url': 'http://10.164.62.253:8086/',
             'token': 'u31cmj6sXb8CjYO1r0TcBbSNToKHXVsqbgMn-KBq7zvnmAEemTtYlN8ZwX7wXydgRr6VkdjuwwbiD0YgS6lq0A==',
@@ -107,6 +108,20 @@ class UrlDataService:
         reset_numbers=False,
         write_output=True,
     ):
+        # 网页主动更新和后台同步共用编号状态，必须串行处理。
+        with self._process_lock:
+            result = self._process_data(start_time, stop_time, reset_numbers, write_output)
+            self.last_process_logs = result.get('logs', [])
+            return result
+
+    @staticmethod
+    def _record_time_text(value):
+        if hasattr(value, 'astimezone'):
+            local_time = value.astimezone(timezone(timedelta(hours=8)))
+            return local_time.strftime('%Y-%m-%d %H:%M:%S.') + f'{local_time.microsecond // 1000:03d}'
+        return str(value)
+
+    def _process_data(self, start_time, stop_time, reset_numbers, write_output):
         logs = []
 
         def log(msg, level='info', content=None, time_str=None):
@@ -133,8 +148,9 @@ class UrlDataService:
             log("从 jbcj01 读取到 {} 条数据".format(len(data_records)))
 
             if not data_records:
-                log("InfluxDB 无数据", "warning")
-                return {'success': False, 'message': '指定时间范围内无数据', 'logs': logs}
+                message = '同步时段内 jbcj01 没有二维码数据；jbcj03 的校验编号不能单独生成轨迹。'
+                log(message, "warning")
+                return {'success': False, 'code': 'no_data', 'message': message, 'logs': logs}
 
             verification_records = []
             if enable_verification:
@@ -156,7 +172,29 @@ class UrlDataService:
             verification_errors = []
             db_rows = []
 
+            # 在推进编号之前去重，同时保留原始 idx，避免改变校验记录的 +2 偏移。
+            record_times = [self._record_time_text(record['time']) for record in data_records]
+            seen = set()
+            if not reset_numbers:
+                conn = self._get_conn()
+                try:
+                    seen = {
+                        (row['record_time'], row['content'])
+                        for row in conn.execute(
+                            'SELECT record_time, content FROM records WHERE record_time BETWEEN ? AND ?',
+                            (min(record_times), max(record_times)),
+                        )
+                    }
+                finally:
+                    conn.close()
+
             for idx, record in enumerate(data_records):
+                time_str = record_times[idx]
+                content_val = record['value']
+                record_key = (time_str, content_val)
+                if record_key in seen:
+                    continue
+                seen.add(record_key)
                 was_corrected = 0
 
                 for i in range(BOX_COUNT):
@@ -165,14 +203,6 @@ class UrlDataService:
                         current_numbers[i] = min_numbers[i]
                         if i == 3:
                             cycle_count += 1
-
-                if hasattr(record['time'], 'astimezone'):
-                    local_time = record['time'].astimezone(timezone(timedelta(hours=8)))
-                    time_str = local_time.strftime('%Y-%m-%d %H:%M:%S.') + f'{local_time.microsecond // 1000:03d}'
-                else:
-                    time_str = str(record['time'])
-
-                content_val = record['value']
 
                 verification_value = verification_records[idx + 2]['value'] if (
                         enable_verification and idx + 2 < len(verification_records)) else "N/A"
@@ -216,8 +246,6 @@ class UrlDataService:
             if verification_errors and enable_verification:
                 log("累计触发 {} 次校验纠正".format(intervention_count), "warning")
 
-            self._save_last_numbers_raw(current_numbers, cycle_count)
-
             conn = self._get_conn()
             c = conn.cursor()
             new_count = 0
@@ -238,7 +266,7 @@ class UrlDataService:
                     new_count += 1
             conn.commit()
             conn.close()
-            skipped_count = len(db_rows) - new_count - updated_count
+            skipped_count = len(data_records) - new_count - updated_count
             log(
                 "写入数据库 {} 条新记录，校正 {} 条已有记录（跳过 {} 条重复）".format(
                     new_count, updated_count, skipped_count
@@ -248,9 +276,13 @@ class UrlDataService:
 
             # 记录本次处理的最新数据时间
             if db_rows:
-                self._save_last_sync_time(db_rows[-1][11])  # record_time
+                self._save_last_numbers_raw(current_numbers, cycle_count)
+                latest_time = max(row[11] for row in db_rows)
+                previous_sync = self._get_last_sync_time()
+                if not previous_sync or latest_time > previous_sync:
+                    self._save_last_sync_time(latest_time)
 
-            if write_output:
+            if write_output and db_rows:
                 try:
                     file_date = start_time[:10].replace('-', '')
                 except:
@@ -270,6 +302,50 @@ class UrlDataService:
             return {'success': False, 'message': str(e), 'logs': logs}
 
     # ========== 查询功能（从数据库） ==========
+
+    def refresh_for_query(self, date, start_time=None, stop_time=None):
+        """查询最新时段前补同步；历史查询不重置编号或重放已入库的数据。"""
+        try:
+            local_tz = timezone(timedelta(hours=8))
+            day = datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=local_tz)
+            if bool(start_time) != bool(stop_time):
+                raise ValueError('请同时填写开始和结束时间')
+            if start_time and stop_time:
+                start = datetime.strptime(f'{date} {start_time}', '%Y-%m-%d %H:%M').replace(tzinfo=local_tz)
+                end = datetime.strptime(f'{date} {stop_time}', '%Y-%m-%d %H:%M').replace(tzinfo=local_tz)
+                if start > end:
+                    raise ValueError('开始时间不能晚于结束时间')
+                # 与本地查询一致：结束时间包含这一整分钟。
+                end += timedelta(minutes=1)
+            else:
+                start, end = day, day + timedelta(days=1)
+            now = datetime.now(local_tz)
+            if start > now:
+                raise ValueError('查询时间尚未到达')
+            end = min(end, now)
+
+            with self._process_lock:
+                summary = self._database_summary()
+                if not summary['record_count']:
+                    # 复用首次同步策略，防止一次短时段查询截断整个初始化范围。
+                    initial = self.ensure_initial_sync()
+                    return {
+                        'success': initial['success'],
+                        'message': '首次同步完成' if initial['success'] else initial.get('error', '首次同步失败'),
+                        'logs': self.last_process_logs,
+                    }
+                last_time = datetime.fromisoformat(summary['last_record_time'])
+                if last_time.tzinfo is None:
+                    last_time = last_time.replace(tzinfo=local_tz)
+                if last_time >= end:
+                    return {'success': True, 'message': '已查询本地记录', 'logs': []}
+
+                # 从本地最后一条开始延续编号，涵盖上次同步到查询起点之间的记录。
+                return self.process_data(last_time.isoformat(), end.isoformat(), write_output=False)
+        except Exception as exc:
+            message = str(exc)
+            self.last_process_logs = [{'msg': message, 'level': 'error'}]
+            return {'success': False, 'message': message, 'logs': self.last_process_logs}
 
     def query_by_date(self, date, start_time=None, stop_time=None, sort_order='desc'):
         order = 'DESC' if sort_order == 'desc' else 'ASC'
@@ -387,6 +463,11 @@ class UrlDataService:
 
     def query(self, query_type, **kwargs):
         sort_order = kwargs.get('sort_order', 'desc')
+        sync_result = None
+        if query_type == 'date' and kwargs.get('refresh') is True:
+            sync_result = self.refresh_for_query(
+                kwargs.get('date', ''), kwargs.get('start_time'), kwargs.get('stop_time')
+            )
         if query_type == 'date':
             results = self.query_by_date(
                 kwargs.get('date', ''),
@@ -409,11 +490,15 @@ class UrlDataService:
         total = len(results)
         url_count = sum(1 for r in results if r['type'] == 'URL')
         fail_count = sum(1 for r in results if r['type'] == '失败')
-        return {
+        response = {
             'results': results,
             'stats': {'total': total, 'url': url_count, 'fail': fail_count,
                       'other': total - url_count - fail_count}
         }
+        if sync_result is not None:
+            response['sync'] = sync_result
+            response['latest_record_time'] = self._database_summary()['last_record_time']
+        return response
 
     def get_file_list(self):
         conn = self._get_conn()
@@ -549,7 +634,7 @@ class UrlDataService:
         - 本地库已有记录时从最后时间继续增量同步，不再回补历史。
         - 新环境默认只回溯最近 24 小时；可在 config.json 中显式开启全量历史。
         """
-        with self._initial_sync_lock:
+        with self._process_lock, self._initial_sync_lock:
             summary = self._database_summary()
             previous_state = self._read_initial_sync_state() or {}
 
@@ -849,43 +934,22 @@ class UrlDataService:
             return {'success': False, 'error': str(exc)}
 
     def _load_data_from_influx(self, start_time, stop_time=None):
-        try:
-            from influxdb_client import InfluxDBClient
-            client = InfluxDBClient(
-                url=self.influx_config['url'],
-                token=self.influx_config['token'],
-                org=self.influx_config['org']
-            )
-            bucket = self.influx_config['bucket_data']
-            stop_clause = f', stop: {stop_time}' if stop_time else ''
-            query = f'''from(bucket: "{bucket}")
-                |> range(start: {start_time}{stop_clause})
-                |> filter(fn: (r) => r["_field"] == "code")
-                |> sort(columns: ["_time"])'''
-            tables = client.query_api().query(query, org=self.influx_config['org'])
-            records = []
-            for table in tables:
-                for record in table.records:
-                    records.append({
-                        'time': record.get_time(),
-                        'value': str(record.get_value())
-                    })
-            client.close()
-            records.sort(key=lambda r: r['time'])
-            return records
-        except Exception as e:
-            logging.error("读取 jbcj01 失败: %s", e)
-            return []
+        return self._load_influx_records('bucket_data', start_time, stop_time)
 
     def _load_verification_from_influx(self, start_time, stop_time=None):
+        return self._load_influx_records('bucket_verify', start_time, stop_time)
+
+    def _load_influx_records(self, bucket_key, start_time, stop_time=None):
+        bucket = self.influx_config[bucket_key]
+        client = None
         try:
             from influxdb_client import InfluxDBClient
             client = InfluxDBClient(
                 url=self.influx_config['url'],
                 token=self.influx_config['token'],
-                org=self.influx_config['org']
+                org=self.influx_config['org'],
+                timeout=30000,
             )
-            bucket = self.influx_config['bucket_verify']
             stop_clause = f', stop: {stop_time}' if stop_time else ''
             query = f'''from(bucket: "{bucket}")
               |> range(start: {start_time}{stop_clause})
@@ -899,12 +963,13 @@ class UrlDataService:
                         'time': record.get_time(),
                         'value': str(record.get_value())
                     })
-            client.close()
             records.sort(key=lambda r: r['time'])
             return records
         except Exception as e:
-            logging.error("读取 jbcj03 失败: %s", e)
-            return []
+            raise RuntimeError(f'读取 {bucket} 失败：{e}') from e
+        finally:
+            if client is not None:
+                client.close()
 
     def get_influx_status(self):
         try:
@@ -967,13 +1032,48 @@ class UrlDataService:
         except Exception as e:
             return {'success': False, 'error': str(e)}
 
+    @staticmethod
+    def _box_number(value):
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            number = float(value)
+            return int(number) if number.is_integer() else None
+        except (TypeError, ValueError, OverflowError):
+            return None
+
+    def get_box_layout(self):
+        """使用现有编号配置定位各轮，七号轮不参与轨迹展示。"""
+        self._reload_config()
+        mins = self.config.get('编号下限列表', [])
+        maxs = self.config.get('编号上限列表', [])
+        names = {1: '一号轮', 2: '二号轮', 3: '三号轮', 4: '四号轮',
+                 5: '五号轮', 6: '六号轮', 8: '八号轮'}
+        wheels = []
+        for wheel_id, name in names.items():
+            minimum = self._box_number(mins[wheel_id]) if len(mins) > wheel_id else None
+            maximum = self._box_number(maxs[wheel_id]) if len(maxs) > wheel_id else None
+            valid = minimum is not None and maximum is not None and minimum <= maximum
+            wheels.append({
+                'id': wheel_id, 'name': name,
+                'min': minimum if valid else None,
+                'max': maximum if valid else None,
+            })
+        return {'wheels': wheels}
+
     def query_box_by_qrcode(self, qrcode):
+        layout = self.get_box_layout()
+        # 二维码中的百分号和下划线是字面内容，不是 LIKE 通配符。
+        escaped_code = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
         conn = self._get_conn()
-        c = conn.cursor()
-        c.execute('SELECT * FROM records WHERE content LIKE ? ORDER BY record_time DESC LIMIT 50',
-                  (f'%{qrcode}%',))
-        rows = c.fetchall()
-        conn.close()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM records WHERE content LIKE ? ESCAPE '\\' "
+                'ORDER BY record_time DESC, id DESC LIMIT 50',
+                (f'%{escaped_code}%',),
+            ).fetchall()
+        finally:
+            conn.close()
 
         if rows:
             matched = []
@@ -982,32 +1082,44 @@ class UrlDataService:
                     'index': row['id'],
                     'numbers': [row['num3']],
                     'box_num': row['num3'],
+                    'wheel_numbers': {
+                        str(wheel['id']): self._box_number(row[f"num{wheel['id']}"])
+                        for wheel in layout['wheels']
+                    },
                     'content': row['content'],
                     'time': row['record_time']
                 })
-            return {'success': True, 'total_records': len(rows), 'matches': matched, 'source': 'database'}
+            return {'success': True, 'total_records': len(rows), 'matches': matched,
+                    'source': 'database', 'wheels': layout['wheels']}
 
-        records = self._load_data_from_influx('-2h')
+        try:
+            records = self._load_data_from_influx('-2h')
+            verification_records = self._load_verification_from_influx('-2h') if records else []
+        except Exception as exc:
+            return {'success': False, 'error': str(exc)}
         if not records:
-            return {'success': False, 'error': '最近2小时无数据'}
-        verification_records = self._load_verification_from_influx('-2h')
+            return {'success': False, 'error': 'jbcj01 最近2小时无二维码数据'}
         matched = []
         for idx, record in enumerate(records):
             if qrcode and qrcode in str(record['value']):
                 box_num = None
                 if idx + 2 < len(verification_records):
-                    try:
-                        box_num = int(float(str(verification_records[idx + 2]['value']).strip()))
-                    except (ValueError, TypeError):
-                        box_num = None
+                    box_num = self._box_number(verification_records[idx + 2]['value'])
                 matched.append({
                     'index': idx,
                     'numbers': [box_num] if box_num is not None else [None],
                     'box_num': box_num,
+                    # 实时回退数据仅能确认三号轮，其他轮保持未知。
+                    'wheel_numbers': {
+                        str(wheel['id']): box_num if wheel['id'] == 3 else None
+                        for wheel in layout['wheels']
+                    },
                     'content': record['value'],
-                    'time': str(record['time'])
+                    'time': self._record_time_text(record['time'])
                 })
-        return {'success': True, 'total_records': len(records), 'matches': matched, 'source': 'influxdb'}
+        matched.sort(key=lambda item: item['time'], reverse=True)
+        return {'success': True, 'total_records': len(records), 'matches': matched,
+                'source': 'influxdb', 'wheels': layout['wheels']}
 
     def start_auto_sync(self):
         def _sync_loop():

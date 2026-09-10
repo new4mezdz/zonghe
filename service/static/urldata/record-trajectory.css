@@ -1,0 +1,36 @@
+.record-trajectory {
+    --ink:#263953; --muted:#7585a2; --warning:#91661d;
+    margin-bottom:15px; overflow:hidden; border:1px solid #ced8f3; border-radius:12px;
+    color:var(--ink); background:#edf1fb; line-height:1.5; color-scheme:light;
+}
+.record-trajectory-header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 18px; background:#fafbff; border-bottom:1px solid #ced8f3; }
+.record-trajectory-brand { display:flex; gap:11px; align-items:center; }
+.record-trajectory-icon { display:grid; place-items:center; width:32px; height:32px; border:1px solid #7d8cf2; border-radius:50%; color:#7486e4; font-size:19px; }
+.record-trajectory h2 { font-size:16px; font-weight:500; }
+.record-trajectory-header p { color:var(--muted); font-size:10px; letter-spacing:1px; margin-top:1px; }
+.record-trajectory-reset { padding:6px 11px; background:#fff; color:#526798; border:1px solid #d9e1f3; border-radius:7px; cursor:pointer; font:inherit; font-size:12px; white-space:nowrap; }
+.record-trajectory-summary { margin:12px 18px 0; padding:9px 13px; border:1px solid #d4def5; border-radius:8px; background:#f9fbff; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.record-trajectory-summary > div { min-width:0; }
+.record-trajectory-label { font-size:10px; color:var(--muted); }
+#recordSelectedIndex { margin-left:9px; color:#596dc6; }
+#recordSelectedCode { display:block; font-weight:500; font-size:13px; overflow-wrap:anywhere; }
+#recordSelectedTime { display:block; font-size:11px; color:var(--muted); }
+#recordLocationStatus { font-size:12px; color:#4c60cf; white-space:nowrap; }
+.record-trajectory-scroll { overflow-x:auto; overscroll-behavior-x:contain; padding:0 14px; }
+.record-trajectory .wheel-diagram { height:clamp(300px,32vw,380px); min-width:900px; }
+.record-trajectory-footer { padding:8px 18px 13px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:11px; color:var(--muted); }
+.record-trajectory-legend { display:flex; align-items:center; gap:7px; }
+.record-trajectory-legend:before { content:""; display:inline-block; width:10px; height:10px; border-radius:3px; background:#4c60cf; box-shadow:2px 2px #a5b4e8; transform:rotate(-7deg); }
+#resultsBody tr[data-idx] { cursor:pointer; }
+#resultsBody tr.is-trajectory-selected { background:rgba(112,132,230,.22)!important; }
+#resultsBody tr.is-trajectory-selected td:first-child { box-shadow:inset 3px 0 #99a9ff; }
+#resultsBody .record-select { border:0; background:none; color:inherit; font:inherit; text-align:left; padding:2px 0; cursor:pointer; }
+#resultsBody .record-select[aria-pressed="true"] { color:#b7c5ff; }
+#resultsBody .record-select:hover { color:#c5d1ff; text-decoration:underline; }
+.record-trajectory button:focus-visible, .record-trajectory [tabindex]:focus-visible, #resultsBody button:focus-visible { outline:2px solid #8e9dee; outline-offset:3px; }
+@media(max-width:600px) {
+    .record-trajectory-header { padding:12px; }
+    .record-trajectory-summary { margin:10px 12px 0; flex-direction:column; align-items:flex-start; gap:6px; }
+    .record-trajectory h2 { font-size:15px; }
+    .record-trajectory-header p { font-size:9px; letter-spacing:0; }
+}

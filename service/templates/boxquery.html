@@ -3,539 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>轮模盒查询</title>
-    <style>
-
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); min-height: 100vh; color: #eaeaea; }
-        .header { background: rgba(255,255,255,0.05); padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .header h1 { font-size: 1.8rem; }
-        .header a { color: #e94560; text-decoration: none; margin-left: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
-        .panel { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
-        .panel-title { font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: space-between; }
-
-        /* 查询栏 */
-        .query-row { display: flex; gap: 10px; align-items: center; }
-        .query-input {
-            flex: 1; padding: 12px 16px; font-size: 1rem;
-            background: rgba(0,0,0,0.3); border: 1px solid #444;
-            border-radius: 8px; color: #fff; outline: none;
-        }
-        .query-input:focus { border-color: #e94560; }
-        .btn { padding: 12px 24px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: all 0.2s; }
-        .btn-primary { background: #e94560; color: #fff; }
-        .btn-primary:hover { background: #d63850; }
-        .btn-secondary { background: #444; color: #fff; }
-        .btn-secondary:hover { background: #555; }
-        .btn-sm { padding: 8px 16px; font-size: 0.85rem; }
-
-        /* 8个盒子区域 */
-        .boxes-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-top: 10px;
-        }
-        .box-item {
-            aspect-ratio: 1;
-            background: #3a3a4a;
-            border-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.4s ease;
-            border: 3px solid transparent;
-            position: relative;
-            min-height: 120px;
-        }
-        .box-item .box-number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #888;
-            transition: color 0.4s;
-        }
-        .box-item .box-label {
-            font-size: 0.9rem;
-            color: #888;
-            margin-top: 8px;
-            transition: color 0.4s;
-        }
-        .box-item .box-value {
-            font-size: 0.75rem;
-            color: #666;
-            margin-top: 4px;
-            font-family: Consolas, monospace;
-            transition: color 0.4s;
-        }
-
-        /* 计数徽章 */
-        .box-item .box-count {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: #e94560;
-            color: #fff;
-            font-size: 0.75rem;
-            font-weight: bold;
-            min-width: 24px;
-            height: 24px;
-            padding: 0 6px;
-            border-radius: 12px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        .box-item .box-count.show {
-            display: flex;
-        }
-
-        /* 高亮状态 */
-        .box-item.highlight {
-            background: linear-gradient(135deg, #1a5c2e, #2d8a4e);
-            border-color: #4CAF50;
-            box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
-            animation: pulse 1.5s ease-in-out infinite;
-        }
-        .box-item.highlight .box-number { color: #fff; }
-        .box-item.highlight .box-label { color: #c8e6c9; }
-        .box-item.highlight .box-value { color: #a5d6a7; }
-
-        @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); }
-            50% { box-shadow: 0 0 35px rgba(76, 175, 80, 0.7); }
-        }
-
-        /* 结果信息 */
-        .result-info {
-            margin-top: 15px; padding: 12px 16px;
-            border-radius: 8px; font-size: 0.9rem;
-            display: none;
-        }
-        .result-info.show { display: block; }
-        .result-info.success { background: rgba(76,175,80,0.15); border: 1px solid rgba(76,175,80,0.3); color: #81c784; }
-        .result-info.warning { background: rgba(255,152,0,0.15); border: 1px solid rgba(255,152,0,0.3); color: #ffb74d; }
-        .result-info.error { background: rgba(244,67,54,0.15); border: 1px solid rgba(244,67,54,0.3); color: #e57373; }
-
-        /* 数据统计 */
-        .stats-text { color: #888; font-size: 0.85rem; margin-top: 10px; }
-        .stats-text span { color: #e94560; font-weight: bold; }
-
-        /* 匹配详情表格 */
-        .match-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.85rem; }
-        .match-table th { background: rgba(0,0,0,0.3); padding: 10px 8px; text-align: left; color: #aaa; }
-        .match-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .match-table tr:hover { background: rgba(255,255,255,0.03); }
-
-        .loading { text-align: center; padding: 20px; color: #888; display: none; }
-        .loading.show { display: block; }
-
-        @media (max-width: 600px) {
-            .boxes-container { grid-template-columns: repeat(2, 1fr); }
-        }
-
-         /* 左侧查询记录 */
-.main-layout { display: flex; gap: 0; }
-.history-panel {
-    width: 280px; min-width: 280px;
-    background: rgba(255,255,255,0.03);
-    border-right: 1px solid rgba(255,255,255,0.1);
-    height: calc(100vh - 73px);
-    overflow-y: auto;
-    padding: 15px;
-}
-.history-panel h3 { font-size: 0.95rem; color: #aaa; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-.history-list { list-style: none; }
-.history-item {
-    padding: 10px 12px; margin-bottom: 6px;
-    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px; cursor: pointer; transition: all 0.2s;
-}
-.history-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
-.history-item.active { border-color: #e94560; background: rgba(233,69,96,0.1); }
-.history-item .hi-qrcode {
-    font-size: 0.85rem; color: #ddd; font-family: Consolas, monospace;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.history-item .hi-meta {
-    font-size: 0.75rem; color: #888; margin-top: 4px;
-    display: flex; justify-content: space-between;
-}
-.history-item .hi-box { color: #4CAF50; font-weight: bold; }
-.history-clear { width: 100%; margin-top: 10px; padding: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #888; cursor: pointer; font-size: 0.8rem; }
-.history-clear:hover { background: rgba(255,255,255,0.1); color: #ccc; }
-.main-content { flex: 1; min-width: 0; }
-
-@media (max-width: 800px) {
-    .main-layout { flex-direction: column; }
-    .history-panel { width: 100%; min-width: 0; height: auto; max-height: 200px; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
-}
-        /* 轮次记录 */
-.round-item { margin-bottom: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; }
-.round-item.current { border-color: #e94560; background: rgba(233,69,96,0.05); }
-.round-item.completed { border-color: #4CAF50; }
-.round-header { padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; }
-.round-header:hover { background: rgba(255,255,255,0.06); }
-.round-title { font-size: 0.85rem; color: #ddd; }
-.round-title .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
-.round-title .badge-ok { background: rgba(76,175,80,0.2); color: #81c784; }
-.round-title .badge-ing { background: rgba(233,69,96,0.2); color: #e94560; }
-.round-meta { font-size: 0.72rem; color: #888; }
-.round-progress { font-size: 0.72rem; color: #aaa; margin-top: 4px; }
-.round-detail { display: none; padding: 0 12px 10px; border-top: 1px solid rgba(255,255,255,0.06); }
-.round-detail.open { display: block; }
-.rd-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.78rem; }
-.rd-row:last-child { border-bottom: none; }
-.rd-qr { color: #ccc; font-family: Consolas, monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
-.rd-box { color: #4CAF50; font-weight: bold; min-width: 36px; text-align: center; }
-.rd-time { color: #888; min-width: 60px; text-align: right; }
-/* 完成弹窗 */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 9999; animation: fadeIn 0.2s; }
-.modal-box { background: #1e1e30; border: 1px solid rgba(255,255,255,0.15); border-radius: 16px; padding: 40px 50px; text-align: center; animation: popIn 0.3s; }
-.modal-box h2 { font-size: 1.5rem; color: #4CAF50; margin-bottom: 10px; }
-.modal-box p { color: #aaa; font-size: 1rem; margin-bottom: 25px; }
-.modal-box .btn { min-width: 120px; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-    </style>
+    <title>轮模盒轨迹查询</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260910-linked">
+    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/trajectory-view.css') }}?v=20260910-linked">
+    <script defer src="{{ url_for('static', filename='boxquery/trajectory.js') }}?v=20260910-linked"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/trajectory-view.js') }}?v=20260910-linked"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260910-linked"></script>
 </head>
 <body>
-    <div class="header">
-        <h1>📦 轮模盒查询</h1>
-        <a href="/">← 返回首页</a>
-    </div>
-   <div class="main-layout">
-    <!-- 左侧查询记录 -->
-    <div class="history-panel">
-        <h3>📝 查询记录</h3>
-        <ul class="history-list" id="historyList"></ul>
-        <button class="history-clear" onclick="clearHistory()">清空记录</button>
-    </div>
-
-    <!-- 右侧主内容 -->
-    <div class="main-content">
-        <div class="container">
-            <!-- 查询区 -->
-            <div class="panel">
-                <div class="panel-title">🔍 二维码查询</div>
+    <header class="page-header">
+        <div><span class="eyebrow">MOLD TRAJECTORY</span><h1>轮模盒轨迹查询</h1></div>
+        <nav aria-label="页面导航"><a href="/urldata">轨迹数据与编号配置</a><a href="/">返回首页</a></nav>
+    </header>
+    <main class="workspace">
+        <section class="query-panel" aria-labelledby="queryTitle">
+            <form id="queryForm">
+                <label for="qrcodeInput" id="queryTitle">查询二维码</label>
                 <div class="query-row">
-                    <input type="text" class="query-input" id="qrcodeInput" placeholder="输入二维码内容..." autofocus>
-                    <button class="btn btn-primary" onclick="doQuery()">查询</button>
-                    <button class="btn btn-secondary" onclick="clearInput()">清空</button>
+                    <input id="qrcodeInput" name="qrcode" type="text" maxlength="4096" placeholder="输入或扫描二维码内容，按回车查询" autocomplete="off" autofocus required>
+                    <button type="submit" class="button primary" id="queryButton">查询定位</button>
+                    <button type="button" class="button" id="clearInputButton">清空输入</button>
                 </div>
-                <div class="stats-text" id="dataStats">按回车或点击查询按钮开始</div>
+            </form>
+            <p id="queryStatus" class="query-status" role="status" aria-live="polite">输入二维码后，点击查询记录可切换各轮定位。</p>
+        </section>
+        <div class="content-grid">
+            <aside class="sidebar" aria-label="扫码记录与检验进度">
+                <section class="inspection-panel" aria-labelledby="inspectionTitle">
+                    <div class="section-heading"><h2 id="inspectionTitle">三号轮 · 八盒检验</h2><span id="inspectionProgress">0 / 8</span></div>
+                    <div class="inspection-slots" id="inspectionSlots" aria-label="三号轮一至八号模盒扫码状态"></div>
+                    <p class="subtle" id="roundStatus">第 1 轮检验</p>
+                </section>
+                <section class="history-panel" aria-labelledby="historyTitle">
+                    <div class="section-heading"><h2 id="historyTitle">查询记录</h2><button type="button" class="text-button" id="clearHistoryButton">清空记录</button></div>
+                    <p class="subtle">点击二维码，查看该次记录的模盒轨迹</p>
+                    <div id="historyList" class="history-list"></div>
+                </section>
+            </aside>
+            <div class="main-content">
+                <section class="trajectory-panel" aria-labelledby="trajectoryTitle">
+                    <header class="trajectory-header"><div class="trajectory-brand"><span class="trajectory-icon" aria-hidden="true">◎</span><div><h2 id="trajectoryTitle">轮模盒 · 运动轨迹</h2><p>MOLD MOTION · 七轮联动定位</p></div></div><button type="button" class="button small" id="resetButton">重置高亮</button></header>
+                    <div class="diagram-caption"><span>转台透视 · 按设备轮位布局</span><span>↻ 顺时针定位</span></div>
+                    <div class="selection-summary"><div><span class="summary-label">当前二维码</span><strong id="selectedCode">尚未选择</strong><span id="selectedTime" class="subtle"></span></div><span id="locationStatus" class="location-status">等待查询</span></div>
+                    <div class="diagram-scroll" role="region" aria-label="设备轮位图，小屏幕可横向滚动" tabindex="0">
+                        <svg id="wheelDiagram" class="wheel-diagram" viewBox="0 0 1000 430" role="img" aria-labelledby="diagramTitle diagramDescription">
+                            <title id="diagramTitle">模盒轮位轨迹</title>
+                            <desc id="diagramDescription">一号轮为左侧倾斜椭圆，二、三号轮在左下，四、五号轮在上方，六号轮在右下，八号轮在右上。点击查询记录后，高亮移动至各轮模盒编号对应位置。</desc>
+                        </svg>
+                    </div>
+                    <footer class="diagram-footer"><span class="legend">工位固定 · 蓝色模盒为当前定位</span><span id="dataSource">编号范围读取现有配置</span></footer>
+                </section>
+                <section class="matches-panel" id="matchPanel" aria-labelledby="matchTitle" hidden>
+                    <div class="section-heading"><h2 id="matchTitle">匹配记录</h2><span class="subtle" id="matchCount"></span></div>
+                    <div class="table-scroll"><table><thead><tr><th scope="col">记录时间</th><th scope="col">二维码</th><th scope="col">三号轮模盒</th><th scope="col">定位</th></tr></thead><tbody id="matchBody"></tbody></table></div>
+                </section>
             </div>
-
-            <!-- 8个盒子 -->
-            <div class="panel">
-                <div class="panel-title">
-                    <span>📦 三号轮模盒状态（最近2小时数据）</span>
-                    <button class="btn btn-secondary btn-sm" onclick="resetBoxes()">重置</button>
-                </div>
-                <div class="boxes-container" id="boxesContainer">
-                    <div class="box-item" id="box0">
-                        <span class="box-count" id="boxCount0">0</span>
-                        <span class="box-number">1</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal0">-</span>
-                    </div>
-                    <div class="box-item" id="box1">
-                        <span class="box-count" id="boxCount1">0</span>
-                        <span class="box-number">2</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal1">-</span>
-                    </div>
-                    <div class="box-item" id="box2">
-                        <span class="box-count" id="boxCount2">0</span>
-                        <span class="box-number">3</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal2">-</span>
-                    </div>
-                    <div class="box-item" id="box3">
-                        <span class="box-count" id="boxCount3">0</span>
-                        <span class="box-number">4</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal3">-</span>
-                    </div>
-                    <div class="box-item" id="box4">
-                        <span class="box-count" id="boxCount4">0</span>
-                        <span class="box-number">5</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal4">-</span>
-                    </div>
-                    <div class="box-item" id="box5">
-                        <span class="box-count" id="boxCount5">0</span>
-                        <span class="box-number">6</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal5">-</span>
-                    </div>
-                    <div class="box-item" id="box6">
-                        <span class="box-count" id="boxCount6">0</span>
-                        <span class="box-number">7</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal6">-</span>
-                    </div>
-                    <div class="box-item" id="box7">
-                        <span class="box-count" id="boxCount7">0</span>
-                        <span class="box-number">8</span>
-                        <span class="box-label">三号轮模盒</span>
-                        <span class="box-value" id="boxVal7">-</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 结果信息 -->
-            <div class="result-info" id="resultInfo"></div>
-
-            <!-- 匹配详情 -->
-            <div class="panel" id="matchPanel" style="display:none;">
-                <div class="panel-title">📋 匹配详情</div>
-                <table class="match-table">
-                    <thead>
-                        <tr>
-                            <th>三号轮模盒编号</th>
-                            <th>二维码</th>
-                            <th>时间</th>
-                        </tr>
-                    </thead>
-                    <tbody id="matchBody"></tbody>
-                </table>
-            </div>
-
-            <div class="loading" id="loading">⏳ 正在查询最近2小时数据...</div>
         </div>
-    </div>
-</div>
-
-    <script>
-let boxHitCounts = [0,0,0,0,0,0,0,0];
-let boxLit = [false,false,false,false,false,false,false,false];
-let roundCount = 0;
-let currentRoundItems = [];
-let roundHistory = [];   // [{roundNum, completedTime, items:[{qrcode,time,boxNum,matches}]}]
-
-document.getElementById('qrcodeInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doQuery();
-});
-
-function clearInput() {
-    document.getElementById('qrcodeInput').value = '';
-    document.getElementById('qrcodeInput').focus();
-}
-
-function resetBoxes() {
-    boxHitCounts = [0,0,0,0,0,0,0,0];
-    boxLit = [false,false,false,false,false,false,false,false];
-    for (let i = 0; i < 8; i++) {
-        document.getElementById('box' + i).classList.remove('highlight');
-        document.getElementById('boxVal' + i).textContent = '-';
-        const c = document.getElementById('boxCount' + i);
-        c.textContent = '0'; c.classList.remove('show');
-    }
-    document.getElementById('dataStats').textContent = '按回车或点击查询按钮开始';
-    document.getElementById('resultInfo').classList.remove('show');
-    document.getElementById('matchPanel').style.display = 'none';
-}
-
-function clearHistory() {
-    roundHistory = [];
-    currentRoundItems = [];
-    roundCount = 0;
-    renderHistory();
-    document.getElementById('resultInfo').classList.remove('show');
-    document.getElementById('matchPanel').style.display = 'none';
-}
-
-function getNowStr() {
-    const now = new Date();
-    return now.getFullYear() + '-' +
-        String(now.getMonth()+1).padStart(2,'0') + '-' +
-        String(now.getDate()).padStart(2,'0') + ' ' +
-        String(now.getHours()).padStart(2,'0') + ':' +
-        String(now.getMinutes()).padStart(2,'0') + ':' +
-        String(now.getSeconds()).padStart(2,'0');
-}
-
-function getTimeOnly(str) {
-    return str.split(' ')[1] || str;
-}
-
-/* ---- 渲染左侧记录 ---- */
-function renderHistory() {
-    const list = document.getElementById('historyList');
-    let html = '';
-
-    // 当前进行中的轮次
-    if (currentRoundItems.length > 0) {
-        const litCount = boxLit.filter(b => b).length;
-        html += '<li class="round-item current">' +
-            '<div class="round-header" onclick="toggleRound(\'current\')">' +
-                '<div><div class="round-title">第 ' + (roundCount + 1) + ' 轮 <span class="badge badge-ing">进行中</span></div>' +
-                '<div class="round-progress">' + litCount + '/8 已点亮 · ' + currentRoundItems.length + ' 次扫码</div></div>' +
-                '<div class="round-meta">▼</div>' +
-            '</div>' +
-            '<div class="round-detail" id="detail-current">' +
-                currentRoundItems.map(it =>
-                    '<div class="rd-row">' +
-                        '<span class="rd-qr" title="' + escapeHtml(it.qrcode) + '">' + escapeHtml(it.qrcode) + '</span>' +
-                        '<span class="rd-box">盒' + (it.boxNum || '-') + '</span>' +
-                        '<span class="rd-time">' + getTimeOnly(it.time) + '</span>' +
-                    '</div>'
-                ).join('') +
-            '</div>' +
-        '</li>';
-    }
-
-    // 已完成的轮次
-    roundHistory.forEach((r, idx) => {
-        html += '<li class="round-item completed">' +
-            '<div class="round-header" onclick="toggleRound(' + idx + ')">' +
-                '<div><div class="round-title">第 ' + r.roundNum + ' 轮 <span class="badge badge-ok">✓ 完成</span></div>' +
-                '<div class="round-progress">' + r.items.length + ' 次扫码 · ' + getTimeOnly(r.completedTime) + '</div></div>' +
-                '<div class="round-meta">▼</div>' +
-            '</div>' +
-            '<div class="round-detail" id="detail-' + idx + '">' +
-                r.items.map(it =>
-                    '<div class="rd-row">' +
-                        '<span class="rd-qr" title="' + escapeHtml(it.qrcode) + '">' + escapeHtml(it.qrcode) + '</span>' +
-                        '<span class="rd-box">盒' + (it.boxNum || '-') + '</span>' +
-                        '<span class="rd-time">' + getTimeOnly(it.time) + '</span>' +
-                    '</div>'
-                ).join('') +
-            '</div>' +
-        '</li>';
-    });
-
-    if (!html) {
-        html = '<li style="color:#666;font-size:0.8rem;text-align:center;padding:20px 0;">暂无查询记录</li>';
-    }
-    list.innerHTML = html;
-}
-
-function toggleRound(id) {
-    const el = document.getElementById('detail-' + id);
-    if (el) el.classList.toggle('open');
-}
-
-/* ---- 完成弹窗 ---- */
-function showCompleteModal(roundNum) {
-    const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
-    overlay.innerHTML =
-        '<div class="modal-box">' +
-            '<h2>🎉 检验完成</h2>' +
-            '<p>已完成今日第 <strong style="color:#e94560;font-size:1.3rem;">' + roundNum + '</strong> 轮检验</p>' +
-            '<button class="btn btn-primary" onclick="this.closest(\'.modal-overlay\').remove()">确 定</button>' +
-        '</div>';
-    document.body.appendChild(overlay);
-    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-}
-
-/* ---- 查询 ---- */
-async function doQuery() {
-    const qrcode = document.getElementById('qrcodeInput').value.trim();
-    if (!qrcode) { alert('请输入二维码内容'); return; }
-
-    document.getElementById('loading').classList.add('show');
-    document.getElementById('resultInfo').classList.remove('show');
-    document.getElementById('matchPanel').style.display = 'none';
-
-    try {
-        const res = await fetch('/api/urldata/box_query', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ qrcode })
-        });
-        const data = await res.json();
-        document.getElementById('loading').classList.remove('show');
-
-        if (!data.success) { showResult('error', data.error || '查询失败'); return; }
-
-        document.getElementById('dataStats').innerHTML =
-            '共 <span>' + data.total_records + '</span> 条记录，匹配到 <span>' + data.matches.length + '</span> 条';
-
-        const timeStr = getNowStr();
-        let boxNum = null;
-
-        if (data.matches.length === 0) {
-            showResult('warning', '未找到匹配的二维码，请确认输入是否正确');
-        } else {
-            const latest = data.matches[data.matches.length - 1];
-            boxNum = latest.box_num;
-            const boxIndex = boxNum - 1;
-
-            if (boxIndex >= 0 && boxIndex < 8) {
-                document.getElementById('box' + boxIndex).classList.add('highlight');
-                document.getElementById('boxVal' + boxIndex).textContent = '编号: ' + boxNum;
-                boxHitCounts[boxIndex]++;
-                boxLit[boxIndex] = true;
-                const countEl = document.getElementById('boxCount' + boxIndex);
-                countEl.textContent = boxHitCounts[boxIndex];
-                if (boxHitCounts[boxIndex] >= 2) countEl.classList.add('show');
-            }
-
-            showResult('success', '找到 ' + data.matches.length + ' 条匹配记录，三号轮模盒编号为 ' + boxNum);
-
-            document.getElementById('matchPanel').style.display = 'block';
-            const tbody = document.getElementById('matchBody');
-            tbody.innerHTML = data.matches.map(m => {
-                const t = m.time.includes('T') ? m.time.replace('T', ' ').substring(0, 19) : m.time;
-                return '<tr>' +
-                    '<td style="font-family:Consolas;color:#888;font-size:1.1rem;font-weight:bold;">' + m.box_num + '</td>' +
-                    '<td>' + escapeHtml(m.content) + '</td>' +
-                    '<td>' + t + '</td>' +
-                '</tr>';
-            }).join('');
-        }
-
-        // 记录到当前轮次
-        currentRoundItems.unshift({ qrcode, time: timeStr, boxNum, matches: data.matches });
-        renderHistory();
-
-        // 检查是否8个盒子全亮 → 完成一轮
-        if (boxLit.every(b => b)) {
-            roundCount++;
-            const completedTime = getNowStr();
-            roundHistory.unshift({ roundNum: roundCount, completedTime, items: [...currentRoundItems] });
-            currentRoundItems = [];
-            // 重置盒子
-            boxLit = [false,false,false,false,false,false,false,false];
-            boxHitCounts = [0,0,0,0,0,0,0,0];
-            for (let i = 0; i < 8; i++) {
-                document.getElementById('box' + i).classList.remove('highlight');
-                document.getElementById('boxVal' + i).textContent = '-';
-                const c = document.getElementById('boxCount' + i);
-                c.textContent = '0'; c.classList.remove('show');
-            }
-            renderHistory();
-            // 延迟弹窗，让用户先看到UI更新
-            setTimeout(() => showCompleteModal(roundCount), 300);
-        }
-
-        document.getElementById('qrcodeInput').value = '';
-        document.getElementById('qrcodeInput').focus();
-
-    } catch (e) {
-        document.getElementById('loading').classList.remove('show');
-        showResult('error', '请求失败: ' + e.message);
-    }
-}
-
-function showResult(type, msg) {
-    const el = document.getElementById('resultInfo');
-    el.className = 'result-info show ' + type;
-    el.textContent = msg;
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-renderHistory();
-</script>
+    </main>
+    <noscript>请启用 JavaScript，以查询二维码和查看模盒轨迹。</noscript>
 </body>
 </html>

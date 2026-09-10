@@ -27,7 +27,8 @@ def query_urldata():
         box_queries=data.get('box_queries'),
         start_time=data.get('start_time'),
         stop_time=data.get('stop_time'),
-        sort_order=data.get('sort_order', 'desc')
+        sort_order=data.get('sort_order', 'desc'),
+        refresh=data.get('refresh') is True,
     )
     return jsonify(result)
 
@@ -135,9 +136,18 @@ def get_process_logs():
     return jsonify({'logs': urldata_service.get_last_process_logs()})
 @urldata_bp.route('/api/urldata/box_query', methods=['POST'])
 def box_query():
-    data = request.json
-    qrcode = data.get('qrcode', '')
-    if not qrcode:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': '请求数据格式不正确'}), 400
+    qrcode = data.get('qrcode')
+    if not isinstance(qrcode, str) or not qrcode.strip():
         return jsonify({'success': False, 'error': '请输入二维码'}), 400
-    result = urldata_service.query_box_by_qrcode(qrcode)
+    if len(qrcode) > 4096:
+        return jsonify({'success': False, 'error': '二维码内容过长'}), 400
+    result = urldata_service.query_box_by_qrcode(qrcode.strip())
     return jsonify(result)
+
+
+@urldata_bp.route('/api/urldata/box_layout', methods=['GET'])
+def box_layout():
+    return jsonify(urldata_service.get_box_layout())
