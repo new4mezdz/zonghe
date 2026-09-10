@@ -34,32 +34,47 @@
         byId('selectedCode').textContent='尚未选择';byId('selectedTime').textContent='';
     }
     function renderMatches() {
-        const panel=byId('matchPanel'),body=byId('matchBody');body.replaceChildren();
-        const matches=activeEntry?activeEntry.matches:[];panel.hidden=!matches.length;
+        const body=byId('matchBody');body.replaceChildren();
+        const matches=activeEntry?activeEntry.matches:[];
         byId('matchCount').textContent=matches.length+' 条 · 时间倒序';
+        if(!matches.length) {
+            const row=element('tr','',null,body);
+            element('td','table-empty',activeEntry?'本次查询没有匹配记录，请调整二维码或查询范围。':'查询二维码后，在这里对照各轮模盒编号。',row).colSpan=T.WHEELS.length+3;
+            return;
+        }
         matches.forEach(record=>{
             const row=element('tr',record===selectedRecord?'is-selected':'',null,body);
             element('td','time-cell',timeText(record.time),row);
             const codeCell=element('td','',null,row);
             const codeButton=button('record-code',record.content||activeEntry.qrcode,codeCell,()=>selectRecord(record));
             codeButton.title=String(record.content||'');codeButton.setAttribute('aria-label','定位此记录：'+String(record.content||''));
-            element('td','number-cell',T.wheelNumber(record,3)??'—',row);
+            for(const wheel of T.WHEELS) {
+                const value=T.wheelNumber(record,wheel.id);
+                const cell=element('td','number-cell'+(wheel.id===3?' inspection-column':''),value??'—',row);
+                cell.dataset.wheel=wheel.id;
+                cell.title=wheel.name+'：'+(value===null?'暂无编号':value);
+            }
             button('select-record',record===selectedRecord?'已选中':'查看轨迹',element('td','',null,row),()=>selectRecord(record));
         });
     }
     function chooseEntry(entry) {
         cancelQuery();activeEntry=entry;setLayout(entry.wheels);
-        byId('dataSource').textContent=entry.source==='influxdb'?'实时回退查询 · 仅三号轮可确认编号':'本地轨迹数据 · 编号范围读取现有配置';
+        byId('dataSource').textContent=entry.source==='influxdb'?'远程最近'+entry.lookbackHours+'小时 · 仅三号轮可确认编号':'本地轨迹数据 · 编号范围读取现有配置';
         if(entry.matches.length) {
             selectRecord(entry.matches[0]);
             status('找到 '+entry.matches.length+' 条匹配记录，已选择最新记录；可点击其他记录切换。');
+            const box=T.wheelNumber(entry.matches[0],3);
+            if(box===null || box<1 || box>8)status('已找到二维码记录，但最新记录缺少有效的三号轮模盒编号。'+(entry.warning||'请检查校验数据。'),'warning');
+            else if(entry.warning)status(entry.warning,'warning');
         } else {
-            clearSelection();renderMatches();status('未找到匹配的二维码，请确认输入内容。','warning');
+            clearSelection();renderMatches();
+            status(entry.source==='influxdb'?'本地历史记录及远程最近'+entry.lookbackHours+'小时内未找到匹配的二维码，请确认输入或扩大远程查询范围。':'未找到匹配的二维码，请确认输入内容。','warning');
         }
         renderHistory();
     }
     function renderHistory() {
         const list=byId('historyList');list.replaceChildren();
+        byId('historyCount').textContent=history.length+' 条';
         if(!history.length){element('div','empty-state','暂无查询记录',list);return;}
         let previousRound=null;
         for(const entry of history) {
@@ -83,6 +98,7 @@
             if(count>1)element('small','',count,el);
         });
         byId('inspectionProgress').textContent=hitCounts.filter(Boolean).length+' / 8';
+        byId('inspectionMeter').value=hitCounts.filter(Boolean).length;
         byId('roundStatus').textContent='第 '+(roundCount+1)+' 轮检验'+(roundCount?' · 已完成 '+roundCount+' 轮':'');
     }
     function registerScan(entry) {
@@ -96,17 +112,18 @@
         if(event)event.preventDefault();
         const qrcode=byId('qrcodeInput').value.trim();
         if(!qrcode){status('请输入二维码内容。','warning');byId('qrcodeInput').focus();return;}
+        const lookbackHours=Number(byId('lookbackHours').value);
         cancelQuery();const sequence=querySequence;controller=new AbortController();
         byId('queryButton').disabled=true;byId('queryButton').textContent='正在查询';status('正在查询二维码对应的模盒轨迹…');
         try {
-            const response=await fetch('/api/urldata/box_query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qrcode}),signal:controller.signal});
+            const response=await fetch('/api/urldata/box_query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qrcode,lookback_hours:lookbackHours}),signal:controller.signal});
             const data=await response.json();
             if(sequence!==querySequence)return;
             if(!response.ok || !data.success)throw new Error(data.error||'查询失败（HTTP '+response.status+'）');
             if(!Array.isArray(data.matches) || data.matches.some(m=>!m || typeof m!=='object'))throw new Error('查询返回的数据格式不完整');
             layoutVersion++;
             // Backend returns newest first, including the real-time fallback.
-            const entry={id:++historyId,qrcode,matches:data.matches,wheels:data.wheels||[],source:data.source,queriedAt:clockText(),round:roundCount+1};
+            const entry={id:++historyId,qrcode,matches:data.matches,wheels:data.wheels||[],source:data.source,lookbackHours:data.lookback_hours??lookbackHours,warning:data.warning,queriedAt:clockText(),round:roundCount+1};
             history.unshift(entry);history=history.slice(0,200);
             const completed=registerScan(entry);chooseEntry(entry);
             if(completed)status('已完成第 '+roundCount+' 轮八盒检验。当前二维码已定位，继续扫码开始下一轮。');

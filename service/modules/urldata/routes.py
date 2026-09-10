@@ -144,7 +144,10 @@ def box_query():
         return jsonify({'success': False, 'error': '请输入二维码'}), 400
     if len(qrcode) > 4096:
         return jsonify({'success': False, 'error': '二维码内容过长'}), 400
-    result = urldata_service.query_box_by_qrcode(qrcode.strip())
+    lookback_hours = data.get('lookback_hours', 24)
+    if type(lookback_hours) is not int or lookback_hours not in (2, 24, 168):
+        return jsonify({'success': False, 'error': '请选择有效的远程查询时间范围'}), 400
+    result = urldata_service.query_box_by_qrcode(qrcode.strip(), lookback_hours)
     return jsonify(result)
 
 

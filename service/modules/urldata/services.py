@@ -966,7 +966,11 @@ class UrlDataService:
             records.sort(key=lambda r: r['time'])
             return records
         except Exception as e:
-            raise RuntimeError(f'读取 {bucket} 失败：{e}') from e
+            logging.error("读取 %s 失败: %s", bucket, e)
+            message = ('读取二维码数据库失败，请检查数据库连接和访问权限'
+                       if bucket_key == 'bucket_data'
+                       else '读取校验数据库失败，暂时无法确定轮模盒编号')
+            raise RuntimeError(message) from e
         finally:
             if client is not None:
                 client.close()
@@ -1061,7 +1065,12 @@ class UrlDataService:
             })
         return {'wheels': wheels}
 
-    def query_box_by_qrcode(self, qrcode):
+    def query_box_by_qrcode(self, qrcode, lookback_hours=24):
+        if not isinstance(qrcode, str) or not qrcode.strip():
+            return {'success': False, 'error': '请输入二维码'}
+        qrcode = qrcode.strip()
+        if type(lookback_hours) is not int or lookback_hours not in (2, 24, 168):
+            return {'success': False, 'error': '请选择有效的远程查询时间范围'}
         layout = self.get_box_layout()
         # 二维码中的百分号和下划线是字面内容，不是 LIKE 通配符。
         escaped_code = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
@@ -1092,34 +1101,54 @@ class UrlDataService:
             return {'success': True, 'total_records': len(rows), 'matches': matched,
                     'source': 'database', 'wheels': layout['wheels']}
 
+        # 两路数据使用同一个固定窗口，避免分别计算“现在”造成校验序号偏移。
+        stop = datetime.now(timezone.utc)
+        start_time = (stop - timedelta(hours=lookback_hours)).isoformat()
+        stop_time = stop.isoformat()
         try:
-            records = self._load_data_from_influx('-2h')
-            verification_records = self._load_verification_from_influx('-2h') if records else []
-        except Exception as exc:
+            records = self._load_data_from_influx(start_time, stop_time)
+        except RuntimeError as exc:
             return {'success': False, 'error': str(exc)}
-        if not records:
-            return {'success': False, 'error': 'jbcj01 最近2小时无二维码数据'}
+
+        matching_indices = [
+            idx for idx, record in enumerate(records)
+            if qrcode.casefold() in str(record['value']).casefold()
+        ]
+        warning = None
+        verification_records = []
+        if matching_indices:
+            try:
+                verification_records = self._load_verification_from_influx(start_time, stop_time)
+            except RuntimeError as exc:
+                warning = str(exc)
         matched = []
-        for idx, record in enumerate(records):
-            if qrcode and qrcode in str(record['value']):
-                box_num = None
-                if idx + 2 < len(verification_records):
-                    box_num = self._box_number(verification_records[idx + 2]['value'])
-                matched.append({
-                    'index': idx,
-                    'numbers': [box_num] if box_num is not None else [None],
-                    'box_num': box_num,
-                    # 实时回退数据仅能确认三号轮，其他轮保持未知。
-                    'wheel_numbers': {
-                        str(wheel['id']): box_num if wheel['id'] == 3 else None
-                        for wheel in layout['wheels']
-                    },
-                    'content': record['value'],
-                    'time': self._record_time_text(record['time'])
-                })
+        for idx in reversed(matching_indices):
+            record = records[idx]
+            box_num = None
+            if idx + 2 < len(verification_records):
+                value = self._box_number(verification_records[idx + 2]['value'])
+                if value is not None and 1 <= value <= 8:
+                    box_num = value
+            matched.append({
+                'index': idx,
+                'numbers': [box_num],
+                'box_num': box_num,
+                # 实时回退数据仅能确认三号轮，其他轮保持未知。
+                'wheel_numbers': {
+                    str(wheel['id']): box_num if wheel['id'] == 3 else None
+                    for wheel in layout['wheels']
+                },
+                'content': record['value'],
+                'time': self._record_time_text(record['time'])
+            })
         matched.sort(key=lambda item: item['time'], reverse=True)
-        return {'success': True, 'total_records': len(records), 'matches': matched,
-                'source': 'influxdb', 'wheels': layout['wheels']}
+        result = {
+            'success': True, 'total_records': len(records), 'matches': matched,
+            'source': 'influxdb', 'wheels': layout['wheels'], 'lookback_hours': lookback_hours,
+        }
+        if warning:
+            result['warning'] = warning
+        return result
 
     def start_auto_sync(self):
         def _sync_loop():
