@@ -1,0 +1,318 @@
+<div id="mold-query-styles" data-style="clean" aria-label="盒模轨迹查询 · 三套风格预览">
+  <style>
+    #mold-query-styles{--mq-page:light-dark(#f2f5fa,#121c2b);--mq-panel:light-dark(#ffffff,#1b293b);--mq-canvas:light-dark(#f8faff,#162334);--mq-ink:light-dark(#20314c,#e5edf9);--mq-muted:light-dark(#62738c,#a3b4ca);--mq-line:light-dark(#dfe6f0,#344458);--mq-accent:light-dark(#315ce5,#91acff);--mq-soft:light-dark(#eaf0ff,#263d67);--mq-on:light-dark(#ffffff,#12223e);--mq-good:light-dark(#197754,#78d8b6);--mq-good-soft:light-dark(#eaf7f0,#203f39);--mq-track:light-dark(#c5d2e8,#536980);--mq-edge:light-dark(#dce5f3,#344b62);--mq-radius:12px;color:var(--mq-ink);font-family:Inter,"Microsoft YaHei","PingFang SC",sans-serif;font-size:14px;line-height:1.5;color-scheme:light}
+    #mold-query-styles *{box-sizing:border-box}
+    #mold-query-styles [hidden]{display:none!important}
+    #mold-query-styles button,#mold-query-styles input{font:inherit;color:inherit}
+    #mold-query-styles button{cursor:pointer}
+    #mold-query-styles h2,#mold-query-styles h3,#mold-query-styles p{margin:0}
+    #mold-query-styles strong,#mold-query-styles h2,#mold-query-styles h3{font-weight:500}
+    #mold-query-styles .mq-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+    #mold-query-styles .mq-choice{display:flex;gap:12px;align-items:center;padding:14px;text-align:left;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:10px;min-width:0}
+    #mold-query-styles .mq-choice[aria-pressed="true"]{border-color:var(--mq-accent);box-shadow:inset 0 0 0 1px var(--mq-accent);background:var(--mq-soft)}
+    #mold-query-styles .mq-choice strong{display:block;font-size:14px}
+    #mold-query-styles .mq-choice small{display:block;color:var(--mq-muted);font-size:11px;margin-top:3px}
+    #mold-query-styles .mq-swatch{display:block;width:31px;height:35px;flex:none;border-radius:5px;border:1px solid #bac8db;background:linear-gradient(90deg,#eaf0ff 28%,#fff 28%);position:relative}
+    #mold-query-styles .mq-swatch:after{content:"";position:absolute;left:12px;right:4px;top:10px;height:11px;border:2px solid #4168de;border-radius:50%}
+    #mold-query-styles .mq-swatch-dark{background:linear-gradient(#223344 22%,#0e1b2a 22%);border-color:#3d556d}
+    #mold-query-styles .mq-swatch-dark:after{left:5px;border-color:#73d6f3}
+    #mold-query-styles .mq-swatch-dense{background:repeating-linear-gradient(#f7fbf8 0 5px,#d4e7dd 5px 6px);border-color:#a7c8b7}
+    #mold-query-styles .mq-swatch-dense:after{border-color:#277c62}
+    #mold-query-styles .mq-app{background:var(--mq-page);border:1px solid var(--mq-line);border-radius:var(--mq-radius);overflow:hidden}
+    #mold-query-styles .mq-header{padding:19px 22px;background:var(--mq-panel);border-bottom:1px solid var(--mq-line);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    #mold-query-styles .mq-brand{display:flex;gap:11px;align-items:center}
+    #mold-query-styles .mq-mark{width:37px;height:37px;display:grid;place-items:center;background:var(--mq-accent);color:var(--mq-on);border-radius:10px}
+    #mold-query-styles .mq-mark i{width:20px;height:20px}
+    #mold-query-styles .mq-header h2{font-size:19px;letter-spacing:.3px}
+    #mold-query-styles .mq-eyebrow{font-size:11px;color:var(--mq-muted);letter-spacing:1.2px}
+    #mold-query-styles .mq-top-meta{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mq-muted)}
+    #mold-query-styles .mq-preview-label{border:1px solid var(--mq-line);padding:4px 8px;border-radius:5px;white-space:nowrap}
+    #mold-query-styles .mq-body{padding:18px;display:grid;grid-template-columns:208px minmax(0,1fr);gap:16px;align-items:start}
+    #mold-query-styles .mq-search{grid-column:1/-1;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius);padding:16px 18px}
+    #mold-query-styles .mq-search-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+    #mold-query-styles .mq-search-top label{font-weight:500}
+    #mold-query-styles .mq-hint{font-size:11px;color:var(--mq-muted)}
+    #mold-query-styles .mq-input-row{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+    #mold-query-styles .mq-input-wrap{flex:1;min-width:160px;position:relative}
+    #mold-query-styles .mq-input-wrap>i,#mold-query-styles .mq-input-wrap>svg{position:absolute;left:12px;top:13px;width:17px;height:17px;color:var(--mq-muted);pointer-events:none}
+    #mold-query-styles .mq-input-wrap input{width:100%;height:44px;border:1px solid var(--mq-line);border-radius:7px;background:var(--mq-canvas);padding:10px 12px 10px 38px;min-width:0;font-size:14px}
+    #mold-query-styles .mq-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 14px;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:7px;white-space:nowrap}
+    #mold-query-styles .mq-button-main{background:var(--mq-accent);border-color:var(--mq-accent);color:var(--mq-on)}
+    #mold-query-styles .mq-button-small{padding:5px 9px;font-size:11px}
+    #mold-query-styles .mq-button svg{width:15px;height:15px}
+    #mold-query-styles .mq-search-status{font-size:11px;color:var(--mq-muted);margin-top:8px;min-height:17px}
+    #mold-query-styles .mq-search-status[data-error="true"]{color:light-dark(#ae3737,#ffaaaa)}
+    #mold-query-styles .mq-sidebar{display:grid;gap:14px;min-width:0}
+    #mold-query-styles .mq-inspection,#mold-query-styles .mq-history{background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius);padding:15px}
+    #mold-query-styles .mq-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:13px}
+    #mold-query-styles h3{font-size:13px}
+    #mold-query-styles .mq-count{font-size:12px;font-variant-numeric:tabular-nums;color:var(--mq-accent)}
+    #mold-query-styles .mq-slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+    #mold-query-styles .mq-slot{height:32px;display:grid;place-items:center;border-radius:5px;background:var(--mq-canvas);border:1px solid var(--mq-line);color:var(--mq-muted);font-size:12px;position:relative}
+    #mold-query-styles .mq-slot[data-hit="true"]{background:var(--mq-good-soft);border-color:var(--mq-good);color:var(--mq-good)}
+    #mold-query-styles .mq-slot[data-hit="true"]:after{content:"✓";position:absolute;right:2px;top:0;font-size:10px}
+    #mold-query-styles .mq-inspection-note{margin-top:10px;display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--mq-muted)}
+    #mold-query-styles .mq-meter{height:4px;background:var(--mq-line);margin-top:11px;border-radius:3px;overflow:hidden}
+    #mold-query-styles .mq-meter>span{display:block;width:50%;height:100%;background:var(--mq-good)}
+    #mold-query-styles .mq-record-list{display:grid;gap:6px}
+    #mold-query-styles .mq-record{display:block;width:100%;text-align:left;padding:10px 9px;background:var(--mq-panel);border:1px solid transparent;border-radius:7px;min-width:0}
+    #mold-query-styles .mq-record[aria-pressed="true"]{background:var(--mq-soft);border-color:var(--mq-accent)}
+    #mold-query-styles .mq-code{font-size:12px;display:block;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    #mold-query-styles .mq-record-meta{display:flex;justify-content:space-between;gap:5px;font-size:11px;color:var(--mq-muted);margin-top:5px}
+    #mold-query-styles .mq-history-foot{padding-top:12px;font-size:11px;color:var(--mq-muted)}
+    #mold-query-styles .mq-stage{min-width:0;overflow:hidden;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius)}
+    #mold-query-styles .mq-stage-head{padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--mq-line)}
+    #mold-query-styles .mq-stage-title{display:flex;align-items:center;gap:8px}
+    #mold-query-styles .mq-stage-title i,#mold-query-styles .mq-stage-title svg{color:var(--mq-accent);width:18px;height:18px}
+    #mold-query-styles .mq-stage-title h3{font-size:15px}
+    #mold-query-styles .mq-selection{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 18px;background:var(--mq-canvas);flex-wrap:wrap}
+    #mold-query-styles .mq-selected-code{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+    #mold-query-styles .mq-selection-label{font-size:11px;color:var(--mq-muted);margin-right:7px}
+    #mold-query-styles .mq-located{font-size:11px;color:var(--mq-good);display:flex;align-items:center;gap:5px;white-space:nowrap}
+    #mold-query-styles .mq-located:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+    #mold-query-styles .mq-diagram-area{background:var(--mq-canvas);padding:8px 8px 0;min-width:0}
+    #mold-query-styles .mq-diagram{display:block;width:100%;height:auto;overflow:visible}
+    #mold-query-styles .mq-diagram text{font-family:inherit;font-weight:400;text-anchor:middle;dominant-baseline:middle;fill:var(--mq-ink);font-size:12px}
+    #mold-query-styles .mq-diagram .mq-wheel-title{font-weight:500;font-size:13px}
+    #mold-query-styles .mq-diagram .mq-wheel-value{font-weight:500;fill:var(--mq-accent);font-size:14px}
+    #mold-query-styles .mq-diagram .mq-wheel-detail{fill:var(--mq-muted);font-size:11px}
+    #mold-query-styles .mq-wheel-face{fill:var(--mq-panel);stroke:var(--mq-line);stroke-width:1}
+    #mold-query-styles .mq-wheel-edge{fill:var(--mq-edge)}
+    #mold-query-styles .mq-wheel-track{fill:none;stroke:var(--mq-track);stroke-width:1.2}
+    #mold-query-styles .mq-wheel-spoke{stroke:var(--mq-line);stroke-width:1;fill:none}
+    #mold-query-styles .mq-station-face{fill:var(--mq-panel);stroke:var(--mq-track);stroke-width:1}
+    #mold-query-styles .mq-diagram .mq-station-number{fill:var(--mq-muted);font-size:11px}
+    #mold-query-styles .mq-marker-face{fill:var(--mq-accent);stroke:var(--mq-accent);stroke-width:1}
+    #mold-query-styles .mq-diagram .mq-marker-number{fill:var(--mq-on);font-weight:500;font-size:12px}
+    #mold-query-styles .mq-marker-halo{fill:var(--mq-accent);opacity:.13}
+    #mold-query-styles .mq-diagram-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 18px 15px;font-size:11px;color:var(--mq-muted);background:var(--mq-canvas)}
+    #mold-query-styles .mq-legend{display:flex;align-items:center;gap:6px}
+    #mold-query-styles .mq-legend:before{content:"";width:9px;height:9px;border-radius:2px;background:var(--mq-accent)}
+    #mold-query-styles .mq-readouts{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--mq-line)}
+    #mold-query-styles .mq-readout{display:grid;gap:4px;text-align:center;padding:13px 2px;border-right:1px solid var(--mq-line)}
+    #mold-query-styles .mq-readout:last-child{border-right:0}
+    #mold-query-styles .mq-readout:first-child{background:var(--mq-soft)}
+    #mold-query-styles .mq-readout span{color:var(--mq-muted);font-size:11px}
+    #mold-query-styles .mq-readout strong{font-variant-numeric:tabular-nums;font-size:17px;color:var(--mq-accent)}
+    #mold-query-styles .mq-records-table{grid-column:1/-1;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius);padding:14px 16px;display:none;min-width:0}
+    #mold-query-styles .mq-table-scroll{overflow:auto}
+    #mold-query-styles table{width:100%;border-collapse:collapse;text-align:left;font-size:12px;white-space:nowrap}
+    #mold-query-styles th{font-weight:400;color:var(--mq-muted);font-size:11px;padding:8px;border-bottom:1px solid var(--mq-line)}
+    #mold-query-styles td{padding:8px;border-bottom:1px solid var(--mq-line);font-variant-numeric:tabular-nums}
+    #mold-query-styles tr:last-child td{border-bottom:0}
+    #mold-query-styles tr[data-selected="true"]{background:var(--mq-soft)}
+    #mold-query-styles .mq-table-select{border:0;background:transparent;color:var(--mq-accent);padding:3px 0;white-space:nowrap}
+    #mold-query-styles .mq-app-foot{padding:0 20px 15px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--mq-muted);font-size:11px}
+    #mold-query-styles[data-style="control"]{color-scheme:dark;--mq-page:#0c1521;--mq-panel:#142232;--mq-canvas:#0f1c2b;--mq-ink:#e5f0fd;--mq-muted:#9cb0c6;--mq-line:#2b4055;--mq-accent:#6cd8f3;--mq-soft:#193e50;--mq-on:#09232c;--mq-good:#80ddba;--mq-good-soft:#203d36;--mq-track:#48657c;--mq-edge:#213a50;--mq-radius:6px}
+    #mold-query-styles[data-style="control"] .mq-body{grid-template-columns:minmax(0,1fr)}
+    #mold-query-styles[data-style="control"] .mq-sidebar{grid-row:3;grid-template-columns:240px minmax(0,1fr)}
+    #mold-query-styles[data-style="control"] .mq-stage{grid-row:2}
+    #mold-query-styles[data-style="control"] .mq-record-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #mold-query-styles[data-style="control"] .mq-history-foot{display:none}
+    #mold-query-styles[data-style="control"] .mq-header{border-top:3px solid var(--mq-accent);padding-top:16px}
+    #mold-query-styles[data-style="control"] .mq-mark{border-radius:4px}
+    #mold-query-styles[data-style="control"] .mq-diagram-area{background-image:linear-gradient(var(--mq-line) 1px,transparent 1px),linear-gradient(90deg,var(--mq-line) 1px,transparent 1px);background-size:32px 32px;background-blend-mode:soft-light}
+    #mold-query-styles[data-style="control"] .mq-readout strong{font-size:22px}
+    #mold-query-styles[data-style="control"] .mq-readout{padding:10px 2px}
+    #mold-query-styles[data-style="dense"]{--mq-page:light-dark(#f3f6f4,#14221d);--mq-panel:light-dark(#ffffff,#1a2c25);--mq-canvas:light-dark(#fafcfb,#172720);--mq-ink:light-dark(#233d32,#deede5);--mq-muted:light-dark(#63786d,#a8bfb2);--mq-line:light-dark(#dce6df,#355447);--mq-accent:light-dark(#16765a,#80d7b6);--mq-soft:light-dark(#e8f4ee,#234e3d);--mq-on:light-dark(#ffffff,#153628);--mq-track:light-dark(#bfd0c5,#537361);--mq-edge:light-dark(#dce8e0,#355744);--mq-radius:4px}
+    #mold-query-styles[data-style="dense"] .mq-header{padding:12px 18px}
+    #mold-query-styles[data-style="dense"] .mq-header h2{font-size:17px}
+    #mold-query-styles[data-style="dense"] .mq-eyebrow{display:none}
+    #mold-query-styles[data-style="dense"] .mq-mark{width:29px;height:29px;border-radius:4px}
+    #mold-query-styles[data-style="dense"] .mq-body{grid-template-columns:180px minmax(0,1fr);padding:12px;gap:10px}
+    #mold-query-styles[data-style="dense"] .mq-search{padding:11px 14px}
+    #mold-query-styles[data-style="dense"] .mq-search-top{margin-bottom:6px}
+    #mold-query-styles[data-style="dense"] .mq-sidebar{gap:10px}
+    #mold-query-styles[data-style="dense"] .mq-inspection,#mold-query-styles[data-style="dense"] .mq-history{padding:11px}
+    #mold-query-styles[data-style="dense"] .mq-record{padding:6px;border-radius:3px}
+    #mold-query-styles[data-style="dense"] .mq-history-foot{display:none}
+    #mold-query-styles[data-style="dense"] .mq-stage-head{padding:11px 14px}
+    #mold-query-styles[data-style="dense"] .mq-selection{padding:9px 14px}
+    #mold-query-styles[data-style="dense"] .mq-readouts{display:none}
+    #mold-query-styles[data-style="dense"] .mq-records-table{display:block}
+    #mold-query-styles[data-style="dense"] .mq-app-foot{padding:0 14px 12px}
+    @media(max-width:760px){
+      #mold-query-styles .mq-body{grid-template-columns:minmax(0,1fr)!important;padding:12px;gap:12px}
+      #mold-query-styles .mq-sidebar{grid-row:3;grid-template-columns:185px minmax(0,1fr)}
+      #mold-query-styles .mq-stage{grid-row:2}
+      #mold-query-styles[data-style="control"] .mq-sidebar{grid-template-columns:185px minmax(0,1fr)}
+      #mold-query-styles[data-style="control"] .mq-record-list{grid-template-columns:minmax(0,1fr)}
+      #mold-query-styles .mq-choice{padding:11px 9px;gap:7px}
+      #mold-query-styles .mq-choice small{font-size:11px}
+      #mold-query-styles .mq-swatch{display:none}
+      #mold-query-styles .mq-record-list{gap:2px}
+      #mold-query-styles .mq-record{padding:6px 8px}
+      #mold-query-styles .mq-history-foot{display:none}
+    }
+    @media(max-width:460px){
+      #mold-query-styles .mq-choices{gap:5px;margin-bottom:10px}
+      #mold-query-styles .mq-choice{padding:10px 6px;display:block}
+      #mold-query-styles .mq-choice strong{font-size:12px}
+      #mold-query-styles .mq-choice small{display:none}
+      #mold-query-styles .mq-header{padding:14px 12px;gap:10px}
+      #mold-query-styles .mq-top-meta{font-size:11px;gap:9px}
+      #mold-query-styles .mq-header h2{font-size:17px}
+      #mold-query-styles .mq-body{padding:9px}
+      #mold-query-styles .mq-search{padding:12px}
+      #mold-query-styles .mq-input-wrap{flex-basis:100%}
+      #mold-query-styles .mq-input-wrap input{font-size:16px}
+      #mold-query-styles .mq-input-row>.mq-button{flex:1}
+      #mold-query-styles .mq-sidebar,#mold-query-styles[data-style="control"] .mq-sidebar{grid-template-columns:minmax(0,1fr)}
+      #mold-query-styles .mq-slots{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+      #mold-query-styles .mq-record-list,#mold-query-styles[data-style="control"] .mq-record-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+      #mold-query-styles .mq-stage-head{padding:12px}
+      #mold-query-styles .mq-selection{padding:10px 12px}
+      #mold-query-styles .mq-readouts{grid-template-columns:repeat(4,minmax(0,1fr))}
+      #mold-query-styles .mq-readout{border-bottom:1px solid var(--mq-line)}
+      #mold-query-styles .mq-diagram-footer{padding:10px 12px}
+    }
+    @media(pointer:coarse){#mold-query-styles button{min-height:44px}}
+  </style>
+  <div class="mq-choices" role="group" aria-label="切换风格模板">
+    <button class="mq-choice" type="button" data-variant="clean" aria-pressed="true"><span class="mq-swatch" aria-hidden="true"></span><span><strong>A · 简洁蓝白</strong><small>清晰留白 · 日常查询</small></span></button>
+    <button class="mq-choice" type="button" data-variant="control" aria-pressed="false"><span class="mq-swatch mq-swatch-dark" aria-hidden="true"></span><span><strong>B · 深色工控</strong><small>轨迹大图 · 车间展示</small></span></button>
+    <button class="mq-choice" type="button" data-variant="dense" aria-pressed="false"><span class="mq-swatch mq-swatch-dense" aria-hidden="true"></span><span><strong>C · 紧凑工作台</strong><small>图表对照 · 高频核查</small></span></button>
+  </div>
+  <section class="mq-app" aria-label="盒模轨迹查询界面">
+    <header class="mq-header">
+      <div class="mq-brand"><div class="mq-mark"><i data-lucide="scan-line" aria-hidden="true"></i></div><div><h2>盒模轨迹查询</h2><p class="mq-eyebrow">MOLD TRAJECTORY</p></div></div>
+      <div class="mq-top-meta"><span>七轮联动定位</span><span class="mq-preview-label">风格预览 · 示例数据</span></div>
+    </header>
+    <div class="mq-body">
+      <form class="mq-search" aria-label="查询示例二维码">
+        <div class="mq-search-top"><label for="mq-qrcode">二维码查询</label><span class="mq-hint">输入或扫描二维码 · Enter 查询</span></div>
+        <div class="mq-input-row"><div class="mq-input-wrap"><i data-lucide="scan-barcode" aria-hidden="true"></i><input id="mq-qrcode" autocomplete="off" placeholder="输入二维码或编号，例如 03001" value="MH-03001" maxlength="100"></div><button class="mq-button mq-button-main" type="submit"><i data-lucide="search" aria-hidden="true"></i>查询定位</button><button class="mq-button" type="button" data-action="clear">清空</button></div>
+        <p class="mq-search-status" role="status" aria-live="polite">已找到示例记录，可点击查询记录切换定位。</p>
+      </form>
+      <aside class="mq-sidebar" aria-label="检验进度与查询记录">
+        <section class="mq-inspection"><div class="mq-section-title"><h3>三号轮 · 八盒检验</h3><span class="mq-count mq-progress">4 / 8</span></div><div class="mq-slots" aria-label="三号轮编号一至八的检验状态"></div><div class="mq-meter" aria-hidden="true"><span></span></div><div class="mq-inspection-note"><span class="mq-round">第 1 轮检验</span><span>✓ 已扫码</span></div></section>
+        <section class="mq-history"><div class="mq-section-title"><h3>查询记录</h3><span class="mq-count">4 条</span></div><div class="mq-record-list"></div><div class="mq-history-foot">点击记录，查看对应轮位</div></section>
+      </aside>
+      <section class="mq-stage" aria-label="七轮定位图">
+        <header class="mq-stage-head"><div class="mq-stage-title"><i data-lucide="orbit" aria-hidden="true"></i><h3>轮模盒 · 运动轨迹</h3></div><button class="mq-button mq-button-small" type="button" data-action="reset">重置高亮</button></header>
+        <div class="mq-selection"><div><span class="mq-selection-label">当前二维码</span><strong class="mq-selected-code">MH-03001</strong></div><span class="mq-located" role="status" aria-live="polite">7 / 7 轮已定位</span></div>
+        <div class="mq-diagram-area"><svg class="mq-diagram" role="img" aria-label="一号轮位于左侧，二三号轮在左下，四五号轮在上方，六号轮在右下，八号轮在右上。一号轮仅含编号1和2。"></svg></div>
+        <div class="mq-diagram-footer"><span class="mq-legend">实色模盒 · 当前定位</span><span>工位固定 · 高亮顺时针移动</span></div>
+        <div class="mq-readouts" aria-label="各轮当前模盒编号"></div>
+      </section>
+      <section class="mq-records-table" aria-label="各轮编号记录对照"><div class="mq-section-title"><h3>记录与轮位对照</h3><span class="mq-hint">按记录时间倒序</span></div><div class="mq-table-scroll"><table><thead><tr><th scope="col">记录时间</th><th scope="col">二维码</th><th scope="col">一号</th><th scope="col">二号</th><th scope="col">三号</th><th scope="col">四号</th><th scope="col">五号</th><th scope="col">六号</th><th scope="col">八号</th><th scope="col">操作</th></tr></thead><tbody></tbody></table></div></section>
+    </div>
+    <footer class="mq-app-foot"><span>一号轮编号：1、2</span><span>示例轮位 · 其余轮编号范围以正式配置为准</span></footer>
+  </section>
+  <script>
+    (()=>{
+      const root=document.getElementById('mold-query-styles');
+      const $=s=>root.querySelector(s), $$=s=>Array.from(root.querySelectorAll(s));
+      const styleState={variant:'clean',depth:true};
+      const ns='http://www.w3.org/2000/svg', reduce=matchMedia('(prefers-reduced-motion: reduce)');
+      // Only presentation data; no production APIs or stored configuration are changed.
+      // Wheel one has exactly two explicit, valid identifiers in every demo record.
+      const configs=[
+        {id:1,name:'一号轮',numbers:[1,2],cx:58,cy:285,rx:35,ry:83,rotation:20},
+        {id:2,name:'二号轮',numbers:[1,2,3,4,5,6],cx:201,cy:286,rx:88,ry:54,rotation:0},
+        {id:3,name:'三号轮',numbers:[1,2,3,4,5,6,7,8],cx:390,cy:293,rx:88,ry:54,rotation:0},
+        {id:4,name:'四号轮',numbers:[1,2,3,4,5,6],cx:497,cy:144,rx:96,ry:57,rotation:0},
+        {id:5,name:'五号轮',numbers:[1,2,3,4,5,6],cx:704,cy:144,rx:89,ry:54,rotation:0},
+        {id:6,name:'六号轮',numbers:[1,2,3,4,5,6],cx:789,cy:327,rx:91,ry:54,rotation:0},
+        {id:8,name:'八号轮',numbers:[1,2,3,4,5,6],cx:902,cy:146,rx:83,ry:54,rotation:0}
+      ];
+      const records=[
+        {code:'MH-03001',time:'14:32:08',values:[1,3,4,2,5,3,6]},
+        {code:'MH-03002',time:'14:31:46',values:[2,5,1,4,2,6,3]},
+        {code:'MH-03003',time:'14:31:20',values:[1,2,6,1,4,2,5]},
+        {code:'MH-03004',time:'14:30:57',values:[2,4,2,6,3,5,1]}
+      ];
+      let selected=0, drawing=[],frame=0,animationStart=0;
+      const seen=new Set([1,2,4,6]);
+      const positions=configs.map((w,i)=>w.numbers.indexOf(records[0].values[i])/w.numbers.length);
+      const mod=v=>((v%1)+1)%1;
+      function make(tag,cls,text,parent){const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=text;if(parent)parent.appendChild(el);return el;}
+      function svg(tag,attrs,parent){const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(parent)parent.appendChild(el);return el;}
+      function label(text,x,y,cls,parent){const el=svg('text',{x,y,class:cls},parent);el.textContent=text;return el;}
+      function point(w,f){const a=f*Math.PI*2-Math.PI/2,r=w.rotation*Math.PI/180,x=w.rx*Math.cos(a),y=w.ry*Math.sin(a);return{x:w.cx+x*Math.cos(r)-y*Math.sin(r),y:w.cy+x*Math.sin(r)+y*Math.cos(r)};}
+      function tile(parent,p,value,active){const g=svg('g',{transform:`translate(${p.x} ${p.y})`},parent);if(active)svg('rect',{x:-18,y:-17,width:36,height:34,rx:9,class:'mq-marker-halo'},g);svg('rect',{x:-11,y:-11,width:22,height:22,rx:4,class:active?'mq-marker-face':'mq-station-face'},g);const text=label(value,0,1,active?'mq-marker-number':'mq-station-number',g);return {g,text};}
+      function renderDiagram(){
+        cancelAnimationFrame(frame);frame=0;
+        const host=$('.mq-diagram-area'), diagram=$('.mq-diagram');
+        const width=Math.max(220,Math.round(host.clientWidth-16));
+        const compact=width<570;
+        const cols=width<360?1:2;
+        const height=compact?Math.ceil(configs.length/cols)*174+14:Math.max(315,width*.46);
+        diagram.setAttribute('viewBox',`0 0 ${width} ${height}`);diagram.style.height=height+'px';
+        diagram.replaceChildren();drawing=[];
+        svg('title',{},diagram).textContent='七轮模盒定位示意，一号轮仅有编号1和2';
+        if(compact)label('窄屏轮位分组',width/2,10,'mq-wheel-detail',diagram);
+        configs.forEach((config,index)=>{
+          let w;
+          if(compact){const cell=width/cols;w={...config,cx:cell*(index%cols+.5),cy:Math.floor(index/cols)*174+98,rx:config.id===1?25:Math.min(62,cell*.33),ry:config.id===1?46:37,rotation:config.id===1?20:0};}
+          else{const scale=(width-30)/1000;w={...config,cx:15+config.cx*scale,cy:config.cy/430*(height-12)+4,rx:Math.max(config.id===1?20:45,config.rx*scale),ry:config.id===1?56:Math.max(30,config.ry*scale)};}
+          const g=svg('g',{'data-wheel':w.id},diagram);
+          const r=`rotate(${w.rotation} ${w.cx} ${w.cy})`;
+          if(styleState.depth)svg('ellipse',{cx:w.cx,cy:w.cy+7,rx:w.rx+7,ry:w.ry+7,transform:r,class:'mq-wheel-edge'},g);
+          svg('ellipse',{cx:w.cx,cy:w.cy,rx:w.rx+7,ry:w.ry+7,transform:r,class:'mq-wheel-face'},g);
+          svg('ellipse',{cx:w.cx,cy:w.cy,rx:w.rx,ry:w.ry,transform:r,class:'mq-wheel-track'},g);
+          config.numbers.forEach((n,i)=>{const p=point(w,i/config.numbers.length);svg('line',{x1:w.cx,y1:w.cy,x2:p.x,y2:p.y,class:'mq-wheel-spoke'},g);});
+          svg('ellipse',{cx:w.cx,cy:w.cy,rx:w.id===1?13:26,ry:17,class:'mq-wheel-face'},g);
+          let titleX=w.cx,titleY=w.cy-w.ry-30;
+          if(!compact&&w.id===1)titleY=w.cy-w.ry-46;
+          label(w.name,titleX,titleY,'mq-wheel-title',g);
+          if(w.id===1)label('仅 1 / 2',titleX,titleY+18,'mq-wheel-detail',g);
+          config.numbers.forEach((n,i)=>{const t=tile(g,point(w,i/config.numbers.length),String(n),false);svg('title',{},t.g).textContent=w.name+' · 模盒 '+n;});
+          const value=selected===null?'—':String(records[selected].values[index]);
+          label(value,w.cx,w.cy,'mq-wheel-value',g);
+          const target=selected===null?0:config.numbers.indexOf(records[selected].values[index])/config.numbers.length;
+          positions[index]=target;
+          const marker=tile(g,point(w,target),value,true);
+          marker.g.setAttribute('visibility',selected===null?'hidden':'visible');
+          drawing.push({w,marker});
+        });
+        if(selected!==null)$('.mq-located').textContent='7 / 7 轮已定位';
+      }
+      function renderSelection(){
+        $$('.mq-record').forEach((b,i)=>b.setAttribute('aria-pressed',String(i===selected)));
+        $$('.mq-data-row').forEach((row,i)=>{row.dataset.selected=String(i===selected);row.querySelector('button').textContent=i===selected?'已定位':'定位';});
+        $('.mq-selected-code').textContent=selected===null?'尚未选择':records[selected].code;
+        $$('.mq-readout strong').forEach((el,i)=>el.textContent=selected===null?'—':String(records[selected].values[i]));
+      }
+      function select(index,animate=true){
+        cancelAnimationFrame(frame);frame=0;selected=index;renderSelection();
+        $('.mq-located').textContent='7 / 7 轮已定位';
+        if(!drawing.length){renderDiagram();return;}
+        const targets=configs.map((c,i)=>c.numbers.indexOf(records[index].values[i])/c.numbers.length);
+        const start=positions.slice(),dist=targets.map((t,i)=>mod(t-start[i]));
+        drawing.forEach((d,i)=>{d.marker.g.setAttribute('visibility','visible');d.marker.text.textContent=String(records[index].values[i]);d.marker.g.parentNode.querySelector('.mq-wheel-value').textContent=String(records[index].values[i]);});
+        function paint(t){
+          drawing.forEach((d,i)=>{positions[i]=start[i]+dist[i]*t;const p=point(d.w,positions[i]);d.marker.g.setAttribute('transform',`translate(${p.x} ${p.y})`);d.marker.text.textContent=t<1&&dist[i]>.001?'·':String(records[index].values[i]);});
+        }
+        if(!animate||reduce.matches||dist.every(d=>d<.001)){paint(1);return;}
+        $('.mq-located').textContent='正在定位…';animationStart=performance.now();
+        function step(now){const t=Math.min(1,(now-animationStart)/820);paint(t*t*(3-2*t));if(t<1)frame=requestAnimationFrame(step);else{frame=0;$('.mq-located').textContent='7 / 7 轮已定位';}}
+        frame=requestAnimationFrame(step);
+      }
+      records.forEach((record,index)=>{
+        const b=make('button','mq-record',null,$('.mq-record-list'));b.type='button';b.setAttribute('aria-pressed',String(index===0));
+        make('span','mq-code',record.code,b);const meta=make('span','mq-record-meta',null,b);make('span','',record.time,meta);make('span','',`三号轮 · ${record.values[2]}`,meta);
+        b.addEventListener('click',()=>{select(index);$('.mq-search-status').textContent='已切换至 '+record.code+' 的示例定位。';$('.mq-search-status').dataset.error='false';});
+        const row=make('tr','mq-data-row',null,$('tbody'));make('td','',record.time,row);make('td','',record.code,row);record.values.forEach(v=>make('td','',String(v),row));const cell=make('td','',null,row);const pick=make('button','mq-table-select','定位',cell);pick.type='button';pick.addEventListener('click',()=>select(index));
+      });
+      configs.forEach(w=>{const el=make('div','mq-readout',null,$('.mq-readouts'));make('span','',w.name,el);make('strong','',null,el);});
+      for(let n=1;n<=8;n++){const slot=make('span','mq-slot',String(n),$('.mq-slots'));slot.dataset.hit=String(seen.has(n));slot.setAttribute('aria-label',`${n}号模盒，${seen.has(n)?'已扫码':'未扫码'}`);}
+      $('.mq-search').addEventListener('submit',event=>{
+        event.preventDefault();const query=$('#mq-qrcode').value.trim().toUpperCase();
+        const index=query?records.findIndex(record=>record.code.includes(query)):-1;
+        $('.mq-search-status').dataset.error=String(index<0);
+        if(index<0){$('.mq-search-status').textContent=query?'未找到示例记录，可输入 MH-03001 至 MH-03004。':'请输入二维码后查询。';return;}
+        select(index);$('.mq-search-status').textContent='已找到 '+records[index].code+' · 示例记录时间 '+records[index].time;
+      });
+      $('[data-action="clear"]').addEventListener('click',()=>{$('#mq-qrcode').value='';$('.mq-search-status').dataset.error='false';$('.mq-search-status').textContent='输入示例二维码后查询。';$('#mq-qrcode').focus();});
+      $('[data-action="reset"]').addEventListener('click',()=>{cancelAnimationFrame(frame);frame=0;selected=null;renderSelection();drawing.forEach(d=>{d.marker.g.setAttribute('visibility','hidden');d.marker.g.parentNode.querySelector('.mq-wheel-value').textContent='—';});$('.mq-located').textContent='等待选择记录';});
+      function renderStyle(){root.dataset.style=styleState.variant;$$('[data-variant]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.variant===styleState.variant)));renderDiagram();}
+      $$('[data-variant]').forEach(b=>b.addEventListener('click',()=>{styleState.variant=b.dataset.variant;renderStyle();}));
+      renderSelection();renderStyle();
+      let lastWidth=$('.mq-diagram-area').clientWidth;
+      new ResizeObserver(entries=>{const width=entries[0].target.clientWidth;if(Math.abs(width-lastWidth)>1){lastWidth=width;renderDiagram();}}).observe($('.mq-diagram-area'));
+      reduce.addEventListener('change',()=>{if(reduce.matches&&selected!==null)select(selected,false);});
+      if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:renderStyle});tweak.addSelect(styleState,'variant',{label:'界面风格',options:[{label:'A · 简洁蓝白',value:'clean'},{label:'B · 深色工控',value:'control'},{label:'C · 紧凑工作台',value:'dense'}]});tweak.addToggle(styleState,'depth',{label:'转台立体层次'});}
+    })();
+  </script>
+</div>

@@ -1,0 +1,1711 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>盒模轨迹查询 · 三套风格预览</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe sandbox="allow-scripts" referrerpolicy="no-referrer" title="盒模轨迹查询 · 三套风格预览" srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;盒模轨迹查询 · 三套风格预览&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: pointer;
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+#widget &gt; :not(.card, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .btn,
+  .nav-link,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;div id=&quot;mold-query-styles&quot; data-style=&quot;clean&quot; aria-label=&quot;盒模轨迹查询 · 三套风格预览&quot;&gt;
+  &lt;style&gt;
+    #mold-query-styles{--mq-page:light-dark(#f2f5fa,#121c2b);--mq-panel:light-dark(#ffffff,#1b293b);--mq-canvas:light-dark(#f8faff,#162334);--mq-ink:light-dark(#20314c,#e5edf9);--mq-muted:light-dark(#62738c,#a3b4ca);--mq-line:light-dark(#dfe6f0,#344458);--mq-accent:light-dark(#315ce5,#91acff);--mq-soft:light-dark(#eaf0ff,#263d67);--mq-on:light-dark(#ffffff,#12223e);--mq-good:light-dark(#197754,#78d8b6);--mq-good-soft:light-dark(#eaf7f0,#203f39);--mq-track:light-dark(#c5d2e8,#536980);--mq-edge:light-dark(#dce5f3,#344b62);--mq-radius:12px;color:var(--mq-ink);font-family:Inter,&quot;Microsoft YaHei&quot;,&quot;PingFang SC&quot;,sans-serif;font-size:14px;line-height:1.5;color-scheme:light}
+    #mold-query-styles *{box-sizing:border-box}
+    #mold-query-styles [hidden]{display:none!important}
+    #mold-query-styles button,#mold-query-styles input{font:inherit;color:inherit}
+    #mold-query-styles button{cursor:pointer}
+    #mold-query-styles h2,#mold-query-styles h3,#mold-query-styles p{margin:0}
+    #mold-query-styles strong,#mold-query-styles h2,#mold-query-styles h3{font-weight:500}
+    #mold-query-styles .mq-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px}
+    #mold-query-styles .mq-choice{display:flex;gap:12px;align-items:center;padding:14px;text-align:left;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:10px;min-width:0}
+    #mold-query-styles .mq-choice[aria-pressed=&quot;true&quot;]{border-color:var(--mq-accent);box-shadow:inset 0 0 0 1px var(--mq-accent);background:var(--mq-soft)}
+    #mold-query-styles .mq-choice strong{display:block;font-size:14px}
+    #mold-query-styles .mq-choice small{display:block;color:var(--mq-muted);font-size:11px;margin-top:3px}
+    #mold-query-styles .mq-swatch{display:block;width:31px;height:35px;flex:none;border-radius:5px;border:1px solid #bac8db;background:linear-gradient(90deg,#eaf0ff 28%,#fff 28%);position:relative}
+    #mold-query-styles .mq-swatch:after{content:&quot;&quot;;position:absolute;left:12px;right:4px;top:10px;height:11px;border:2px solid #4168de;border-radius:50%}
+    #mold-query-styles .mq-swatch-dark{background:linear-gradient(#223344 22%,#0e1b2a 22%);border-color:#3d556d}
+    #mold-query-styles .mq-swatch-dark:after{left:5px;border-color:#73d6f3}
+    #mold-query-styles .mq-swatch-dense{background:repeating-linear-gradient(#f7fbf8 0 5px,#d4e7dd 5px 6px);border-color:#a7c8b7}
+    #mold-query-styles .mq-swatch-dense:after{border-color:#277c62}
+    #mold-query-styles .mq-app{background:var(--mq-page);border:1px solid var(--mq-line);border-radius:var(--mq-radius);overflow:hidden}
+    #mold-query-styles .mq-header{padding:19px 22px;background:var(--mq-panel);border-bottom:1px solid var(--mq-line);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    #mold-query-styles .mq-brand{display:flex;gap:11px;align-items:center}
+    #mold-query-styles .mq-mark{width:37px;height:37px;display:grid;place-items:center;background:var(--mq-accent);color:var(--mq-on);border-radius:10px}
+    #mold-query-styles .mq-mark i{width:20px;height:20px}
+    #mold-query-styles .mq-header h2{font-size:19px;letter-spacing:.3px}
+    #mold-query-styles .mq-eyebrow{font-size:11px;color:var(--mq-muted);letter-spacing:1.2px}
+    #mold-query-styles .mq-top-meta{display:flex;align-items:center;gap:16px;font-size:12px;color:var(--mq-muted)}
+    #mold-query-styles .mq-preview-label{border:1px solid var(--mq-line);padding:4px 8px;border-radius:5px;white-space:nowrap}
+    #mold-query-styles .mq-body{padding:18px;display:grid;grid-template-columns:208px minmax(0,1fr);gap:16px;align-items:start}
+    #mold-query-styles .mq-search{grid-column:1/-1;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius);padding:16px 18px}
+    #mold-query-styles .mq-search-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;flex-wrap:wrap}
+    #mold-query-styles .mq-search-top label{font-weight:500}
+    #mold-query-styles .mq-hint{font-size:11px;color:var(--mq-muted)}
+    #mold-query-styles .mq-input-row{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+    #mold-query-styles .mq-input-wrap{flex:1;min-width:160px;position:relative}
+    #mold-query-styles .mq-input-wrap&gt;i,#mold-query-styles .mq-input-wrap&gt;svg{position:absolute;left:12px;top:13px;width:17px;height:17px;color:var(--mq-muted);pointer-events:none}
+    #mold-query-styles .mq-input-wrap input{width:100%;height:44px;border:1px solid var(--mq-line);border-radius:7px;background:var(--mq-canvas);padding:10px 12px 10px 38px;min-width:0;font-size:14px}
+    #mold-query-styles .mq-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 14px;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:7px;white-space:nowrap}
+    #mold-query-styles .mq-button-main{background:var(--mq-accent);border-color:var(--mq-accent);color:var(--mq-on)}
+    #mold-query-styles .mq-button-small{padding:5px 9px;font-size:11px}
+    #mold-query-styles .mq-button svg{width:15px;height:15px}
+    #mold-query-styles .mq-search-status{font-size:11px;color:var(--mq-muted);margin-top:8px;min-height:17px}
+    #mold-query-styles .mq-search-status[data-error=&quot;true&quot;]{color:light-dark(#ae3737,#ffaaaa)}
+    #mold-query-styles .mq-sidebar{display:grid;gap:14px;min-width:0}
+    #mold-query-styles .mq-inspection,#mold-query-styles .mq-history{background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius);padding:15px}
+    #mold-query-styles .mq-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:13px}
+    #mold-query-styles h3{font-size:13px}
+    #mold-query-styles .mq-count{font-size:12px;font-variant-numeric:tabular-nums;color:var(--mq-accent)}
+    #mold-query-styles .mq-slots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+    #mold-query-styles .mq-slot{height:32px;display:grid;place-items:center;border-radius:5px;background:var(--mq-canvas);border:1px solid var(--mq-line);color:var(--mq-muted);font-size:12px;position:relative}
+    #mold-query-styles .mq-slot[data-hit=&quot;true&quot;]{background:var(--mq-good-soft);border-color:var(--mq-good);color:var(--mq-good)}
+    #mold-query-styles .mq-slot[data-hit=&quot;true&quot;]:after{content:&quot;✓&quot;;position:absolute;right:2px;top:0;font-size:10px}
+    #mold-query-styles .mq-inspection-note{margin-top:10px;display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--mq-muted)}
+    #mold-query-styles .mq-meter{height:4px;background:var(--mq-line);margin-top:11px;border-radius:3px;overflow:hidden}
+    #mold-query-styles .mq-meter&gt;span{display:block;width:50%;height:100%;background:var(--mq-good)}
+    #mold-query-styles .mq-record-list{display:grid;gap:6px}
+    #mold-query-styles .mq-record{display:block;width:100%;text-align:left;padding:10px 9px;background:var(--mq-panel);border:1px solid transparent;border-radius:7px;min-width:0}
+    #mold-query-styles .mq-record[aria-pressed=&quot;true&quot;]{background:var(--mq-soft);border-color:var(--mq-accent)}
+    #mold-query-styles .mq-code{font-size:12px;display:block;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+    #mold-query-styles .mq-record-meta{display:flex;justify-content:space-between;gap:5px;font-size:11px;color:var(--mq-muted);margin-top:5px}
+    #mold-query-styles .mq-history-foot{padding-top:12px;font-size:11px;color:var(--mq-muted)}
+    #mold-query-styles .mq-stage{min-width:0;overflow:hidden;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius)}
+    #mold-query-styles .mq-stage-head{padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--mq-line)}
+    #mold-query-styles .mq-stage-title{display:flex;align-items:center;gap:8px}
+    #mold-query-styles .mq-stage-title i,#mold-query-styles .mq-stage-title svg{color:var(--mq-accent);width:18px;height:18px}
+    #mold-query-styles .mq-stage-title h3{font-size:15px}
+    #mold-query-styles .mq-selection{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 18px;background:var(--mq-canvas);flex-wrap:wrap}
+    #mold-query-styles .mq-selected-code{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+    #mold-query-styles .mq-selection-label{font-size:11px;color:var(--mq-muted);margin-right:7px}
+    #mold-query-styles .mq-located{font-size:11px;color:var(--mq-good);display:flex;align-items:center;gap:5px;white-space:nowrap}
+    #mold-query-styles .mq-located:before{content:&quot;&quot;;width:5px;height:5px;border-radius:50%;background:currentColor}
+    #mold-query-styles .mq-diagram-area{background:var(--mq-canvas);padding:8px 8px 0;min-width:0}
+    #mold-query-styles .mq-diagram{display:block;width:100%;height:auto;overflow:visible}
+    #mold-query-styles .mq-diagram text{font-family:inherit;font-weight:400;text-anchor:middle;dominant-baseline:middle;fill:var(--mq-ink);font-size:12px}
+    #mold-query-styles .mq-diagram .mq-wheel-title{font-weight:500;font-size:13px}
+    #mold-query-styles .mq-diagram .mq-wheel-value{font-weight:500;fill:var(--mq-accent);font-size:14px}
+    #mold-query-styles .mq-diagram .mq-wheel-detail{fill:var(--mq-muted);font-size:11px}
+    #mold-query-styles .mq-wheel-face{fill:var(--mq-panel);stroke:var(--mq-line);stroke-width:1}
+    #mold-query-styles .mq-wheel-edge{fill:var(--mq-edge)}
+    #mold-query-styles .mq-wheel-track{fill:none;stroke:var(--mq-track);stroke-width:1.2}
+    #mold-query-styles .mq-wheel-spoke{stroke:var(--mq-line);stroke-width:1;fill:none}
+    #mold-query-styles .mq-station-face{fill:var(--mq-panel);stroke:var(--mq-track);stroke-width:1}
+    #mold-query-styles .mq-diagram .mq-station-number{fill:var(--mq-muted);font-size:11px}
+    #mold-query-styles .mq-marker-face{fill:var(--mq-accent);stroke:var(--mq-accent);stroke-width:1}
+    #mold-query-styles .mq-diagram .mq-marker-number{fill:var(--mq-on);font-weight:500;font-size:12px}
+    #mold-query-styles .mq-marker-halo{fill:var(--mq-accent);opacity:.13}
+    #mold-query-styles .mq-diagram-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 18px 15px;font-size:11px;color:var(--mq-muted);background:var(--mq-canvas)}
+    #mold-query-styles .mq-legend{display:flex;align-items:center;gap:6px}
+    #mold-query-styles .mq-legend:before{content:&quot;&quot;;width:9px;height:9px;border-radius:2px;background:var(--mq-accent)}
+    #mold-query-styles .mq-readouts{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--mq-line)}
+    #mold-query-styles .mq-readout{display:grid;gap:4px;text-align:center;padding:13px 2px;border-right:1px solid var(--mq-line)}
+    #mold-query-styles .mq-readout:last-child{border-right:0}
+    #mold-query-styles .mq-readout:first-child{background:var(--mq-soft)}
+    #mold-query-styles .mq-readout span{color:var(--mq-muted);font-size:11px}
+    #mold-query-styles .mq-readout strong{font-variant-numeric:tabular-nums;font-size:17px;color:var(--mq-accent)}
+    #mold-query-styles .mq-records-table{grid-column:1/-1;background:var(--mq-panel);border:1px solid var(--mq-line);border-radius:var(--mq-radius);padding:14px 16px;display:none;min-width:0}
+    #mold-query-styles .mq-table-scroll{overflow:auto}
+    #mold-query-styles table{width:100%;border-collapse:collapse;text-align:left;font-size:12px;white-space:nowrap}
+    #mold-query-styles th{font-weight:400;color:var(--mq-muted);font-size:11px;padding:8px;border-bottom:1px solid var(--mq-line)}
+    #mold-query-styles td{padding:8px;border-bottom:1px solid var(--mq-line);font-variant-numeric:tabular-nums}
+    #mold-query-styles tr:last-child td{border-bottom:0}
+    #mold-query-styles tr[data-selected=&quot;true&quot;]{background:var(--mq-soft)}
+    #mold-query-styles .mq-table-select{border:0;background:transparent;color:var(--mq-accent);padding:3px 0;white-space:nowrap}
+    #mold-query-styles .mq-app-foot{padding:0 20px 15px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--mq-muted);font-size:11px}
+    #mold-query-styles[data-style=&quot;control&quot;]{color-scheme:dark;--mq-page:#0c1521;--mq-panel:#142232;--mq-canvas:#0f1c2b;--mq-ink:#e5f0fd;--mq-muted:#9cb0c6;--mq-line:#2b4055;--mq-accent:#6cd8f3;--mq-soft:#193e50;--mq-on:#09232c;--mq-good:#80ddba;--mq-good-soft:#203d36;--mq-track:#48657c;--mq-edge:#213a50;--mq-radius:6px}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-body{grid-template-columns:minmax(0,1fr)}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-sidebar{grid-row:3;grid-template-columns:240px minmax(0,1fr)}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-stage{grid-row:2}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-record-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-history-foot{display:none}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-header{border-top:3px solid var(--mq-accent);padding-top:16px}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-mark{border-radius:4px}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-diagram-area{background-image:linear-gradient(var(--mq-line) 1px,transparent 1px),linear-gradient(90deg,var(--mq-line) 1px,transparent 1px);background-size:32px 32px;background-blend-mode:soft-light}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-readout strong{font-size:22px}
+    #mold-query-styles[data-style=&quot;control&quot;] .mq-readout{padding:10px 2px}
+    #mold-query-styles[data-style=&quot;dense&quot;]{--mq-page:light-dark(#f3f6f4,#14221d);--mq-panel:light-dark(#ffffff,#1a2c25);--mq-canvas:light-dark(#fafcfb,#172720);--mq-ink:light-dark(#233d32,#deede5);--mq-muted:light-dark(#63786d,#a8bfb2);--mq-line:light-dark(#dce6df,#355447);--mq-accent:light-dark(#16765a,#80d7b6);--mq-soft:light-dark(#e8f4ee,#234e3d);--mq-on:light-dark(#ffffff,#153628);--mq-track:light-dark(#bfd0c5,#537361);--mq-edge:light-dark(#dce8e0,#355744);--mq-radius:4px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-header{padding:12px 18px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-header h2{font-size:17px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-eyebrow{display:none}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-mark{width:29px;height:29px;border-radius:4px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-body{grid-template-columns:180px minmax(0,1fr);padding:12px;gap:10px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-search{padding:11px 14px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-search-top{margin-bottom:6px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-sidebar{gap:10px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-inspection,#mold-query-styles[data-style=&quot;dense&quot;] .mq-history{padding:11px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-record{padding:6px;border-radius:3px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-history-foot{display:none}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-stage-head{padding:11px 14px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-selection{padding:9px 14px}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-readouts{display:none}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-records-table{display:block}
+    #mold-query-styles[data-style=&quot;dense&quot;] .mq-app-foot{padding:0 14px 12px}
+    @media(max-width:760px){
+      #mold-query-styles .mq-body{grid-template-columns:minmax(0,1fr)!important;padding:12px;gap:12px}
+      #mold-query-styles .mq-sidebar{grid-row:3;grid-template-columns:185px minmax(0,1fr)}
+      #mold-query-styles .mq-stage{grid-row:2}
+      #mold-query-styles[data-style=&quot;control&quot;] .mq-sidebar{grid-template-columns:185px minmax(0,1fr)}
+      #mold-query-styles[data-style=&quot;control&quot;] .mq-record-list{grid-template-columns:minmax(0,1fr)}
+      #mold-query-styles .mq-choice{padding:11px 9px;gap:7px}
+      #mold-query-styles .mq-choice small{font-size:11px}
+      #mold-query-styles .mq-swatch{display:none}
+      #mold-query-styles .mq-record-list{gap:2px}
+      #mold-query-styles .mq-record{padding:6px 8px}
+      #mold-query-styles .mq-history-foot{display:none}
+    }
+    @media(max-width:460px){
+      #mold-query-styles .mq-choices{gap:5px;margin-bottom:10px}
+      #mold-query-styles .mq-choice{padding:10px 6px;display:block}
+      #mold-query-styles .mq-choice strong{font-size:12px}
+      #mold-query-styles .mq-choice small{display:none}
+      #mold-query-styles .mq-header{padding:14px 12px;gap:10px}
+      #mold-query-styles .mq-top-meta{font-size:11px;gap:9px}
+      #mold-query-styles .mq-header h2{font-size:17px}
+      #mold-query-styles .mq-body{padding:9px}
+      #mold-query-styles .mq-search{padding:12px}
+      #mold-query-styles .mq-input-wrap{flex-basis:100%}
+      #mold-query-styles .mq-input-wrap input{font-size:16px}
+      #mold-query-styles .mq-input-row&gt;.mq-button{flex:1}
+      #mold-query-styles .mq-sidebar,#mold-query-styles[data-style=&quot;control&quot;] .mq-sidebar{grid-template-columns:minmax(0,1fr)}
+      #mold-query-styles .mq-slots{grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+      #mold-query-styles .mq-record-list,#mold-query-styles[data-style=&quot;control&quot;] .mq-record-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+      #mold-query-styles .mq-stage-head{padding:12px}
+      #mold-query-styles .mq-selection{padding:10px 12px}
+      #mold-query-styles .mq-readouts{grid-template-columns:repeat(4,minmax(0,1fr))}
+      #mold-query-styles .mq-readout{border-bottom:1px solid var(--mq-line)}
+      #mold-query-styles .mq-diagram-footer{padding:10px 12px}
+    }
+    @media(pointer:coarse){#mold-query-styles button{min-height:44px}}
+  &lt;/style&gt;
+  &lt;div class=&quot;mq-choices&quot; role=&quot;group&quot; aria-label=&quot;切换风格模板&quot;&gt;
+    &lt;button class=&quot;mq-choice&quot; type=&quot;button&quot; data-variant=&quot;clean&quot; aria-pressed=&quot;true&quot;&gt;&lt;span class=&quot;mq-swatch&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;&lt;span&gt;&lt;strong&gt;A · 简洁蓝白&lt;/strong&gt;&lt;small&gt;清晰留白 · 日常查询&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+    &lt;button class=&quot;mq-choice&quot; type=&quot;button&quot; data-variant=&quot;control&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;mq-swatch mq-swatch-dark&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;&lt;span&gt;&lt;strong&gt;B · 深色工控&lt;/strong&gt;&lt;small&gt;轨迹大图 · 车间展示&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+    &lt;button class=&quot;mq-choice&quot; type=&quot;button&quot; data-variant=&quot;dense&quot; aria-pressed=&quot;false&quot;&gt;&lt;span class=&quot;mq-swatch mq-swatch-dense&quot; aria-hidden=&quot;true&quot;&gt;&lt;/span&gt;&lt;span&gt;&lt;strong&gt;C · 紧凑工作台&lt;/strong&gt;&lt;small&gt;图表对照 · 高频核查&lt;/small&gt;&lt;/span&gt;&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;section class=&quot;mq-app&quot; aria-label=&quot;盒模轨迹查询界面&quot;&gt;
+    &lt;header class=&quot;mq-header&quot;&gt;
+      &lt;div class=&quot;mq-brand&quot;&gt;&lt;div class=&quot;mq-mark&quot;&gt;&lt;i data-lucide=&quot;scan-line&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/div&gt;&lt;div&gt;&lt;h2&gt;盒模轨迹查询&lt;/h2&gt;&lt;p class=&quot;mq-eyebrow&quot;&gt;MOLD TRAJECTORY&lt;/p&gt;&lt;/div&gt;&lt;/div&gt;
+      &lt;div class=&quot;mq-top-meta&quot;&gt;&lt;span&gt;七轮联动定位&lt;/span&gt;&lt;span class=&quot;mq-preview-label&quot;&gt;风格预览 · 示例数据&lt;/span&gt;&lt;/div&gt;
+    &lt;/header&gt;
+    &lt;div class=&quot;mq-body&quot;&gt;
+      &lt;form class=&quot;mq-search&quot; aria-label=&quot;查询示例二维码&quot;&gt;
+        &lt;div class=&quot;mq-search-top&quot;&gt;&lt;label for=&quot;mq-qrcode&quot;&gt;二维码查询&lt;/label&gt;&lt;span class=&quot;mq-hint&quot;&gt;输入或扫描二维码 · Enter 查询&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;mq-input-row&quot;&gt;&lt;div class=&quot;mq-input-wrap&quot;&gt;&lt;i data-lucide=&quot;scan-barcode&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;input id=&quot;mq-qrcode&quot; autocomplete=&quot;off&quot; placeholder=&quot;输入二维码或编号，例如 03001&quot; value=&quot;MH-03001&quot; maxlength=&quot;100&quot;&gt;&lt;/div&gt;&lt;button class=&quot;mq-button mq-button-main&quot; type=&quot;submit&quot;&gt;&lt;i data-lucide=&quot;search&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;查询定位&lt;/button&gt;&lt;button class=&quot;mq-button&quot; type=&quot;button&quot; data-action=&quot;clear&quot;&gt;清空&lt;/button&gt;&lt;/div&gt;
+        &lt;p class=&quot;mq-search-status&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;已找到示例记录，可点击查询记录切换定位。&lt;/p&gt;
+      &lt;/form&gt;
+      &lt;aside class=&quot;mq-sidebar&quot; aria-label=&quot;检验进度与查询记录&quot;&gt;
+        &lt;section class=&quot;mq-inspection&quot;&gt;&lt;div class=&quot;mq-section-title&quot;&gt;&lt;h3&gt;三号轮 · 八盒检验&lt;/h3&gt;&lt;span class=&quot;mq-count mq-progress&quot;&gt;4 / 8&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;mq-slots&quot; aria-label=&quot;三号轮编号一至八的检验状态&quot;&gt;&lt;/div&gt;&lt;div class=&quot;mq-meter&quot; aria-hidden=&quot;true&quot;&gt;&lt;span&gt;&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;mq-inspection-note&quot;&gt;&lt;span class=&quot;mq-round&quot;&gt;第 1 轮检验&lt;/span&gt;&lt;span&gt;✓ 已扫码&lt;/span&gt;&lt;/div&gt;&lt;/section&gt;
+        &lt;section class=&quot;mq-history&quot;&gt;&lt;div class=&quot;mq-section-title&quot;&gt;&lt;h3&gt;查询记录&lt;/h3&gt;&lt;span class=&quot;mq-count&quot;&gt;4 条&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;mq-record-list&quot;&gt;&lt;/div&gt;&lt;div class=&quot;mq-history-foot&quot;&gt;点击记录，查看对应轮位&lt;/div&gt;&lt;/section&gt;
+      &lt;/aside&gt;
+      &lt;section class=&quot;mq-stage&quot; aria-label=&quot;七轮定位图&quot;&gt;
+        &lt;header class=&quot;mq-stage-head&quot;&gt;&lt;div class=&quot;mq-stage-title&quot;&gt;&lt;i data-lucide=&quot;orbit&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;h3&gt;轮模盒 · 运动轨迹&lt;/h3&gt;&lt;/div&gt;&lt;button class=&quot;mq-button mq-button-small&quot; type=&quot;button&quot; data-action=&quot;reset&quot;&gt;重置高亮&lt;/button&gt;&lt;/header&gt;
+        &lt;div class=&quot;mq-selection&quot;&gt;&lt;div&gt;&lt;span class=&quot;mq-selection-label&quot;&gt;当前二维码&lt;/span&gt;&lt;strong class=&quot;mq-selected-code&quot;&gt;MH-03001&lt;/strong&gt;&lt;/div&gt;&lt;span class=&quot;mq-located&quot; role=&quot;status&quot; aria-live=&quot;polite&quot;&gt;7 / 7 轮已定位&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;mq-diagram-area&quot;&gt;&lt;svg class=&quot;mq-diagram&quot; role=&quot;img&quot; aria-label=&quot;一号轮位于左侧，二三号轮在左下，四五号轮在上方，六号轮在右下，八号轮在右上。一号轮仅含编号1和2。&quot;&gt;&lt;/svg&gt;&lt;/div&gt;
+        &lt;div class=&quot;mq-diagram-footer&quot;&gt;&lt;span class=&quot;mq-legend&quot;&gt;实色模盒 · 当前定位&lt;/span&gt;&lt;span&gt;工位固定 · 高亮顺时针移动&lt;/span&gt;&lt;/div&gt;
+        &lt;div class=&quot;mq-readouts&quot; aria-label=&quot;各轮当前模盒编号&quot;&gt;&lt;/div&gt;
+      &lt;/section&gt;
+      &lt;section class=&quot;mq-records-table&quot; aria-label=&quot;各轮编号记录对照&quot;&gt;&lt;div class=&quot;mq-section-title&quot;&gt;&lt;h3&gt;记录与轮位对照&lt;/h3&gt;&lt;span class=&quot;mq-hint&quot;&gt;按记录时间倒序&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;mq-table-scroll&quot;&gt;&lt;table&gt;&lt;thead&gt;&lt;tr&gt;&lt;th scope=&quot;col&quot;&gt;记录时间&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;二维码&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;一号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;二号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;三号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;四号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;五号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;六号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;八号&lt;/th&gt;&lt;th scope=&quot;col&quot;&gt;操作&lt;/th&gt;&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;&lt;/section&gt;
+    &lt;/div&gt;
+    &lt;footer class=&quot;mq-app-foot&quot;&gt;&lt;span&gt;一号轮编号：1、2&lt;/span&gt;&lt;span&gt;示例轮位 · 其余轮编号范围以正式配置为准&lt;/span&gt;&lt;/footer&gt;
+  &lt;/section&gt;
+  &lt;script&gt;
+    (()=&gt;{
+      const root=document.getElementById(&#x27;mold-query-styles&#x27;);
+      const $=s=&gt;root.querySelector(s), $$=s=&gt;Array.from(root.querySelectorAll(s));
+      const styleState={variant:&#x27;clean&#x27;,depth:true};
+      const ns=&#x27;http://www.w3.org/2000/svg&#x27;, reduce=matchMedia(&#x27;(prefers-reduced-motion: reduce)&#x27;);
+      // Only presentation data; no production APIs or stored configuration are changed.
+      // Wheel one has exactly two explicit, valid identifiers in every demo record.
+      const configs=[
+        {id:1,name:&#x27;一号轮&#x27;,numbers:[1,2],cx:58,cy:285,rx:35,ry:83,rotation:20},
+        {id:2,name:&#x27;二号轮&#x27;,numbers:[1,2,3,4,5,6],cx:201,cy:286,rx:88,ry:54,rotation:0},
+        {id:3,name:&#x27;三号轮&#x27;,numbers:[1,2,3,4,5,6,7,8],cx:390,cy:293,rx:88,ry:54,rotation:0},
+        {id:4,name:&#x27;四号轮&#x27;,numbers:[1,2,3,4,5,6],cx:497,cy:144,rx:96,ry:57,rotation:0},
+        {id:5,name:&#x27;五号轮&#x27;,numbers:[1,2,3,4,5,6],cx:704,cy:144,rx:89,ry:54,rotation:0},
+        {id:6,name:&#x27;六号轮&#x27;,numbers:[1,2,3,4,5,6],cx:789,cy:327,rx:91,ry:54,rotation:0},
+        {id:8,name:&#x27;八号轮&#x27;,numbers:[1,2,3,4,5,6],cx:902,cy:146,rx:83,ry:54,rotation:0}
+      ];
+      const records=[
+        {code:&#x27;MH-03001&#x27;,time:&#x27;14:32:08&#x27;,values:[1,3,4,2,5,3,6]},
+        {code:&#x27;MH-03002&#x27;,time:&#x27;14:31:46&#x27;,values:[2,5,1,4,2,6,3]},
+        {code:&#x27;MH-03003&#x27;,time:&#x27;14:31:20&#x27;,values:[1,2,6,1,4,2,5]},
+        {code:&#x27;MH-03004&#x27;,time:&#x27;14:30:57&#x27;,values:[2,4,2,6,3,5,1]}
+      ];
+      let selected=0, drawing=[],frame=0,animationStart=0;
+      const seen=new Set([1,2,4,6]);
+      const positions=configs.map((w,i)=&gt;w.numbers.indexOf(records[0].values[i])/w.numbers.length);
+      const mod=v=&gt;((v%1)+1)%1;
+      function make(tag,cls,text,parent){const el=document.createElement(tag);if(cls)el.className=cls;if(text!=null)el.textContent=text;if(parent)parent.appendChild(el);return el;}
+      function svg(tag,attrs,parent){const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(parent)parent.appendChild(el);return el;}
+      function label(text,x,y,cls,parent){const el=svg(&#x27;text&#x27;,{x,y,class:cls},parent);el.textContent=text;return el;}
+      function point(w,f){const a=f*Math.PI*2-Math.PI/2,r=w.rotation*Math.PI/180,x=w.rx*Math.cos(a),y=w.ry*Math.sin(a);return{x:w.cx+x*Math.cos(r)-y*Math.sin(r),y:w.cy+x*Math.sin(r)+y*Math.cos(r)};}
+      function tile(parent,p,value,active){const g=svg(&#x27;g&#x27;,{transform:`translate(${p.x} ${p.y})`},parent);if(active)svg(&#x27;rect&#x27;,{x:-18,y:-17,width:36,height:34,rx:9,class:&#x27;mq-marker-halo&#x27;},g);svg(&#x27;rect&#x27;,{x:-11,y:-11,width:22,height:22,rx:4,class:active?&#x27;mq-marker-face&#x27;:&#x27;mq-station-face&#x27;},g);const text=label(value,0,1,active?&#x27;mq-marker-number&#x27;:&#x27;mq-station-number&#x27;,g);return {g,text};}
+      function renderDiagram(){
+        cancelAnimationFrame(frame);frame=0;
+        const host=$(&#x27;.mq-diagram-area&#x27;), diagram=$(&#x27;.mq-diagram&#x27;);
+        const width=Math.max(220,Math.round(host.clientWidth-16));
+        const compact=width&lt;570;
+        const cols=width&lt;360?1:2;
+        const height=compact?Math.ceil(configs.length/cols)*174+14:Math.max(315,width*.46);
+        diagram.setAttribute(&#x27;viewBox&#x27;,`0 0 ${width} ${height}`);diagram.style.height=height+&#x27;px&#x27;;
+        diagram.replaceChildren();drawing=[];
+        svg(&#x27;title&#x27;,{},diagram).textContent=&#x27;七轮模盒定位示意，一号轮仅有编号1和2&#x27;;
+        if(compact)label(&#x27;窄屏轮位分组&#x27;,width/2,10,&#x27;mq-wheel-detail&#x27;,diagram);
+        configs.forEach((config,index)=&gt;{
+          let w;
+          if(compact){const cell=width/cols;w={...config,cx:cell*(index%cols+.5),cy:Math.floor(index/cols)*174+98,rx:config.id===1?25:Math.min(62,cell*.33),ry:config.id===1?46:37,rotation:config.id===1?20:0};}
+          else{const scale=(width-30)/1000;w={...config,cx:15+config.cx*scale,cy:config.cy/430*(height-12)+4,rx:Math.max(config.id===1?20:45,config.rx*scale),ry:config.id===1?56:Math.max(30,config.ry*scale)};}
+          const g=svg(&#x27;g&#x27;,{&#x27;data-wheel&#x27;:w.id},diagram);
+          const r=`rotate(${w.rotation} ${w.cx} ${w.cy})`;
+          if(styleState.depth)svg(&#x27;ellipse&#x27;,{cx:w.cx,cy:w.cy+7,rx:w.rx+7,ry:w.ry+7,transform:r,class:&#x27;mq-wheel-edge&#x27;},g);
+          svg(&#x27;ellipse&#x27;,{cx:w.cx,cy:w.cy,rx:w.rx+7,ry:w.ry+7,transform:r,class:&#x27;mq-wheel-face&#x27;},g);
+          svg(&#x27;ellipse&#x27;,{cx:w.cx,cy:w.cy,rx:w.rx,ry:w.ry,transform:r,class:&#x27;mq-wheel-track&#x27;},g);
+          config.numbers.forEach((n,i)=&gt;{const p=point(w,i/config.numbers.length);svg(&#x27;line&#x27;,{x1:w.cx,y1:w.cy,x2:p.x,y2:p.y,class:&#x27;mq-wheel-spoke&#x27;},g);});
+          svg(&#x27;ellipse&#x27;,{cx:w.cx,cy:w.cy,rx:w.id===1?13:26,ry:17,class:&#x27;mq-wheel-face&#x27;},g);
+          let titleX=w.cx,titleY=w.cy-w.ry-30;
+          if(!compact&amp;&amp;w.id===1)titleY=w.cy-w.ry-46;
+          label(w.name,titleX,titleY,&#x27;mq-wheel-title&#x27;,g);
+          if(w.id===1)label(&#x27;仅 1 / 2&#x27;,titleX,titleY+18,&#x27;mq-wheel-detail&#x27;,g);
+          config.numbers.forEach((n,i)=&gt;{const t=tile(g,point(w,i/config.numbers.length),String(n),false);svg(&#x27;title&#x27;,{},t.g).textContent=w.name+&#x27; · 模盒 &#x27;+n;});
+          const value=selected===null?&#x27;—&#x27;:String(records[selected].values[index]);
+          label(value,w.cx,w.cy,&#x27;mq-wheel-value&#x27;,g);
+          const target=selected===null?0:config.numbers.indexOf(records[selected].values[index])/config.numbers.length;
+          positions[index]=target;
+          const marker=tile(g,point(w,target),value,true);
+          marker.g.setAttribute(&#x27;visibility&#x27;,selected===null?&#x27;hidden&#x27;:&#x27;visible&#x27;);
+          drawing.push({w,marker});
+        });
+        if(selected!==null)$(&#x27;.mq-located&#x27;).textContent=&#x27;7 / 7 轮已定位&#x27;;
+      }
+      function renderSelection(){
+        $$(&#x27;.mq-record&#x27;).forEach((b,i)=&gt;b.setAttribute(&#x27;aria-pressed&#x27;,String(i===selected)));
+        $$(&#x27;.mq-data-row&#x27;).forEach((row,i)=&gt;{row.dataset.selected=String(i===selected);row.querySelector(&#x27;button&#x27;).textContent=i===selected?&#x27;已定位&#x27;:&#x27;定位&#x27;;});
+        $(&#x27;.mq-selected-code&#x27;).textContent=selected===null?&#x27;尚未选择&#x27;:records[selected].code;
+        $$(&#x27;.mq-readout strong&#x27;).forEach((el,i)=&gt;el.textContent=selected===null?&#x27;—&#x27;:String(records[selected].values[i]));
+      }
+      function select(index,animate=true){
+        cancelAnimationFrame(frame);frame=0;selected=index;renderSelection();
+        $(&#x27;.mq-located&#x27;).textContent=&#x27;7 / 7 轮已定位&#x27;;
+        if(!drawing.length){renderDiagram();return;}
+        const targets=configs.map((c,i)=&gt;c.numbers.indexOf(records[index].values[i])/c.numbers.length);
+        const start=positions.slice(),dist=targets.map((t,i)=&gt;mod(t-start[i]));
+        drawing.forEach((d,i)=&gt;{d.marker.g.setAttribute(&#x27;visibility&#x27;,&#x27;visible&#x27;);d.marker.text.textContent=String(records[index].values[i]);d.marker.g.parentNode.querySelector(&#x27;.mq-wheel-value&#x27;).textContent=String(records[index].values[i]);});
+        function paint(t){
+          drawing.forEach((d,i)=&gt;{positions[i]=start[i]+dist[i]*t;const p=point(d.w,positions[i]);d.marker.g.setAttribute(&#x27;transform&#x27;,`translate(${p.x} ${p.y})`);d.marker.text.textContent=t&lt;1&amp;&amp;dist[i]&gt;.001?&#x27;·&#x27;:String(records[index].values[i]);});
+        }
+        if(!animate||reduce.matches||dist.every(d=&gt;d&lt;.001)){paint(1);return;}
+        $(&#x27;.mq-located&#x27;).textContent=&#x27;正在定位…&#x27;;animationStart=performance.now();
+        function step(now){const t=Math.min(1,(now-animationStart)/820);paint(t*t*(3-2*t));if(t&lt;1)frame=requestAnimationFrame(step);else{frame=0;$(&#x27;.mq-located&#x27;).textContent=&#x27;7 / 7 轮已定位&#x27;;}}
+        frame=requestAnimationFrame(step);
+      }
+      records.forEach((record,index)=&gt;{
+        const b=make(&#x27;button&#x27;,&#x27;mq-record&#x27;,null,$(&#x27;.mq-record-list&#x27;));b.type=&#x27;button&#x27;;b.setAttribute(&#x27;aria-pressed&#x27;,String(index===0));
+        make(&#x27;span&#x27;,&#x27;mq-code&#x27;,record.code,b);const meta=make(&#x27;span&#x27;,&#x27;mq-record-meta&#x27;,null,b);make(&#x27;span&#x27;,&#x27;&#x27;,record.time,meta);make(&#x27;span&#x27;,&#x27;&#x27;,`三号轮 · ${record.values[2]}`,meta);
+        b.addEventListener(&#x27;click&#x27;,()=&gt;{select(index);$(&#x27;.mq-search-status&#x27;).textContent=&#x27;已切换至 &#x27;+record.code+&#x27; 的示例定位。&#x27;;$(&#x27;.mq-search-status&#x27;).dataset.error=&#x27;false&#x27;;});
+        const row=make(&#x27;tr&#x27;,&#x27;mq-data-row&#x27;,null,$(&#x27;tbody&#x27;));make(&#x27;td&#x27;,&#x27;&#x27;,record.time,row);make(&#x27;td&#x27;,&#x27;&#x27;,record.code,row);record.values.forEach(v=&gt;make(&#x27;td&#x27;,&#x27;&#x27;,String(v),row));const cell=make(&#x27;td&#x27;,&#x27;&#x27;,null,row);const pick=make(&#x27;button&#x27;,&#x27;mq-table-select&#x27;,&#x27;定位&#x27;,cell);pick.type=&#x27;button&#x27;;pick.addEventListener(&#x27;click&#x27;,()=&gt;select(index));
+      });
+      configs.forEach(w=&gt;{const el=make(&#x27;div&#x27;,&#x27;mq-readout&#x27;,null,$(&#x27;.mq-readouts&#x27;));make(&#x27;span&#x27;,&#x27;&#x27;,w.name,el);make(&#x27;strong&#x27;,&#x27;&#x27;,null,el);});
+      for(let n=1;n&lt;=8;n++){const slot=make(&#x27;span&#x27;,&#x27;mq-slot&#x27;,String(n),$(&#x27;.mq-slots&#x27;));slot.dataset.hit=String(seen.has(n));slot.setAttribute(&#x27;aria-label&#x27;,`${n}号模盒，${seen.has(n)?&#x27;已扫码&#x27;:&#x27;未扫码&#x27;}`);}
+      $(&#x27;.mq-search&#x27;).addEventListener(&#x27;submit&#x27;,event=&gt;{
+        event.preventDefault();const query=$(&#x27;#mq-qrcode&#x27;).value.trim().toUpperCase();
+        const index=query?records.findIndex(record=&gt;record.code.includes(query)):-1;
+        $(&#x27;.mq-search-status&#x27;).dataset.error=String(index&lt;0);
+        if(index&lt;0){$(&#x27;.mq-search-status&#x27;).textContent=query?&#x27;未找到示例记录，可输入 MH-03001 至 MH-03004。&#x27;:&#x27;请输入二维码后查询。&#x27;;return;}
+        select(index);$(&#x27;.mq-search-status&#x27;).textContent=&#x27;已找到 &#x27;+records[index].code+&#x27; · 示例记录时间 &#x27;+records[index].time;
+      });
+      $(&#x27;[data-action=&quot;clear&quot;]&#x27;).addEventListener(&#x27;click&#x27;,()=&gt;{$(&#x27;#mq-qrcode&#x27;).value=&#x27;&#x27;;$(&#x27;.mq-search-status&#x27;).dataset.error=&#x27;false&#x27;;$(&#x27;.mq-search-status&#x27;).textContent=&#x27;输入示例二维码后查询。&#x27;;$(&#x27;#mq-qrcode&#x27;).focus();});
+      $(&#x27;[data-action=&quot;reset&quot;]&#x27;).addEventListener(&#x27;click&#x27;,()=&gt;{cancelAnimationFrame(frame);frame=0;selected=null;renderSelection();drawing.forEach(d=&gt;{d.marker.g.setAttribute(&#x27;visibility&#x27;,&#x27;hidden&#x27;);d.marker.g.parentNode.querySelector(&#x27;.mq-wheel-value&#x27;).textContent=&#x27;—&#x27;;});$(&#x27;.mq-located&#x27;).textContent=&#x27;等待选择记录&#x27;;});
+      function renderStyle(){root.dataset.style=styleState.variant;$$(&#x27;[data-variant]&#x27;).forEach(b=&gt;b.setAttribute(&#x27;aria-pressed&#x27;,String(b.dataset.variant===styleState.variant)));renderDiagram();}
+      $$(&#x27;[data-variant]&#x27;).forEach(b=&gt;b.addEventListener(&#x27;click&#x27;,()=&gt;{styleState.variant=b.dataset.variant;renderStyle();}));
+      renderSelection();renderStyle();
+      let lastWidth=$(&#x27;.mq-diagram-area&#x27;).clientWidth;
+      new ResizeObserver(entries=&gt;{const width=entries[0].target.clientWidth;if(Math.abs(width-lastWidth)&gt;1){lastWidth=width;renderDiagram();}}).observe($(&#x27;.mq-diagram-area&#x27;));
+      reduce.addEventListener(&#x27;change&#x27;,()=&gt;{if(reduce.matches&amp;&amp;selected!==null)select(selected,false);});
+      if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:renderStyle});tweak.addSelect(styleState,&#x27;variant&#x27;,{label:&#x27;界面风格&#x27;,options:[{label:&#x27;A · 简洁蓝白&#x27;,value:&#x27;clean&#x27;},{label:&#x27;B · 深色工控&#x27;,value:&#x27;control&#x27;},{label:&#x27;C · 紧凑工作台&#x27;,value:&#x27;dense&#x27;}]});tweak.addToggle(styleState,&#x27;depth&#x27;,{label:&#x27;转台立体层次&#x27;});}
+    })();
+  &lt;/script&gt;
+&lt;/div&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (target) =&gt;
+    target?.nodeType === Node.ELEMENT_NODE
+      ? target.closest(&quot;[data-tooltip]&quot;)
+      : null;
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event.target);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event.target);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event.target);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    document.removeEventListener(&quot;pointerover&quot;, handlePointerOpen);
+    document.removeEventListener(&quot;pointerdown&quot;, handlePointer);
+    document.removeEventListener(&quot;pointercancel&quot;, handlePointer);
+    document.removeEventListener(&quot;click&quot;, handleTouchClick);
+    document.removeEventListener(&quot;pointerout&quot;, handleLeave);
+    document.removeEventListener(&quot;focusin&quot;, handleFocusIn);
+    document.removeEventListener(&quot;focusout&quot;, handleLeave);
+    document.removeEventListener(&quot;keydown&quot;, handleKeyDown);
+    document.removeEventListener(&quot;contextmenu&quot;, handleContextMenu);
+    tooltip = null;
+  };
+
+  document.addEventListener(&quot;pointerover&quot;, handlePointerOpen);
+  document.addEventListener(&quot;pointerdown&quot;, handlePointer);
+  document.addEventListener(&quot;pointercancel&quot;, handlePointer);
+  document.addEventListener(&quot;click&quot;, handleTouchClick);
+  document.addEventListener(&quot;pointerout&quot;, handleLeave);
+  document.addEventListener(&quot;focusin&quot;, handleFocusIn);
+  document.addEventListener(&quot;focusout&quot;, handleLeave);
+  document.addEventListener(&quot;keydown&quot;, handleKeyDown);
+  document.addEventListener(&quot;contextmenu&quot;, handleContextMenu);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+</body>
+</html>
