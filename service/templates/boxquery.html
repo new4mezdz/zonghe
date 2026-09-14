@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>轮模盒轨迹查询</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/trajectory-view.css') }}?v=20260910-linked">
-    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260910-compact">
+    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260911-recent">
     <script defer src="{{ url_for('static', filename='boxquery/trajectory.js') }}?v=20260910-linked"></script>
     <script defer src="{{ url_for('static', filename='boxquery/trajectory-view.js') }}?v=20260910-linked"></script>
-    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260910-compact"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260914-query-gaps"></script>
 </head>
 <body class="compact-workbench">
     <header class="page-header">
@@ -27,17 +27,24 @@
                     <button type="submit" class="button primary" id="queryButton">查询定位</button>
                     <button type="button" class="button" id="clearInputButton">清空输入</button>
                 </div>
-                <div class="query-range">
-                    <label for="lookbackHours">远程查询范围</label>
-                    <select id="lookbackHours" name="lookback_hours">
-                        <option value="2">最近2小时</option>
-                        <option value="24" selected>最近24小时</option>
-                        <option value="168">最近7天</option>
-                    </select>
-                    <span>优先查询本地全部历史记录</span>
+                <div class="query-options">
+                    <div class="query-range">
+                        <label for="lookbackHours">远程查询范围</label>
+                        <select id="lookbackHours" name="lookback_hours">
+                            <option value="2">最近2小时</option>
+                            <option value="24" selected>最近24小时</option>
+                            <option value="168">最近7天</option>
+                        </select>
+                        <span>优先查询本地全部历史记录</span>
+                    </div>
+                    <div class="query-shortcuts" role="group" aria-label="按时间快捷查询，无需输入二维码">
+                        <span class="subtle">快捷查询 · 无需二维码</span>
+                        <button type="button" class="button small" id="recent5Button">最近5分钟</button>
+                        <button type="button" class="button small" id="recent30Button">最近30分钟</button>
+                    </div>
                 </div>
             </form>
-            <p id="queryStatus" class="query-status" role="status" aria-live="polite">输入二维码后，点击查询记录可切换各轮定位。</p>
+            <p id="queryStatus" class="query-status" role="status" aria-live="polite">输入二维码或选择快捷时段查询，点击记录可切换各轮定位。</p>
         </section>
         <div class="content-grid">
             <aside class="sidebar" aria-label="扫码记录与检验进度">
@@ -71,7 +78,7 @@
                 <div class="table-scroll" role="region" aria-label="匹配记录与七轮模盒编号，小屏幕可横向滚动" tabindex="0">
                     <table>
                         <thead><tr><th scope="col">记录时间</th><th scope="col">二维码</th><th scope="col">一号轮</th><th scope="col">二号轮</th><th scope="col" class="inspection-column">三号轮</th><th scope="col">四号轮</th><th scope="col">五号轮</th><th scope="col">六号轮</th><th scope="col">八号轮</th><th scope="col">操作</th></tr></thead>
-                        <tbody id="matchBody"><tr><td colspan="10" class="table-empty">查询二维码后，在这里对照各轮模盒编号。</td></tr></tbody>
+                        <tbody id="matchBody"><tr><td colspan="10" class="table-empty">查询二维码或选择快捷时段后，在这里对照各轮模盒编号。</td></tr></tbody>
                     </table>
                 </div>
                 <p class="table-note">“—” 表示暂无编号；点击二维码或“查看轨迹”可切换定位。</p>

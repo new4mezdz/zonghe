@@ -154,3 +154,14 @@ def box_query():
 @urldata_bp.route('/api/urldata/box_layout', methods=['GET'])
 def box_layout():
     return jsonify(urldata_service.get_box_layout())
+
+
+@urldata_bp.route('/api/urldata/box_recent', methods=['POST'])
+def box_recent():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'success': False, 'error': '请求数据格式不正确'}), 400
+    minutes = data.get('lookback_minutes')
+    if type(minutes) is not int or minutes not in (5, 30):
+        return jsonify({'success': False, 'error': '请选择最近5分钟或最近30分钟'}), 400
+    return jsonify(urldata_service.query_recent_boxes(minutes))

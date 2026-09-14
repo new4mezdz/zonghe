@@ -110,7 +110,8 @@ class Config:
             return cls.save_json_config(cls.DEFAULT_CONFIG)
 
         try:
-            with open(cls.CONFIG_FILE, 'r', encoding='utf-8') as f:
+            # Windows 编辑器可能保存 UTF-8 BOM；兼容读取，避免误用默认编号范围。
+            with open(cls.CONFIG_FILE, 'r', encoding='utf-8-sig') as f:
                 current = json.load(f)
             if int(current.get('配置版本', 1) or 1) < 2:
                 timer = current.get('定时处理')

@@ -169,6 +169,15 @@ class UrlDataService:
 
             numbered_data = [] if write_output else None
             current_numbers = list(last_numbers)
+            # 配置读取恢复后，旧状态中可能还存着越界编号（如一号轮为 5）。
+            # 先按完整周期还原相位，再推进；不能直接重置为下限而错开 1、2。
+            for i, value in enumerate(current_numbers):
+                number = self._box_number(value)
+                minimum, maximum = min_numbers[i], max_numbers[i]
+                current_numbers[i] = minimum - 1 if number is None else (
+                    number if minimum - 1 <= number <= maximum
+                    else minimum + (number - minimum) % (maximum - minimum + 1)
+                )
             verification_errors = []
             db_rows = []
 
@@ -208,24 +217,26 @@ class UrlDataService:
                         enable_verification and idx + 2 < len(verification_records)) else "N/A"
 
                 if enable_verification and verification_value != "N/A":
-                    try:
-                        ver_num = int(float(str(verification_value).strip()))
-                        if current_numbers[3] != ver_num:
-                            error_msg = "第{}行：三号轮摸盒({})与校验位({})不匹配，按校验位纠正 | 二维码: {} | 时间: {}".format(
-                                idx + 1, current_numbers[3], ver_num, content_val, time_str)
-                            verification_errors.append(error_msg)
-                            log(error_msg, "warning", content=content_val, time_str=time_str)
-                            current_numbers[3] = ver_num
-                            for i in range(BOX_COUNT):
-                                if i != 3:
-                                    corrected = (cycle_count * 8 + ver_num) % max_numbers[i]
-                                    if corrected == 0:
-                                        corrected = max_numbers[i]
-                                    current_numbers[i] = corrected
-                            intervention_count += 1
-                            was_corrected = 1
-                    except ValueError:
-                        pass
+                    ver_num = self._box_number(verification_value)
+                    if (ver_num is None or not 1 <= ver_num <= 8
+                            or not min_numbers[3] <= ver_num <= max_numbers[3]):
+                        log("第{}行：无效三号轮校验值 {}，保留按配置循环的编号 {}".format(
+                            idx + 1, verification_value, current_numbers[3]),
+                            "warning", content=content_val, time_str=time_str)
+                    elif current_numbers[3] != ver_num:
+                        error_msg = "第{}行：三号轮摸盒({})与校验位({})不匹配，按校验位纠正 | 二维码: {} | 时间: {}".format(
+                            idx + 1, current_numbers[3], ver_num, content_val, time_str)
+                        verification_errors.append(error_msg)
+                        log(error_msg, "warning", content=content_val, time_str=time_str)
+                        current_numbers[3] = ver_num
+                        for i in range(BOX_COUNT):
+                            if i != 3:
+                                corrected = (cycle_count * 8 + ver_num) % max_numbers[i]
+                                if corrected == 0:
+                                    corrected = max_numbers[i]
+                                current_numbers[i] = corrected
+                        intervention_count += 1
+                        was_corrected = 1
 
                 dtype = "失败" if content_val.upper() == "FAIL" else \
                     "URL" if content_val.upper().startswith(("HTTP:", "HTTPS:")) else "其他"
@@ -1071,39 +1082,128 @@ class UrlDataService:
         qrcode = qrcode.strip()
         if type(lookback_hours) is not int or lookback_hours not in (2, 24, 168):
             return {'success': False, 'error': '请选择有效的远程查询时间范围'}
+        return self._query_box_records(qrcode=qrcode, lookback_hours=lookback_hours)
+
+    def query_recent_boxes(self, lookback_minutes):
+        if type(lookback_minutes) is not int or lookback_minutes not in (5, 30):
+            return {'success': False, 'error': '请选择最近5分钟或最近30分钟'}
+        return self._query_box_records(lookback_minutes=lookback_minutes)
+
+    @staticmethod
+    def _remote_wheel_numbers(wheels, box_num):
+        numbers = {str(wheel['id']): None for wheel in wheels}
+        inferred = []
+        if box_num is None:
+            return numbers, inferred
+        numbers['3'] = box_num
+        reference = next((wheel for wheel in wheels if wheel['id'] == 3), None)
+        if not reference or reference['min'] != 1 or reference['max'] != 8:
+            return numbers, inferred
+        for wheel in wheels:
+            if wheel['id'] == 3:
+                continue
+            maximum = wheel['max']
+            # 与同步时的 (cycle_count * 8 + ver_num) % max 校验规则一致。
+            # 只有下限为 1 且上限整除 8 时，未知的 cycle_count 才不影响结果。
+            # 40、42 或 6 等范围必须保留未知，不能从短查询窗口猜测起始相位。
+            if wheel['min'] == 1 and maximum and 8 % maximum == 0:
+                numbers[str(wheel['id'])] = (box_num - 1) % maximum + 1
+                inferred.append(wheel['id'])
+        return numbers, inferred
+
+    def _resolve_remote_box_numbers(self, records, verification_records, wheels):
+        """用两端直接校验核对短缺口，不从查询窗口起点重排编号。"""
+        numbers = []
+        for idx in range(len(records)):
+            value = (self._box_number(verification_records[idx + 2]['value'])
+                     if idx + 2 < len(verification_records) else None)
+            numbers.append(value if value is not None and 1 <= value <= 8 else None)
+        inferred = set()
+        reference = next((wheel for wheel in wheels if wheel['id'] == 3), None)
+        if not reference or reference['min'] != 1 or reference['max'] != 8:
+            return numbers, inferred
+
+        # 锚点必须来自直接校验，不能把推算结果继续当作锚点向外扩展。
+        anchors = [idx for idx, value in enumerate(numbers) if value is not None]
+        for left, right in zip(anchors, anchors[1:]):
+            gap = right - left - 1
+            # 两端跨越整圈、缺少任一端校验，或两端步进不一致时无法核实中间相位。
+            if not 1 <= gap <= 6 or (numbers[left] + right - left - 1) % 8 + 1 != numbers[right]:
+                continue
+            try:
+                if not all(records[idx]['time'] < records[idx + 1]['time']
+                           for idx in range(left, right)):
+                    continue
+            except (KeyError, TypeError):
+                continue
+            for idx in range(left + 1, right):
+                numbers[idx] = (numbers[left] + idx - left - 1) % 8 + 1
+                inferred.add(idx)
+        return numbers, inferred
+
+    def _local_box_record(self, row, wheels):
+        numbers = {str(wheel['id']): self._box_number(row[f"num{wheel['id']}"])
+                   for wheel in wheels}
+        original = {}
+        reference = next((wheel for wheel in wheels if wheel['id'] == 3), None)
+        if reference and reference['min'] == 1 and reference['max'] == 8:
+            for wheel in wheels:
+                key, maximum = str(wheel['id']), wheel['max']
+                value = numbers[key]
+                # 兼容默认上限 1000 时生成的旧数据，仅换算已知的 1/2/4/8 周期。
+                # 不改库，不改有效编号；保留原值，让页面明确区分历史换算结果。
+                if (wheel['min'] == 1 and maximum and 8 % maximum == 0
+                        and value is not None and value > maximum):
+                    original[key] = value
+                    numbers[key] = (value - 1) % maximum + 1
+        result = {
+            'index': row['id'], 'numbers': [numbers['3']], 'box_num': numbers['3'],
+            'wheel_numbers': numbers, 'content': row['content'], 'time': row['record_time'],
+        }
+        if original:
+            result.update(normalized_wheels=[int(key) for key in original],
+                          original_wheel_numbers=original)
+        return result
+
+    def _query_box_records(self, qrcode=None, lookback_hours=24, lookback_minutes=None):
         layout = self.get_box_layout()
-        # 二维码中的百分号和下划线是字面内容，不是 LIKE 通配符。
-        escaped_code = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        recent = lookback_minutes is not None
+        # 固定查询截止时间，本地北京时间与两路远程 UTC 查询使用同一窗口。
+        stop = datetime.now(timezone.utc)
+        start = stop - (timedelta(minutes=lookback_minutes) if recent
+                        else timedelta(hours=lookback_hours))
+        limit = 500 if recent else 50
+        if recent:
+            where = 'record_time >= ? AND record_time <= ?'
+            params = (self._record_time_text(start), self._record_time_text(stop))
+        else:
+            # 二维码中的百分号和下划线是字面内容，不是 LIKE 通配符。
+            escaped_code = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            where = "content LIKE ? ESCAPE '\\'"
+            params = (f'%{escaped_code}%',)
         conn = self._get_conn()
         try:
             rows = conn.execute(
-                "SELECT * FROM records WHERE content LIKE ? ESCAPE '\\' "
-                'ORDER BY record_time DESC, id DESC LIMIT 50',
-                (f'%{escaped_code}%',),
+                f'SELECT * FROM records WHERE {where} '
+                'ORDER BY record_time DESC, id DESC LIMIT ?',
+                params + (limit,),
             ).fetchall()
+            total = conn.execute(
+                f'SELECT COUNT(*) FROM records WHERE {where}', params
+            ).fetchone()[0] if recent else len(rows)
         finally:
             conn.close()
 
         if rows:
-            matched = []
-            for row in rows:
-                matched.append({
-                    'index': row['id'],
-                    'numbers': [row['num3']],
-                    'box_num': row['num3'],
-                    'wheel_numbers': {
-                        str(wheel['id']): self._box_number(row[f"num{wheel['id']}"])
-                        for wheel in layout['wheels']
-                    },
-                    'content': row['content'],
-                    'time': row['record_time']
-                })
-            return {'success': True, 'total_records': len(rows), 'matches': matched,
-                    'source': 'database', 'wheels': layout['wheels']}
+            matched = [self._local_box_record(row, layout['wheels']) for row in rows]
+            result = {'success': True, 'total_records': total, 'matches': matched,
+                      'source': 'database', 'wheels': layout['wheels']}
+            if recent:
+                result.update(lookback_minutes=lookback_minutes, has_more=total > len(matched))
+            return result
 
         # 两路数据使用同一个固定窗口，避免分别计算“现在”造成校验序号偏移。
-        stop = datetime.now(timezone.utc)
-        start_time = (stop - timedelta(hours=lookback_hours)).isoformat()
+        start_time = start.isoformat()
         stop_time = stop.isoformat()
         try:
             records = self._load_data_from_influx(start_time, stop_time)
@@ -1112,7 +1212,7 @@ class UrlDataService:
 
         matching_indices = [
             idx for idx, record in enumerate(records)
-            if qrcode.casefold() in str(record['value']).casefold()
+            if recent or qrcode.casefold() in str(record['value']).casefold()
         ]
         warning = None
         verification_records = []
@@ -1121,23 +1221,34 @@ class UrlDataService:
                 verification_records = self._load_verification_from_influx(start_time, stop_time)
             except RuntimeError as exc:
                 warning = str(exc)
+        # 先核对完整原始序列，再筛二维码/截取最新 500 条，保留 +2 配对与邻近锚点。
+        box_numbers, adjacent_inferred = self._resolve_remote_box_numbers(
+            records, verification_records, layout['wheels'])
         matched = []
-        for idx in reversed(matching_indices):
+        selected_indices = matching_indices[-limit:] if recent else matching_indices
+        for idx in reversed(selected_indices):
             record = records[idx]
-            box_num = None
-            if idx + 2 < len(verification_records):
-                value = self._box_number(verification_records[idx + 2]['value'])
-                if value is not None and 1 <= value <= 8:
-                    box_num = value
+            box_num = box_numbers[idx]
+            verification_value = (verification_records[idx + 2]['value']
+                                  if idx + 2 < len(verification_records) else None)
+            verification_issue = (None if self._box_number(verification_value) in range(1, 9)
+                                  else 'invalid_value' if idx + 2 < len(verification_records)
+                                  else 'missing_record')
+            wheel_numbers, inferred_wheels = self._remote_wheel_numbers(layout['wheels'], box_num)
+            number_source = 'verification' if box_num is not None else 'unavailable'
+            if idx in adjacent_inferred:
+                number_source = 'adjacent_verification'
+                inferred_wheels = [wheel['id'] for wheel in layout['wheels']
+                                   if wheel_numbers[str(wheel['id'])] is not None]
             matched.append({
                 'index': idx,
                 'numbers': [box_num],
                 'box_num': box_num,
-                # 实时回退数据仅能确认三号轮，其他轮保持未知。
-                'wheel_numbers': {
-                    str(wheel['id']): box_num if wheel['id'] == 3 else None
-                    for wheel in layout['wheels']
-                },
+                'wheel_numbers': wheel_numbers,
+                'inferred_wheels': inferred_wheels,
+                'box_number_source': number_source,
+                'verification_value': str(verification_value) if verification_value is not None else None,
+                'verification_issue': verification_issue,
                 'content': record['value'],
                 'time': self._record_time_text(record['time'])
             })
@@ -1148,6 +1259,13 @@ class UrlDataService:
         }
         if warning:
             result['warning'] = warning
+        unresolved_count = sum(record['box_num'] is None for record in matched)
+        if unresolved_count and not warning:
+            result['warning'] = '返回的记录中有 {} 条缺少可核对的三号轮校验编号，已保留待确认。'.format(unresolved_count)
+        if recent:
+            result.pop('lookback_hours')
+            result.update(lookback_minutes=lookback_minutes,
+                          has_more=len(matching_indices) > len(matched))
         return result
 
     def start_auto_sync(self):
