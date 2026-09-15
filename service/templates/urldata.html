@@ -102,13 +102,13 @@
     <div class="container">
         <!-- 数据查询模块 -->
         <div class="panel">
-            <div class="panel-title">🔍 数据查询</div>
+            <div class="panel-title">🔍 今天的数据查询</div>
             <div class="query-row">
                 <span class="query-label">时间段:</span>
-                <input type="date" class="query-input date-input" id="processDate">
-                <input type="time" class="query-input time-input" id="processStartTime" value="08:00">
+                <input type="date" class="query-input date-input" id="processDate" readonly aria-label="北京时间今天">
+                <input type="time" class="query-input time-input" id="processStartTime" value="00:00:00" step="1">
                 <span style="color:#aaa;">~</span>
-                <input type="time" class="query-input time-input" id="processStopTime" value="18:00">
+                <input type="time" class="query-input time-input" id="processStopTime" step="1">
                 <button class="btn" style="background:#6366f1;color:#fff;" onclick="setRecentTime(30)">近半小时</button>
                 <button class="btn" style="background:#6366f1;color:#fff;" onclick="setRecentTime(60)">近一小时</button>
                 <button class="btn btn-primary" onclick="queryByDate()">查询</button>
@@ -120,7 +120,8 @@
                 <button class="btn btn-primary" onclick="queryByContent()">查询</button>
                 <button class="btn btn-danger" onclick="document.getElementById('contentInput').value=''">清空</button>
             </div>
-            <div id="queryStatus" role="status" aria-live="polite" style="color:#aaa;font-size:0.85rem;">按时间查询时会先更新最新轨迹数据。</div>
+            <p style="color:#aaa;font-size:0.85rem;margin-bottom:8px;">查询与同步仅限北京时间今天 00:00 至今，历史数据继续保留。</p>
+            <div id="queryStatus" role="status" aria-live="polite" style="color:#aaa;font-size:0.85rem;">按时间查询时会先更新今天的轨迹数据。</div>
         </div>
 
         <!-- InfluxDB 调试面板 -->
@@ -131,10 +132,7 @@
                 <button class="btn btn-success" onclick="queryInfluxSample('bucket_data')">📦 查 jbcj01 数据</button>
                 <button class="btn btn-warning" onclick="queryInfluxSample('bucket_verify')">📦 查 jbcj03 数据</button>
                 <select id="influxHours" class="query-input" style="max-width:120px;">
-                    <option value="1">最近1小时</option>
-                    <option value="6">最近6小时</option>
-                    <option value="24">最近24小时</option>
-                    <option value="168">最近7天</option>
+                    <option value="24">今天</option>
                 </select>
             </div>
             <div id="influxStatus" style="margin-bottom: 10px;"></div>
@@ -238,6 +236,7 @@
     <div class="modal-overlay" id="schedulerModal">
         <div class="modal">
             <h3>⏰ 定时处理设置</h3>
+            <p style="color:#aaa;font-size:0.85rem;margin-bottom:12px;">每次仅同步北京时间今天零点后的记录。</p>
             <div class="modal-check">
                 <input type="checkbox" id="schedulerEnabled">
                 <label>启用定时自动处理</label>
@@ -285,7 +284,7 @@
             <div id="boxCheckGrid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:15px;"></div>
             <div class="modal-btns">
                 <button class="btn btn-primary" onclick="queryByNumber();closeModal('numberQueryModal')">🔍 查询</button>
-                <button class="btn btn-secondary" onclick="queryAll();closeModal('numberQueryModal')">全部</button>
+                <button class="btn btn-secondary" onclick="queryAll();closeModal('numberQueryModal')">今天全部</button>
                 <button class="btn btn-danger" onclick="clearNumberInput()">清空</button>
                 <button class="btn btn-secondary" onclick="closeModal('numberQueryModal')">取消</button>
             </div>
@@ -341,6 +340,34 @@
         let lastQueryParams = null;
         let lastQueryResults = [];
         let querySequence = 0;
+        let activeQueryDay = '';
+
+        function beijingParts(timestamp=Date.now()) {
+            const text = new Date(timestamp + 8 * 3600000).toISOString();
+            return {date: text.slice(0, 10), time: text.slice(11, 19)};
+        }
+
+        function syncTodayControls() {
+            const now = beijingParts();
+            const changed = activeQueryDay !== now.date;
+            const previousDay = activeQueryDay;
+            activeQueryDay = now.date;
+            const input = document.getElementById('processDate');
+            input.min = input.max = input.value = now.date;
+            document.getElementById('processStartTime').max = now.time;
+            document.getElementById('processStopTime').max = now.time;
+            if (changed) {
+                document.getElementById('processStartTime').value = '00:00:00';
+                document.getElementById('processStopTime').value = now.time;
+                if (previousDay) {
+                    clearResults();
+                    document.getElementById('logBox').replaceChildren();
+                    document.getElementById('influxLog').replaceChildren();
+                    document.getElementById('queryStatus').textContent = '已切换到北京时间今天 ' + now.date + '，请重新查询；历史数据仍保留。';
+                }
+            }
+            return now.date;
+        }
 
         function toggleSort() {
             sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
@@ -384,8 +411,11 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const today = new Date().toISOString().slice(0, 10);
-            document.getElementById('processDate').value = today;
+            syncTodayControls();
+            document.getElementById('processDate').addEventListener('change', syncTodayControls);
+            window.addEventListener('focus', syncTodayControls);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) syncTodayControls(); });
+            setInterval(syncTodayControls, 1000);
             loadSchedulerStatus();
             initBoxCheckGrid();
         });
@@ -440,16 +470,17 @@
 
         // ===== 数据处理 =====
         async function doProcess() {
-            const dateVal = document.getElementById('processDate').value;
+            const dateVal = syncTodayControls();
             const startTime = document.getElementById('processStartTime').value;
-            const stopTime = document.getElementById('processStopTime').value;
+            const selectedStop = document.getElementById('processStopTime').value;
+            const stopTime = selectedStop && selectedStop < beijingParts().time ? selectedStop : beijingParts().time;
 
             if (!dateVal) { alert('请选择日期'); return false; }
             if (!startTime || !stopTime) { alert('请设置起止时间'); return false; }
             if (startTime >= stopTime) { alert('开始时间必须早于结束时间'); return false; }
 
-            const startISO = `${dateVal}T${startTime}:00+08:00`;
-            const stopISO = `${dateVal}T${stopTime}:00+08:00`;
+            const startISO = `${dateVal}T${startTime.length === 5 ? startTime + ':00' : startTime}+08:00`;
+            const stopISO = `${dateVal}T${stopTime.length === 5 ? stopTime + ':00' : stopTime}+08:00`;
 
             addLog(`开始处理数据: ${dateVal} ${startTime} ~ ${stopTime}`);
             try {
@@ -459,6 +490,7 @@
                     body: JSON.stringify({ start_time: startISO, stop_time: stopISO })
                 });
                 const data = await res.json();
+                if (syncTodayControls() !== dateVal) return false;
                 if (data.logs) data.logs.forEach(l => addLog(l.msg, l.level, l.content || null, l.time_str || null));
                 return data.success;
             } catch (e) {
@@ -469,22 +501,23 @@
 
         // ===== 查询功能 =====
         function setRecentTime(minutes) {
-            const now = new Date();
-            const start = new Date(now.getTime() - minutes * 60000);
-            const pad = (n) => String(n).padStart(2, '0');
-            document.getElementById('processDate').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-            document.getElementById('processStartTime').value = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
-            document.getElementById('processStopTime').value = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+            const today = syncTodayControls();
+            const now = Date.now();
+            const midnight = Date.parse(today + 'T00:00:00+08:00');
+            const start = Math.max(midnight, now - minutes * 60000);
+            document.getElementById('processStartTime').value = beijingParts(start).time;
+            document.getElementById('processStopTime').value = beijingParts(now).time;
             queryByDate();
         }
 
         async function queryByDate() {
-            const dateVal = document.getElementById('processDate').value;
+            const dateVal = syncTodayControls();
             if (!dateVal) { alert('请选择日期'); return; }
             const start = document.getElementById('processStartTime').value;
-            const stop = document.getElementById('processStopTime').value;
+            const selectedStop = document.getElementById('processStopTime').value;
+            const stop = selectedStop && selectedStop < beijingParts().time ? selectedStop : beijingParts().time;
             if (!start || !stop) { alert('请设置起止时间'); return; }
-            if (start > stop) { alert('开始时间不能晚于结束时间，请按日期分别查询'); return; }
+            if (start > stop) { alert('开始时间不能晚于今天的查询结束时间'); return; }
             await doQuery({
                 type: 'date',
                 date: dateVal,
@@ -514,7 +547,7 @@
         }
 
         async function queryDuplicates() {
-            const dateVal = document.getElementById('processDate').value;
+            const dateVal = syncTodayControls();
             if (!dateVal) { alert('请选择日期'); return; }
             await doQuery({ type: 'duplicates', date: dateVal });
         }
@@ -533,12 +566,14 @@
         }
 
         async function doQuery(params) {
+            const requestDay = syncTodayControls();
+            params.date = requestDay;
             if (!params.sort_order) params.sort_order = sortOrder;
             lastQueryParams = {...params};
             const sequence = ++querySequence;
             const status = document.getElementById('queryStatus');
             status.style.color = '#aaa';
-            status.textContent = params.refresh ? '正在更新轨迹数据并查询，请稍候…' : '正在查询…';
+            status.textContent = params.refresh ? '正在更新今天的轨迹数据并查询，请稍候…' : '正在查询今天的数据…';
             if (params.refresh) addLog(`正在更新数据并查询：${params.date} ${params.start_time} ~ ${params.stop_time}`);
             try {
                 const res = await fetch('/api/urldata/query', {
@@ -547,22 +582,22 @@
                 });
                 if (!res.ok) throw new Error(`查询请求失败（HTTP ${res.status}）`);
                 const data = await res.json();
-                if (sequence !== querySequence) return;
+                if (syncTodayControls() !== requestDay || sequence !== querySequence) return;
                 if (!Array.isArray(data.results) || !data.stats) throw new Error(data.error || '查询返回的数据不完整');
                 lastQueryResults = data.results;
                 displayResults(data.results);
                 updateStats(data.stats, params.type);
-                const latest = data.latest_record_time ? `本地最新记录：${data.latest_record_time}` : '本地暂无轨迹记录';
+                const latest = data.latest_record_time && data.latest_record_time.slice(0, 10) === requestDay ? `今天本地最新记录：${data.latest_record_time}` : '今天本地暂无最新记录时间';
                 if (data.sync) {
                     (data.sync.logs || []).forEach(l => addLog(l.msg, l.level, l.content || null, l.time_str || null));
                     if (!data.sync.success) {
                         status.style.color = '#ffae00';
-                        status.textContent = `数据更新未完成，当前仅显示本地查询结果。${data.sync.message} ${latest}`;
+                        status.textContent = `今天的数据更新未完成，当前仅显示今天本地查询结果。${data.sync.message} ${latest}`;
                     } else {
-                        status.textContent = `查询完成，共 ${data.results.length} 条。${latest}`;
+                        status.textContent = `今天查询完成，共 ${data.results.length} 条。${latest}`;
                     }
                 } else {
-                    status.textContent = `本地查询完成，共 ${data.results.length} 条。`;
+                    status.textContent = `今天本地查询完成，共 ${data.results.length} 条。`;
                 }
             } catch (e) {
                 if (sequence !== querySequence) return;
@@ -606,7 +641,7 @@
 
         function updateStats(stats, queryType) {
             const names = { date:'日期查询', number:'编号查询', content:'内容查询', duplicates:'重复查询' };
-            document.getElementById('statsText').innerHTML = `${names[queryType]||'查询'} | 总计: <span>${stats.total}</span> | URL: <span>${stats.url}</span> | 失败: <span>${stats.fail}</span> | 其他: <span>${stats.other}</span>`;
+            document.getElementById('statsText').innerHTML = `今天 · ${names[queryType]||'查询'} | 总计: <span>${stats.total}</span> | URL: <span>${stats.url}</span> | 失败: <span>${stats.fail}</span> | 其他: <span>${stats.other}</span>`;
         }
 
         function checkDuplicates(results) {
@@ -680,7 +715,7 @@
                     if (data.buckets) {
                         Object.entries(data.buckets).forEach(([name, info]) => {
                             if (info.connected) {
-                                influxLog(`  Bucket "${name}": 已连接, 最近1小时${info.has_recent_data ? '有' : '无'}数据`, info.has_recent_data ? 'success' : 'warning');
+                                influxLog(`  Bucket "${name}": 已连接, 今天${info.has_recent_data ? '有' : '无'}数据`, info.has_recent_data ? 'success' : 'warning');
                             } else {
                                 influxLog(`  Bucket "${name}": 连接失败 - ${info.error}`, 'error');
                             }
@@ -697,11 +732,13 @@
         }
 
         async function queryInfluxSample(bucketKey) {
+            const requestDay = syncTodayControls();
             const hours = document.getElementById('influxHours').value;
-            influxLog(`查询 ${bucketKey} 最近 ${hours} 小时数据...`);
+            influxLog(`查询 ${bucketKey} 北京时间今天的数据...`);
             try {
                 const res = await fetch(`/api/urldata/influx_sample?bucket=${bucketKey}&hours=${hours}&limit=20`);
                 const data = await res.json();
+                if (syncTodayControls() !== requestDay) return;
                 if (data.success) {
                     influxLog(`Bucket '${data.bucket}' 返回 ${data.count} 条记录`, data.count > 0 ? 'success' : 'warning');
                     if (data.records.length > 0) {
@@ -764,12 +801,12 @@
         async function openSchedulerModal() {
             const res = await fetch('/api/urldata/scheduler_config');
             const cfg = await res.json();
-            document.getElementById('schedulerEnabled').checked = cfg.enabled || false;
-            document.getElementById('schedulerHours').value = cfg.hours || 1;
-            document.getElementById('schedulerMinutes').value = cfg.minutes || 30;
-            document.getElementById('schedulerSeconds').value = cfg.seconds || 0;
-            document.getElementById('schedulerRetry').checked = cfg.retry || true;
-            document.getElementById('schedulerRetryInterval').value = cfg.retry_interval || 30;
+            document.getElementById('schedulerEnabled').checked = cfg.enabled ?? false;
+            document.getElementById('schedulerHours').value = cfg.hours ?? 0;
+            document.getElementById('schedulerMinutes').value = cfg.minutes ?? 30;
+            document.getElementById('schedulerSeconds').value = cfg.seconds ?? 0;
+            document.getElementById('schedulerRetry').checked = cfg.retry ?? true;
+            document.getElementById('schedulerRetryInterval').value = cfg.retry_interval ?? 30;
             document.getElementById('schedulerModal').classList.add('show');
         }
 

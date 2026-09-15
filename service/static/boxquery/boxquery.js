@@ -8,6 +8,20 @@
     let querySequence=0, controller=null, activeEntry=null, selectedRecord=null;
     let refreshTimer=0,refreshExpiry=0,refreshController=null;
     let history=[], historyId=0, roundCount=0, hitCounts=Array(8).fill(0), layoutVersion=0;
+    const beijingDay=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+    let activeDay=beijingDay();
+    function todayRange(entry,remote=false) {
+        const minutes=entry.lookbackMinutes||(remote?entry.recentWindowMinutes:null);
+        return minutes?'今天内最近'+minutes+'分钟':'今天';
+    }
+    function syncTodayScope() {
+        const day=beijingDay();
+        if(day===activeDay)return false;
+        activeDay=day;cancelQuery();history=[];activeEntry=null;roundCount=0;hitCounts=Array(8).fill(0);
+        clearSelection();renderMatches();renderHistory();renderInspection();
+        status('已切换到北京时间今天 '+day+'，请重新查询；历史数据仍保留。');
+        return true;
+    }
     function element(tag,cls,text,parent) {
         const el=document.createElement(tag);if(cls)el.className=cls;
         if(text!==null && text!==undefined)el.textContent=String(text);
@@ -156,7 +170,7 @@
     function startRefresh(entry) {
         if(entry.lookbackMinutes || entry.refreshPending!==true)return;
         const sequence=querySequence,deadline=Date.now()+REFRESH_WAIT_MS;
-        const current=()=>sequence===querySequence && activeEntry===entry;
+        const current=()=>!syncTodayScope() && sequence===querySequence && activeEntry===entry;
         const pendingStatus=()=>{
             const record=selectedRecord||entry.matches[0];
             const transportOnly=record && T.WHEELS.every(wheel=>T.wheelNumber(record,wheel.id)!==null) && T.wheelNumber(record,0)===null;
@@ -189,7 +203,7 @@
                 const merged=mergeRefreshMatches(entry.matches,data.matches);
                 const totalRecords=Math.max(merged.total,data.total_records||0,entry.hasMore?entry.totalRecords||0:0);
                 const hasMore=entry.hasMore || data.has_more===true || merged.total>merged.matches.length;
-                Object.assign(entry,{matches:merged.matches,wheels:data.wheels||entry.wheels,source:data.source,lookbackHours:data.lookback_hours??entry.lookbackHours,recentWindowMinutes:data.recent_window_minutes,totalRecords,hasMore,warning:data.warning,refreshPending:data.refresh_pending===true,retryAfterMs:data.retry_after_ms});
+                Object.assign(entry,{matches:merged.matches,wheels:data.wheels||entry.wheels,source:data.source,lookbackHours:data.lookback_hours??entry.lookbackHours,recentWindowMinutes:data.recent_window_minutes,queryScope:data.query_scope,queryStart:data.query_start,queryStop:data.query_stop,scopeLabel:data.scope_label,totalRecords,hasMore,warning:data.warning,refreshPending:data.refresh_pending===true,retryAfterMs:data.retry_after_ms});
                 layoutVersion++;setLayout(entry.wheels);
                 const record=entry.matches.find(item=>previous && recordKey(item)===recordKey(previous))||previous||entry.matches[0];
                 if(record)applySelection(record);else {clearSelection();renderMatches();}
@@ -233,23 +247,22 @@
     }
     function renderDataSource() {
         const entry=activeEntry;
-        if(!entry){byId('dataSource').textContent='编号范围读取现有配置';return;}
-        const recentLabel=entry.lookbackMinutes?'最近'+entry.lookbackMinutes+'分钟':'';
+        if(!entry){byId('dataSource').textContent='今天 · 编号范围读取现有配置';return;}
         if(entry.source==='influxdb' || entry.source==='mixed') {
             const inferred=Array.isArray(selectedRecord?.inferred_wheels)?selectedRecord.inferred_wheels.filter(id=>id!==0).length:0;
             const adjacent=selectedRecord?.box_number_source==='adjacent_verification';
             const unknown=selectedRecord && T.wheelNumber(selectedRecord,3)===null;
-            const remoteRange=recentLabel||(entry.recentWindowMinutes?'最近'+entry.recentWindowMinutes+'分钟':'最近'+entry.lookbackHours+'小时');
-            byId('dataSource').textContent=(entry.source==='mixed'?'本地与远程':'远程')+remoteRange+(unknown?' · 校验不足，编号待确认':adjacent?' · 相邻校验推算 · '+inferred+'轮已推算':inferred?' · 三号轮校验 · '+inferred+'轮按校验推算':entry.source==='mixed'?' · 编号读取采集与校验数据':' · 仅三号轮可确认编号');
+            const sourceRange=entry.source==='mixed'?'本地'+todayRange(entry)+' · 远程'+todayRange(entry,true):'远程'+todayRange(entry,true);
+            byId('dataSource').textContent=sourceRange+(unknown?' · 校验不足，编号待确认':adjacent?' · 相邻校验推算 · '+inferred+'轮已推算':inferred?' · 三号轮校验 · '+inferred+'轮按校验推算':entry.source==='mixed'?' · 编号读取采集与校验数据':' · 仅三号轮可确认编号');
         } else {
             const normalized=Array.isArray(selectedRecord?.normalized_wheels)?selectedRecord.normalized_wheels.length:0;
-            byId('dataSource').textContent='本地'+(recentLabel||'轨迹数据')+(normalized?' · '+normalized+'工位按配置换算 · 原编号见表格提示':' · 编号范围读取现有配置');
+            byId('dataSource').textContent='本地'+todayRange(entry)+(normalized?' · '+normalized+'工位按配置换算 · 原编号见表格提示':' · 编号范围读取现有配置');
         }
     }
     function renderMatches() {
         const body=byId('matchBody');body.replaceChildren();
         const matches=activeEntry?activeEntry.matches:[];
-        const prefix=activeEntry?.lookbackMinutes?'最近'+activeEntry.lookbackMinutes+'分钟 · ':'';
+        const prefix=activeEntry?todayRange(activeEntry)+' · ':'';
         const count=activeEntry?.hasMore?'共 '+activeEntry.totalRecords+' 条 · 显示最新 '+matches.length+' 条':matches.length+' 条';
         byId('matchCount').textContent=prefix+count+' · 时间倒序';
         if(!matches.length) {
@@ -277,8 +290,9 @@
         });
     }
     function chooseEntry(entry) {
+        if(syncTodayScope())return;
         cancelQuery();activeEntry=entry;setLayout(entry.wheels);
-        const recentLabel=entry.lookbackMinutes?'最近'+entry.lookbackMinutes+'分钟':'';
+        const recentLabel=todayRange(entry);
         if(entry.matches.length) {
             selectRecord(entry.matches[0]);
             status((recentLabel?recentLabel+'内':'')+(entry.hasMore?'共 '+entry.totalRecords+' 条记录，显示最新 '+entry.matches.length+' 条':'找到 '+entry.matches.length+' 条匹配记录')+'，已选择最新记录；可点击其他记录切换。');
@@ -287,8 +301,7 @@
             else if(entry.warning)status(entry.warning,'warning');
         } else {
             clearSelection();renderMatches();
-            const remoteRange=entry.recentWindowMinutes?'最近'+entry.recentWindowMinutes+'分钟':'最近'+entry.lookbackHours+'小时';
-            status(recentLabel?'本地及远程'+recentLabel+'内未找到记录，可稍后重试或扩大时段。':['influxdb','mixed'].includes(entry.source)?'本地历史记录及远程'+remoteRange+'内未找到匹配的二维码，请确认输入或扩大远程查询范围。':'未找到匹配的二维码，请确认输入内容。','warning');
+            status('本地及远程'+recentLabel+'内未找到匹配记录，可稍后重试或查询今天其他时段。','warning');
         }
         renderHistory();
     }
@@ -335,22 +348,23 @@
     }
     async function doQuery(event,recentMinutes=null) {
         if(event)event.preventDefault();
+        syncTodayScope();
         const recent=recentMinutes!==null;
         const qrcode=byId('qrcodeInput').value.trim();
         if(!recent && !qrcode){status('请输入二维码内容。','warning');byId('qrcodeInput').focus();return;}
         const lookbackHours=Number(byId('lookbackHours').value);
         cancelQuery();const sequence=querySequence;controller=new AbortController();
-        queryLoading(true,recentMinutes);status(recent?'正在查询最近'+recentMinutes+'分钟的记录…':'正在查询二维码对应的模盒轨迹…');
+        queryLoading(true,recentMinutes);status(recent?'正在查询今天内最近'+recentMinutes+'分钟的记录…':'正在查询今天二维码对应的模盒轨迹…');
         try {
             const payload=recent?{lookback_minutes:recentMinutes}:{qrcode,lookback_hours:lookbackHours};
             const response=await fetch(recent?'/api/urldata/box_recent':'/api/urldata/box_query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
             const data=await response.json();
-            if(sequence!==querySequence)return;
+            if(syncTodayScope() || sequence!==querySequence)return;
             if(!response.ok || !data.success)throw new Error(data.error||'查询失败（HTTP '+response.status+'）');
             if(!Array.isArray(data.matches) || data.matches.some(m=>!m || typeof m!=='object'))throw new Error('查询返回的数据格式不完整');
             layoutVersion++;
             // Backend returns newest first, including the real-time fallback.
-            const entry={id:++historyId,qrcode:recent?'最近'+recentMinutes+'分钟':qrcode,matches:data.matches,wheels:data.wheels||[],source:data.source,lookbackHours:data.lookback_hours??lookbackHours,lookbackMinutes:recentMinutes,recentWindowMinutes:data.recent_window_minutes,totalRecords:data.total_records,hasMore:data.has_more===true,warning:data.warning,refreshPending:data.refresh_pending===true,retryAfterMs:data.retry_after_ms,queriedAt:clockText(),round:roundCount+1};
+            const entry={id:++historyId,qrcode:recent?'今天内最近'+recentMinutes+'分钟':qrcode,matches:data.matches,wheels:data.wheels||[],source:data.source,lookbackHours:data.lookback_hours??lookbackHours,lookbackMinutes:recentMinutes,recentWindowMinutes:data.recent_window_minutes,queryScope:data.query_scope,queryStart:data.query_start,queryStop:data.query_stop,scopeLabel:data.scope_label,totalRecords:data.total_records,hasMore:data.has_more===true,warning:data.warning,refreshPending:data.refresh_pending===true,retryAfterMs:data.retry_after_ms,queriedAt:clockText(),round:roundCount+1};
             let completed=false;
             if(!recent) {
                 history.unshift(entry);history=history.slice(0,200);
@@ -393,5 +407,8 @@
         clearSelection();renderHistory();renderMatches();renderInspection();status('查询记录与检验进度已清空。');
     });
     window.addEventListener('pagehide',cancelQuery);
+    window.addEventListener('focus',syncTodayScope);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncTodayScope();});
+    setInterval(syncTodayScope,1000);
     renderHistory();renderInspection();loadLayout();
 })();

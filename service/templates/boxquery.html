@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260915-transport-refresh">
     <script defer src="{{ url_for('static', filename='boxquery/trajectory.js') }}?v=20260910-linked"></script>
     <script defer src="{{ url_for('static', filename='boxquery/trajectory-view.js') }}?v=20260910-linked"></script>
-    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260915-transport-wait5"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260915-today"></script>
 </head>
 <body class="compact-workbench">
     <header class="page-header">
@@ -29,22 +29,20 @@
                 </div>
                 <div class="query-options">
                     <div class="query-range">
-                        <label for="lookbackHours">远程查询范围</label>
+                        <label for="lookbackHours">查询范围</label>
                         <select id="lookbackHours" name="lookback_hours">
-                            <option value="2">最近2小时</option>
-                            <option value="24" selected>最近24小时</option>
-                            <option value="168">最近7天</option>
+                            <option value="24" selected>今天</option>
                         </select>
-                        <span>优先查询本地全部历史记录</span>
+                        <span>北京时间今天 00:00 至今 · 历史记录继续保留</span>
                     </div>
                     <div class="query-shortcuts" role="group" aria-label="按时间快捷查询，无需输入二维码">
-                        <span class="subtle">快捷查询 · 无需二维码</span>
+                        <span class="subtle">今天内快捷查询 · 无需二维码</span>
                         <button type="button" class="button small" id="recent5Button">最近5分钟</button>
                         <button type="button" class="button small" id="recent30Button">最近30分钟</button>
                     </div>
                 </div>
             </form>
-            <p id="queryStatus" class="query-status" role="status" aria-live="polite">输入二维码或选择快捷时段查询，点击记录可切换各轮定位。</p>
+            <p id="queryStatus" class="query-status" role="status" aria-live="polite">查询今天的二维码或快捷时段，点击记录可切换各轮定位。</p>
         </section>
         <div class="content-grid">
             <aside class="sidebar" aria-label="扫码记录与检验进度">

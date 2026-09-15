@@ -10,6 +10,7 @@ import threading
 import sys
 import time
 import hashlib
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 BOX_COUNT = 9
@@ -74,6 +75,8 @@ class UrlDataService:
         c.execute('CREATE INDEX IF NOT EXISTS idx_date ON records(date_str)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_content ON records(content)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_content_nocase ON records(content COLLATE NOCASE)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_content_time_nocase '
+                  'ON records(content COLLATE NOCASE, record_time DESC)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_time ON records(record_time)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_num3 ON records(num3)')
         try:
@@ -104,6 +107,46 @@ class UrlDataService:
             return False
 
     # ========== 数据处理 ==========
+
+    @staticmethod
+    def _today_window(now=None):
+        """业务日期固定为北京时间，不随部署电脑的系统时区变化。"""
+        now = now or datetime.now(timezone.utc)
+        local = now.astimezone(timezone(timedelta(hours=8)))
+        return (local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc),
+                now.astimezone(timezone.utc))
+
+    @classmethod
+    def _limit_today_window(cls, start_time=None, stop_time=None, now=None):
+        day_start, current = cls._today_window(now)
+
+        def parse(value, default):
+            if value is None or value == '':
+                return default
+            if value == 0 or value == '0':
+                return datetime(1970, 1, 1, tzinfo=timezone.utc)
+            if isinstance(value, datetime):
+                date = value
+            else:
+                duration = re.fullmatch(r'-(\d+)([smhdw])', str(value))
+                if duration:
+                    units = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 604800}
+                    return current - timedelta(seconds=int(duration[1]) * units[duration[2]])
+                date = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone(timedelta(hours=8)))
+            return date.astimezone(timezone.utc)
+
+        return max(day_start, parse(start_time, day_start)), min(current, parse(stop_time, current))
+
+    @classmethod
+    def _today_text_window(cls):
+        return tuple(cls._record_time_text(value) for value in cls._today_window())
+
+    @staticmethod
+    def _date_time_value(date, value):
+        return datetime.strptime(f'{date} {value}', '%Y-%m-%d %H:%M:%S' if len(value) == 8
+                                 else '%Y-%m-%d %H:%M').replace(tzinfo=timezone(timedelta(hours=8)))
 
     def process_data(
         self,
@@ -137,6 +180,13 @@ class UrlDataService:
             logs.append(entry)
 
         try:
+            # 一次处理固定同一个起止时间，两路读取跨零点时也不会错开窗口。
+            start, stop = self._limit_today_window(start_time, stop_time)
+            if start >= stop:
+                message = '当前仅处理北京时间今天零点至当前时间的数据，所选时段没有交集。'
+                log(message, 'warning')
+                return {'success': False, 'code': 'outside_today', 'message': message, 'logs': logs}
+            start_time, stop_time = start.isoformat(), stop.isoformat()
             self._reload_config()
             config = self.config
             output_dir = _runtime_path(config.get('输出目录', '输出文件'))
@@ -298,10 +348,7 @@ class UrlDataService:
                     self._save_last_sync_time(latest_time)
 
             if write_output and db_rows:
-                try:
-                    file_date = start_time[:10].replace('-', '')
-                except:
-                    file_date = datetime.now().strftime('%Y%m%d')
+                file_date = self._record_time_text(start)[:10].replace('-', '')
                 output_file = os.path.join(output_dir, "{}{}.txt".format(
                     config.get('输出文件前缀', '排序数据_'), file_date
                 ))
@@ -323,18 +370,20 @@ class UrlDataService:
         try:
             local_tz = timezone(timedelta(hours=8))
             day = datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=local_tz)
+            today, now = self._today_window()
+            if day.date() != today.astimezone(local_tz).date():
+                raise ValueError('仅支持查询和同步北京时间今天的数据')
             if bool(start_time) != bool(stop_time):
                 raise ValueError('请同时填写开始和结束时间')
             if start_time and stop_time:
-                start = datetime.strptime(f'{date} {start_time}', '%Y-%m-%d %H:%M').replace(tzinfo=local_tz)
-                end = datetime.strptime(f'{date} {stop_time}', '%Y-%m-%d %H:%M').replace(tzinfo=local_tz)
+                start = self._date_time_value(date, start_time)
+                end = self._date_time_value(date, stop_time)
                 if start > end:
                     raise ValueError('开始时间不能晚于结束时间')
-                # 与本地查询一致：结束时间包含这一整分钟。
-                end += timedelta(minutes=1)
+                # 与本地查询一致：结束时间包含输入精度对应的整秒或整分钟。
+                end += timedelta(seconds=1) if len(stop_time) == 8 else timedelta(minutes=1)
             else:
                 start, end = day, day + timedelta(days=1)
-            now = datetime.now(local_tz)
             if start > now:
                 raise ValueError('查询时间尚未到达')
             end = min(end, now)
@@ -356,28 +405,37 @@ class UrlDataService:
                     return {'success': True, 'message': '已查询本地记录', 'logs': []}
 
                 # 从本地最后一条开始延续编号，涵盖上次同步到查询起点之间的记录。
-                return self.process_data(last_time.isoformat(), end.isoformat(), write_output=False)
+                return self.process_data(max(last_time, today).isoformat(), end.isoformat(), write_output=False)
         except Exception as exc:
             message = str(exc)
             self.last_process_logs = [{'msg': message, 'level': 'error'}]
             return {'success': False, 'message': message, 'logs': self.last_process_logs}
 
     def query_by_date(self, date, start_time=None, stop_time=None, sort_order='desc'):
+        start, stop = self._today_window()
+        if date != self._record_time_text(start)[:10]:
+            return []
+        if bool(start_time) != bool(stop_time):
+            raise ValueError('请同时填写开始和结束时间')
+        if start_time:
+            start = max(start, self._date_time_value(date, start_time))
+            selected_stop = self._date_time_value(date, stop_time)
+            selected_stop += timedelta(seconds=1) if len(stop_time) == 8 else timedelta(minutes=1)
+            stop = min(stop, selected_stop)
+        if start >= stop:
+            return []
+        lower, upper = self._record_time_text(start), self._record_time_text(stop)
         order = 'DESC' if sort_order == 'desc' else 'ASC'
         conn = self._get_conn()
         c = conn.cursor()
-        if start_time and stop_time:
-            c.execute(f'''SELECT * FROM records WHERE date_str=?
-                AND substr(record_time,12,5) >= ? AND substr(record_time,12,5) <= ?
-                ORDER BY record_time {order}''',
-                      (date, start_time, stop_time))
-        else:
-            c.execute(f'SELECT * FROM records WHERE date_str=? ORDER BY record_time {order}', (date,))
+        c.execute(f'SELECT * FROM records WHERE record_time >= ? '
+                  f'AND record_time < ? ORDER BY record_time {order}', (lower, upper))
         rows = c.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]
 
     def query_by_number(self, num_input, box_indices=None, sort_order='desc'):
+        lower, upper = self._today_text_window()
         target_nums = set()
         for part in num_input.split(','):
             part = part.strip()
@@ -402,20 +460,24 @@ class UrlDataService:
                 placeholders = ','.join('?' * len(target_nums))
                 conditions = ' OR '.join(f'{col} IN ({placeholders})' for col in cols)
                 params = list(target_nums) * len(cols)
-                c.execute(f'SELECT * FROM records WHERE {conditions} ORDER BY record_time {order}', params)
+                c.execute(f'SELECT * FROM records WHERE record_time >= ? AND record_time <= ? '
+                          f'AND ({conditions}) ORDER BY record_time {order}', [lower, upper] + params)
             else:
+                conn.close()
                 return []
         else:
             cols = ['transport'] + [f'num{i+1}' for i in range(BOX_COUNT - 1)]
             conditions = ' OR '.join(f'{col} IN ({",".join("?" * len(target_nums))})' for col in cols)
             params = list(target_nums) * len(cols)
-            c.execute(f'SELECT * FROM records WHERE {conditions} ORDER BY record_time {order}', params)
+            c.execute(f'SELECT * FROM records WHERE record_time >= ? AND record_time <= ? '
+                      f'AND ({conditions}) ORDER BY record_time {order}', [lower, upper] + params)
 
         rows = c.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]
 
     def query_by_number_multi(self, box_queries, sort_order='desc'):
+        lower, upper = self._today_text_window()
         order = 'DESC' if sort_order == 'desc' else 'ASC'
         conn = self._get_conn()
         c = conn.cursor()
@@ -438,29 +500,36 @@ class UrlDataService:
         if not conditions:
             conn.close()
             return []
-        sql = f'SELECT * FROM records WHERE {" OR ".join(conditions)} ORDER BY record_time {order}'
-        c.execute(sql, params)
+        sql = (f'SELECT * FROM records WHERE record_time >= ? AND record_time <= ? '
+               f'AND ({" OR ".join(conditions)}) ORDER BY record_time {order}')
+        c.execute(sql, [lower, upper] + params)
         rows = c.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]
 
     def query_by_content(self, content_search, sort_order='desc'):
+        lower, upper = self._today_text_window()
         order = 'DESC' if sort_order == 'desc' else 'ASC'
         conn = self._get_conn()
         c = conn.cursor()
-        c.execute(f'SELECT * FROM records WHERE content LIKE ? ORDER BY record_time {order}',
-                  (f'%{content_search}%',))
+        c.execute(f'SELECT * FROM records WHERE record_time >= ? AND record_time <= ? '
+                  f'AND content LIKE ? ORDER BY record_time {order}',
+                  (lower, upper, f'%{content_search}%'))
         rows = c.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]
 
     def query_duplicates(self, date, sort_order='desc'):
+        lower, upper = self._today_text_window()
+        if date != lower[:10]:
+            return []
         order = 'DESC' if sort_order == 'desc' else 'ASC'
         conn = self._get_conn()
         c = conn.cursor()
-        c.execute(f'''SELECT * FROM records WHERE date_str=? AND content IN
-            (SELECT content FROM records WHERE date_str=? GROUP BY content HAVING COUNT(*)>1)
-            ORDER BY record_time {order}''', (date, date))
+        c.execute(f'''SELECT * FROM records WHERE record_time >= ? AND record_time <= ? AND content IN
+            (SELECT content FROM records WHERE record_time >= ? AND record_time <= ?
+             GROUP BY content HAVING COUNT(*)>1)
+            ORDER BY record_time {order}''', (lower, upper, lower, upper))
         rows = c.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]
@@ -507,6 +576,7 @@ class UrlDataService:
         fail_count = sum(1 for r in results if r['type'] == '失败')
         response = {
             'results': results,
+            'query_scope': 'today', 'scope_label': '今天',
             'stats': {'total': total, 'url': url_count, 'fail': fail_count,
                       'other': total - url_count - fail_count}
         }
@@ -516,12 +586,8 @@ class UrlDataService:
         return response
 
     def get_file_list(self):
-        conn = self._get_conn()
-        c = conn.cursor()
-        c.execute('SELECT DISTINCT date_str FROM records ORDER BY date_str DESC')
-        dates = [row['date_str'] for row in c.fetchall()]
-        conn.close()
-        return dates
+        # 即使今天还没有落库记录，也保留今日入口供手动刷新。
+        return [self._today_text_window()[0][:10]]
 
     # ========== 辅助方法 ==========
 
@@ -644,126 +710,60 @@ class UrlDataService:
         })
 
     def ensure_initial_sync(self):
-        """
-        首次启动自检：
-        - 本地库已有记录时从最后时间继续增量同步，不再回补历史。
-        - 新环境默认只回溯最近 24 小时；可在 config.json 中显式开启全量历史。
-        """
+        """保留历史库和已有编号状态；空库初始化也只读取北京时间今天。"""
         with self._process_lock, self._initial_sync_lock:
             summary = self._database_summary()
             previous_state = self._read_initial_sync_state() or {}
-
             if summary['record_count'] > 0:
                 if summary['last_record_time'] and not self._get_last_sync_time():
                     self._save_last_sync_time(summary['last_record_time'])
                 state = self._write_initial_sync_state({
-                    **previous_state,
-                    'status': 'completed',
-                    'source': previous_state.get('source', 'existing_database'),
-                    'checked_at': _now_text(),
+                    **previous_state, 'status': 'completed', 'query_scope': 'today',
+                    'source': 'existing_database', 'checked_at': _now_text(),
                     'completed_at': previous_state.get('completed_at', _now_text()),
-                    'historical_backfill_enabled': False,
-                    'requires_manual_action': False,
-                    **summary,
+                    'historical_backfill_enabled': False, 'full_history_verified': False,
+                    'requires_manual_action': False, **summary,
                 })
-                logging.info(
-                    "首次同步自检：本地已有 %d 条记录，跳过历史回补",
-                    summary['record_count'],
-                )
+                logging.info("本地已有记录，保留历史及编号状态，仅继续同步今天的数据")
                 return {'success': True, 'action': 'existing_database', 'state': state}
 
+            start, stop = self._today_window()
             started_at = _now_text()
-            self._reload_config()
-            initial_config = self.config.get('首次同步', {})
-            full_history = initial_config.get('拉取全部历史', False) is True
-            try:
-                lookback_hours = max(1, int(initial_config.get('回溯小时', 24)))
-            except (TypeError, ValueError):
-                lookback_hours = 24
-            source = 'influxdb_full_sync' if full_history else 'influxdb_recent_sync'
-            self._write_initial_sync_state({
-                'status': 'running',
-                'source': source,
-                'checked_at': started_at,
-                'started_at': started_at,
-                'historical_backfill_enabled': full_history,
-                'initial_lookback_hours': None if full_history else lookback_hours,
-                'full_history_verified': False,
+            base = {
+                'source': 'influxdb_today_sync', 'query_scope': 'today',
+                'checked_at': started_at, 'started_at': started_at,
+                'query_start': self._record_time_text(start),
+                'query_stop': self._record_time_text(stop),
+                'historical_backfill_enabled': False, 'full_history_verified': False,
                 'requires_manual_action': False,
-                **summary,
-            })
-            if full_history:
-                logging.info("首次同步自检：本地数据库为空，开始自动全量初始化")
-            else:
-                logging.info(
-                    "首次同步自检：本地数据库为空，先同步最近 %d 小时",
-                    lookback_hours,
-                )
-
-            remote_earliest_time = None
+            }
+            self._write_initial_sync_state({**base, 'status': 'running', **summary})
+            logging.info("首次同步只读取北京时间今天零点至当前时间的数据")
             try:
-                if full_history:
-                    earliest = self._get_earliest_influx_time()
-                    if earliest is None:
-                        raise RuntimeError("InfluxDB 主数据桶中没有可读取的数据")
-                    if hasattr(earliest, 'astimezone'):
-                        remote_earliest_time = (
-                            earliest.astimezone(timezone.utc)
-                            .isoformat()
-                            .replace('+00:00', 'Z')
-                        )
-                    else:
-                        remote_earliest_time = str(earliest)
-                    start_time = remote_earliest_time
-                else:
-                    start_time = '-{}h'.format(lookback_hours)
-
-                result = self.process_data(
-                    start_time,
-                    reset_numbers=True,
-                    write_output=False,
-                )
+                # 新库也可能保留着客户设定的编号文件，不能因日期范围改变而重置。
+                result = self.process_data(start.isoformat(), stop.isoformat(),
+                                           reset_numbers=False, write_output=False)
                 summary = self._database_summary()
                 if result.get('success') and summary['record_count'] > 0:
                     state = self._write_initial_sync_state({
-                        'status': 'completed',
-                        'source': source,
-                        'checked_at': started_at,
-                        'started_at': started_at,
-                        'completed_at': _now_text(),
-                        'remote_earliest_time': remote_earliest_time,
-                        'historical_backfill_enabled': full_history,
-                        'initial_lookback_hours': None if full_history else lookback_hours,
-                        'full_history_verified': full_history,
-                        'requires_manual_action': False,
+                        **base, 'status': 'completed', 'completed_at': _now_text(), **summary,
+                    })
+                    return {'success': True, 'action': 'initialized', 'state': state}
+                if result.get('code') in {'no_data', 'outside_today'}:
+                    state = self._write_initial_sync_state({
+                        **base, 'status': 'waiting', 'message': '今天暂时没有可同步记录，等待下次同步',
                         **summary,
                     })
-                    logging.info(
-                        "首次数据初始化完成，共 %d 条记录",
-                        summary['record_count'],
-                    )
-                    return {'success': True, 'action': 'initialized', 'state': state}
-
-                error = result.get('message') or '全量同步结束后本地数据库仍为空'
+                    return {'success': True, 'action': 'waiting_today', 'state': state}
+                error = result.get('message') or '今天的数据同步失败'
             except Exception as exc:
                 error = str(exc)
                 summary = self._database_summary()
-
             state = self._write_initial_sync_state({
-                'status': 'failed',
-                'source': source,
-                'checked_at': started_at,
-                'started_at': started_at,
-                'failed_at': _now_text(),
-                'remote_earliest_time': remote_earliest_time,
-                'historical_backfill_enabled': full_history,
-                'initial_lookback_hours': None if full_history else lookback_hours,
-                'full_history_verified': False,
-                'requires_manual_action': True,
-                'last_error': error,
-                **summary,
+                **base, 'status': 'failed', 'failed_at': _now_text(),
+                'requires_manual_action': True, 'last_error': error, **summary,
             })
-            logging.error("首次全量初始化失败: %s", error)
+            logging.error("今天的数据初始化失败: %s", error)
             return {'success': False, 'action': 'failed', 'error': error, 'state': state}
 
     # ========== 设置相关 ==========
@@ -876,7 +876,7 @@ class UrlDataService:
     # ========== InfluxDB ==========
 
     def _get_earliest_influx_time(self):
-        """查询主数据桶当前可读取到的最早记录时间。"""
+        """只检查主数据桶今天可读取到的最早记录时间。"""
         from influxdb_client import InfluxDBClient
 
         client = InfluxDBClient(
@@ -885,9 +885,10 @@ class UrlDataService:
             org=self.influx_config['org'],
         )
         try:
+            start, stop = self._today_window()
             bucket = self.influx_config['bucket_data']
             query = f'''from(bucket: "{bucket}")
-                |> range(start: 0)
+                |> range(start: {start.isoformat()}, stop: {stop.isoformat()})
                 |> filter(fn: (r) => r["_field"] == "code")
                 |> first()
                 |> group()
@@ -902,7 +903,7 @@ class UrlDataService:
             client.close()
 
     def get_influx_history_profile(self):
-        """列出主数据桶中各 measurement/field 当前可读取到的最早时间。"""
+        """列出主数据桶中各 measurement/field 今天可读取到的最早时间。"""
         try:
             from influxdb_client import InfluxDBClient
 
@@ -912,9 +913,10 @@ class UrlDataService:
                 org=self.influx_config['org'],
             )
             try:
+                start, stop = self._today_window()
                 bucket = self.influx_config['bucket_data']
                 query = f'''from(bucket: "{bucket}")
-                    |> range(start: 0)
+                    |> range(start: {start.isoformat()}, stop: {stop.isoformat()})
                     |> first()
                     |> group(columns: ["_measurement", "_field"])
                     |> sort(columns: ["_time"])
@@ -942,6 +944,7 @@ class UrlDataService:
                     'success': True,
                     'bucket': bucket,
                     'fields': fields,
+                    'query_scope': 'today',
                 }
             finally:
                 client.close()
@@ -1015,10 +1018,12 @@ class UrlDataService:
             health = client.health()
             bucket_status = {}
             query_api = client.query_api()
+            start, stop = self._limit_today_window('-1h')
             for key in ['bucket_data', 'bucket_verify']:
                 bucket = self.influx_config[key]
                 try:
-                    query = f'from(bucket: "{bucket}") |> range(start: -1h) |> limit(n: 1)'
+                    query = (f'from(bucket: "{bucket}") '
+                             f'|> range(start: {start.isoformat()}, stop: {stop.isoformat()}) |> limit(n: 1)')
                     tables = query_api.query(query, org=self.influx_config['org'])
                     has_data = any(len(t.records) > 0 for t in tables)
                     bucket_status[bucket] = {'connected': True, 'has_recent_data': has_data}
@@ -1041,6 +1046,7 @@ class UrlDataService:
 
     def query_influx_sample(self, bucket_key='bucket_data', hours=1, limit=10):
         try:
+            start, stop = self._limit_today_window('-{}h'.format(max(1, int(hours))))
             from influxdb_client import InfluxDBClient
             bucket = self.influx_config[bucket_key]
             client = InfluxDBClient(
@@ -1049,7 +1055,8 @@ class UrlDataService:
                 org=self.influx_config['org']
             )
             query_api = client.query_api()
-            query = f'from(bucket: "{bucket}") |> range(start: -{hours}h) |> limit(n: {limit})'
+            query = (f'from(bucket: "{bucket}") '
+                     f'|> range(start: {start.isoformat()}, stop: {stop.isoformat()}) |> limit(n: {int(limit)})')
             tables = query_api.query(query, org=self.influx_config['org'])
             records = []
             for table in tables:
@@ -1230,9 +1237,11 @@ class UrlDataService:
         windows = [(max(start, date - timedelta(minutes=2)), min(stop, date + timedelta(minutes=2)))
                    for date in times if start <= date <= stop]
         if include_live is not None:
-            windows.append((include_live, stop))
+            windows.append((max(start, include_live), stop))
         merged = []
         for left, right in sorted(windows):
+            if left >= right:
+                continue
             if merged and left <= merged[-1][1]:
                 merged[-1] = (merged[-1][0], max(right, merged[-1][1]))
             else:
@@ -1377,9 +1386,11 @@ class UrlDataService:
         began = time.monotonic()
         wheels = self.get_box_layout()['wheels']
         recent = lookback_minutes is not None
-        stop = datetime.now(timezone.utc)
-        start = stop - (timedelta(minutes=lookback_minutes) if recent else timedelta(hours=lookback_hours))
-        live_start = stop - timedelta(minutes=lookback_minutes if recent else 5)
+        day_start, stop = self._today_window()
+        start = max(day_start, stop - (timedelta(minutes=lookback_minutes) if recent
+                                      else timedelta(hours=lookback_hours)))
+        live_start = max(start, stop - timedelta(minutes=lookback_minutes if recent else 5))
+        local_start, local_stop = self._record_time_text(start), self._record_time_text(stop)
         limit = 500 if recent else 50
         observed = {'remote_checked': False, 'latest_qr_event_time': None,
                     'latest_verification_event_time': None}
@@ -1392,6 +1403,8 @@ class UrlDataService:
                     observed[name] = max(observed[name] or latest, latest)
 
         def finish(result):
+            result.update(query_scope='today', scope_label='今天',
+                          query_start=local_start, query_stop=local_stop)
             matches = result.get('matches', [])
             if not result['success']:
                 state = 'query_error'
@@ -1415,6 +1428,7 @@ class UrlDataService:
                 'query_duration_ms': round((time.monotonic() - began) * 1000),
                 'live_window_start': self._record_time_text(live_start),
                 'live_window_stop': self._record_time_text(stop),
+                'query_scope': 'today', 'query_start': local_start,
                 'latest_match_event_time': max((record['time'] for record in matches), default=None),
             }
             result['diagnostics'] = diagnostics
@@ -1435,13 +1449,15 @@ class UrlDataService:
                 # 仍走 content 索引，不能为了兼容行尾重新扫描全部历史记录。
                 variants = tuple(qrcode + ending for ending in ('', '\r\n', '\n', '\r'))
                 conditions = ' OR '.join('content = ? COLLATE NOCASE' for _ in variants)
-                rows = conn.execute('SELECT * FROM records WHERE (' + conditions + ') '
-                                    'ORDER BY record_time DESC, id DESC LIMIT ?', variants + (limit,)).fetchall()
+                rows = conn.execute('SELECT * FROM records WHERE record_time >= ? AND record_time <= ? '
+                                    'AND (' + conditions + ') ORDER BY record_time DESC, id DESC LIMIT ?',
+                                    (local_start, local_stop) + variants + (limit,)).fetchall()
                 if not rows and not qrcode.lower().startswith(('http://', 'https://')):
                     escaped = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-                    rows = conn.execute("SELECT * FROM records WHERE content LIKE ? ESCAPE '\\' "
+                    rows = conn.execute("SELECT * FROM records WHERE record_time >= ? AND record_time <= ? "
+                                        "AND content LIKE ? ESCAPE '\\' "
                                         'ORDER BY record_time DESC, id DESC LIMIT ?',
-                                        (f'%{escaped}%', limit)).fetchall()
+                                        (local_start, local_stop, f'%{escaped}%', limit)).fetchall()
         finally:
             conn.close()
         local_matches = [self._local_box_record(row, wheels) for row in rows]
@@ -1462,7 +1478,7 @@ class UrlDataService:
                     remote_matches.extend(self._format_remote_boxes(raw, verification, wheels, qrcode))
                     if warning:
                         warnings.append(warning)
-                if not recent and not remote_matches and not refresh:
+                if not recent and not remote_matches and not refresh and start < live_start:
                     # 先在服务器筛出匹配时间，再读取周围完整序列，避免传回整天的所有码。
                     located = self._load_influx_records('bucket_data', start.isoformat(), live_start.isoformat(),
                                                        qrcode=qrcode, limit=limit)
@@ -1503,9 +1519,9 @@ class UrlDataService:
     def start_auto_sync(self):
         def _sync_loop():
             initial_result = None
-            while not initial_result or not initial_result.get('success'):
+            while True:
                 initial_result = self.ensure_initial_sync()
-                if initial_result.get('success'):
+                if initial_result.get('success') and initial_result.get('action') != 'waiting_today':
                     break
                 self._reload_config()
                 retry_config = self.config.get('定时处理', {})
@@ -1541,15 +1557,13 @@ class UrlDataService:
                             interval = 10
                         if skip_immediate_sync:
                             skip_immediate_sync = False
-                            logging.info("首次全量同步刚完成，%d 秒后开始增量同步", interval)
+                            logging.info("首次今日同步刚完成，%d 秒后开始增量同步", interval)
                         else:
                             logging.info("自动同步：开始处理...")
                             last_sync = self._get_last_sync_time()
-                            if last_sync:
-                                start_time = last_sync.replace(' ', 'T') + '+08:00'
-                            else:
-                                start_time = '-{}s'.format(interval + 60)
-                            result = self.process_data(start_time)
+                            # 上次同步可能在昨天或更早；每天从今日零点开始限制增量窗口。
+                            start, stop = self._limit_today_window(last_sync)
+                            result = self.process_data(start.isoformat(), stop.isoformat())
                             self.last_process_logs = result.get('logs', [])
                             logging.info("自动同步：处理完成，等待 %d 秒", interval)
                         threading.Event().wait(interval)
