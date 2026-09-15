@@ -83,9 +83,9 @@
             const description=state==='empty'?'等待查询':state==='missing'?'暂无编号':state==='unconfigured'?'范围未配置':state==='out-of-range'?'编号超出范围':state==='moving'?'目标模盒':'模盒编号';
             group.dataset.state=state;
             value.textContent=motion.target===null?'—':'M-'+String(motion.target).padStart(2,'0');
-            detail.textContent=valid && inferred?'依据前后输送记录核对推算':description;
+            detail.textContent=valid && inferred?'已知编号与连续记录推算':description;
             range.textContent=motion.count?'循环 '+motion.min+'–'+motion.max+' · '+motion.count+' 个盒模':'循环范围待加载';
-            title.textContent='输送盒模：'+description+(motion.target!==null?' '+motion.target:'')+(motion.count?'，编号范围 '+motion.min+' 至 '+motion.max:'')+(valid && inferred?'，依据前后输送记录核对推算':'');
+            title.textContent='输送盒模：'+description+(motion.target!==null?' '+motion.target:'')+(motion.count?'，编号范围 '+motion.min+' 至 '+motion.max:'')+(valid && inferred?'，依据已知输送编号及连续记录推算':'');
             marker.setAttribute('visibility',valid?'visible':'hidden');
             if(valid) {
                 const p=point(motion.cursor);marker.setAttribute('transform','translate('+p.x+' '+p.y+')');
@@ -283,7 +283,7 @@
                 const inferred=Array.isArray(record.inferred_wheels) && record.inferred_wheels.includes(wheel.id);
                 const normalized=Array.isArray(record.normalized_wheels) && record.normalized_wheels.includes(wheel.id);
                 const adjacent=record.box_number_source==='adjacent_verification';
-                cell.title=wheel.name+'：'+(value===null?'暂无编号':value)+(normalized?'（原编号 '+record.original_wheel_numbers?.[String(wheel.id)]+'，按配置循环范围换算）':inferred?(wheel.id===0?'（依据前后输送记录核对推算）':adjacent?'（校验原值 '+(record.verification_value??'空')+'；前后校验一致，按循环推算）':'（按三号轮校验推算）'):'');
+                cell.title=wheel.name+'：'+(value===null?'暂无编号':value)+(normalized?'（原编号 '+record.original_wheel_numbers?.[String(wheel.id)]+'，按配置循环范围换算）':inferred?(wheel.id===0?'（依据已知输送编号及连续记录推算）':adjacent?'（校验原值 '+(record.verification_value??'空')+'；前后校验一致，按循环推算）':'（按三号轮校验推算）'):'');
                 cell.setAttribute('aria-label',cell.title);
             }
             button('select-record',record===selectedRecord?'已选中':'查看轨迹',element('td','',null,row),()=>selectRecord(record));

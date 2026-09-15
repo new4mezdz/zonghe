@@ -1259,8 +1259,53 @@ class UrlDataService:
     def _box_record_key(record):
         return record['time'], str(record['content'])
 
+    @classmethod
+    def _trusted_transport_anchor(cls, row):
+        value, third = cls._box_number(row['transport']), cls._box_number(row['num3'])
+        return (value is not None and 1 <= value <= 40
+                and third is not None and 1 <= third <= 8
+                and cls._box_number(row['verification']) == third)
+
+    def _box_transport_context_windows(self, windows, day_start):
+        """补读今日已知输送编号到查询窗口之间的连续数据，仍不读取昨天。"""
+        if not windows:
+            return []
+        conn = self._get_conn()
+        expanded = []
+        try:
+            for left, right in windows:
+                earliest = max(day_start, left - timedelta(minutes=30))
+                # 少量前置本地记录既提供已知编号，也提供连接处的采集节拍。
+                rows = conn.execute(
+                    'SELECT record_time, transport, num3, verification FROM records '
+                    'WHERE record_time >= ? AND record_time <= ? '
+                    'ORDER BY record_time DESC, id DESC LIMIT 40',
+                    (self._record_time_text(earliest), self._record_time_text(left)),
+                ).fetchall()
+                anchor = next((idx for idx, row in enumerate(rows)
+                               if self._trusted_transport_anchor(row)), None)
+                if anchor is not None:
+                    prefix = rows[min(anchor + 3, len(rows) - 1)]['record_time']
+                    try:
+                        date = datetime.fromisoformat(prefix)
+                        if date.tzinfo is None:
+                            date = date.replace(tzinfo=timezone(timedelta(hours=8)))
+                        left = max(earliest, min(left, date.astimezone(timezone.utc)))
+                    except (ValueError, TypeError):
+                        pass
+                expanded.append((left, right))
+        finally:
+            conn.close()
+        merged = []
+        for left, right in sorted(expanded):
+            if merged and left <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(right, merged[-1][1]))
+            else:
+                merged.append((left, right))
+        return merged
+
     def _box_transport_numbers(self, records, box_numbers, adjacent_inferred, wheels):
-        """输送相位只来自同一条已落库记录；三号轮本身无法确定 40 格相位。"""
+        """沿可信本地输送编号接续完整原始序列；查询推算不写回计数器。"""
         numbers, inferred = {}, set()
         transport = next((wheel for wheel in wheels if wheel['id'] == 0), None)
         reference = next((wheel for wheel in wheels if wheel['id'] == 3), None)
@@ -1270,66 +1315,76 @@ class UrlDataService:
         conn = self._get_conn()
         try:
             rows = conn.execute(
-                'SELECT * FROM records WHERE record_time >= ? AND record_time <= ?',
-                (self._record_time_text(records[0]['time']),
-                 self._record_time_text(records[-1]['time'])),
+                'SELECT record_time, content, transport, num3, verification FROM records '
+                'WHERE record_time >= ? AND record_time <= ?',
+                (self._record_time_text(min(record['time'] for record in records)),
+                 self._record_time_text(max(record['time'] for record in records))),
             ).fetchall()
         finally:
             conn.close()
-        local = {(row['record_time'], str(row['content'])): row for row in rows}
-        # 时间不递增或直接校验的步进变化时分段，禁止跨断点传递输送相位。
-        segments, segment, phase = [], [], None
+        local = {}
+        for row in rows:
+            key = (row['record_time'], str(row['content']))
+            # 重复落库记录即使恰好相同也不能作为独立的相位依据。
+            local[key] = row if key not in local else None
+
+        intervals = [(records[idx + 1]['time'] - records[idx]['time']).total_seconds()
+                     for idx in range(len(records) - 1)]
+        positive = sorted(gap for gap in intervals if gap > 0)
+        max_gap = 2.0
+        if len(positive) >= 3:
+            max_gap = min(max_gap, positive[(len(positive) - 1) // 2] * 3)
+
+        segments, segment = [], []
         for idx, record in enumerate(records):
             number = box_numbers[idx]
-            current_phase = ((number - 1 - idx) % 8
-                             if number is not None and idx not in adjacent_inferred else None)
-            if segment and (record['time'] <= records[idx - 1]['time']
-                            or (phase is not None and current_phase is not None and phase != current_phase)):
+            direct = number is not None and idx not in adjacent_inferred
+            # 原始索引仍用于 +2 校验配对。重复/同时间歧义无法核对完整计数时中断。
+            invalid_order = idx > 0 and (
+                record['time'] <= records[idx - 1]['time']
+                or self._record_time_text(record['time']) == self._record_time_text(records[idx - 1]['time']))
+            if not direct or invalid_order:
+                if segment:
+                    segments.append(segment)
+                segment = []
+                continue
+            if segment and (intervals[idx - 1] > max_gap
+                            or number != box_numbers[segment[-1]] % 8 + 1):
                 segments.append(segment)
-                segment, phase = [], None
+                segment = []
             segment.append(idx)
-            if current_phase is not None:
-                phase = current_phase
         if segment:
             segments.append(segment)
+
         for segment in segments:
             anchors = {}
             for idx in segment:
                 record = records[idx]
                 row = local.get((self._record_time_text(record['time']), str(record['value'])))
-                if row is None or idx in adjacent_inferred or box_numbers[idx] is None:
-                    continue
-                value = self._box_number(row['transport'])
-                if (value is not None and 1 <= value <= 40
-                        and self._box_number(row['num3']) == box_numbers[idx]
-                        and self._box_number(row['verification']) == box_numbers[idx]):
-                    anchors[idx] = value
+                if (row is not None and self._trusted_transport_anchor(row)
+                        and self._box_number(row['num3']) == box_numbers[idx]):
+                    anchors[idx] = self._box_number(row['transport'])
             phases = {(value - 1 - idx) % 40 for idx, value in anchors.items()}
-            # 多个已知输送位置必须一致；冲突时保留数据库值，不外推。
-            if len(anchors) < 2 or len(phases) != 1:
+            # 任一已知编号冲突，整段都不推算；不能拿推算值重新充当锚点。
+            if len(phases) != 1:
                 continue
-            left, right = min(anchors), max(anchors)
-            intervals = [(records[idx + 1]['time'] - records[idx]['time']).total_seconds()
-                         for idx in range(left, right)]
-            # 两侧相位一致仍不足以排除中途整圈漏采；样本少或明显停顿时不补号。
-            if len(intervals) < 3:
-                continue
-            typical = sorted(intervals)[(len(intervals) - 1) // 2]
-            if typical <= 0 or any(gap > min(2.0, typical * 3) for gap in intervals):
-                continue
-            transport_phase = phases.pop()
-            for idx in range(left, right + 1):
-                if box_numbers[idx] is not None:
-                    numbers[idx] = (transport_phase + idx) % 40 + 1
-                    if idx not in anchors:
-                        inferred.add(idx)
+            phase, first = phases.pop(), min(anchors)
+            for idx in segment:
+                if idx < first:
+                    continue
+                numbers[idx] = (phase + idx) % 40 + 1
+                if idx not in anchors:
+                    inferred.add(idx)
         return numbers, inferred
 
-    def _format_remote_boxes(self, records, verification, wheels, qrcode=None):
+    def _format_remote_boxes(self, records, verification, wheels, qrcode=None, visible_windows=None):
         box_numbers, adjacent = self._resolve_remote_box_numbers(records, verification, wheels)
         transport, transport_inferred = self._box_transport_numbers(records, box_numbers, adjacent, wheels)
         matched = []
         for idx, record in enumerate(records):
+            if visible_windows is not None and not any(left <= record['time'] < right
+                                                       for left, right in visible_windows):
+                continue
             if qrcode is not None and qrcode.casefold() not in str(record['value']).casefold():
                 continue
             box_num = box_numbers[idx]
@@ -1352,6 +1407,29 @@ class UrlDataService:
                                        else 'invalid_value' if idx + 2 < len(verification) else 'missing_record'),
                 'content': record['value'], 'time': self._record_time_text(record['time']),
             })
+        return matched
+
+    def _format_box_query_context(self, records, verification, wheels, qrcode, visible_windows):
+        """原窗口决定已有轮号；连接段仅在直接校验一致时补充输送编号。"""
+        extended = {}
+        for record in self._format_remote_boxes(records, verification, wheels, qrcode,
+                                               visible_windows=visible_windows):
+            key = self._box_record_key(record)
+            extended[key] = record if key not in extended else None
+        matched = []
+        for left, right in visible_windows:
+            # 每个窗口保持独立的 +2 关系；不能因连接段两桶数量不同而改动其他轮号。
+            raw_window = [row for row in records if left <= row['time'] < right]
+            verification_window = [row for row in verification if left <= row['time'] < right]
+            for record in self._format_remote_boxes(raw_window, verification_window, wheels, qrcode):
+                extra = extended.get(self._box_record_key(record))
+                if (record['wheel_numbers'].get('0') is None and extra is not None
+                        and extra['wheel_numbers'].get('0') is not None
+                        and record['box_number_source'] == extra['box_number_source'] == 'verification'
+                        and record['box_num'] == extra['box_num']):
+                    record['wheel_numbers']['0'] = extra['wheel_numbers']['0']
+                    record['inferred_wheels'] = sorted(set(record['inferred_wheels']) | {0})
+                matched.append(record)
         return matched
 
     def _merge_box_record(self, local, remote):
@@ -1472,10 +1550,11 @@ class UrlDataService:
                 times = pending_times if refresh else []
                 windows = self._box_context_windows(times or [], start, stop, include_live=live_start)
                 live_only = len(windows) == 1 and windows[0][0] == live_start
-                for raw, verification, warning in self._load_box_windows(windows):
+                context = self._box_transport_context_windows(windows, day_start)
+                for raw, verification, warning in self._load_box_windows(context):
                     observe(raw, verification)
-                    raw_count += len(raw)
-                    remote_matches.extend(self._format_remote_boxes(raw, verification, wheels, qrcode))
+                    raw_count += sum(any(left <= row['time'] < right for left, right in windows) for row in raw)
+                    remote_matches.extend(self._format_box_query_context(raw, verification, wheels, qrcode, windows))
                     if warning:
                         warnings.append(warning)
                 if not recent and not remote_matches and not refresh and start < live_start:
@@ -1483,10 +1562,11 @@ class UrlDataService:
                     located = self._load_influx_records('bucket_data', start.isoformat(), live_start.isoformat(),
                                                        qrcode=qrcode, limit=limit)
                     windows = self._box_context_windows([record['time'] for record in located], start, stop)
-                    for raw, verification, warning in self._load_box_windows(windows):
+                    context = self._box_transport_context_windows(windows, day_start)
+                    for raw, verification, warning in self._load_box_windows(context):
                         observe(raw, verification)
-                        raw_count += len(raw)
-                        remote_matches.extend(self._format_remote_boxes(raw, verification, wheels, qrcode))
+                        raw_count += sum(any(left <= row['time'] < right for left, right in windows) for row in raw)
+                        remote_matches.extend(self._format_box_query_context(raw, verification, wheels, qrcode, windows))
                         if warning:
                             warnings.append(warning)
                     live_only = False
