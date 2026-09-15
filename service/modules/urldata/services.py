@@ -8,6 +8,9 @@ from collections import Counter
 from config import Config
 import threading
 import sys
+import time
+import hashlib
+from concurrent.futures import ThreadPoolExecutor
 
 BOX_COUNT = 9
 
@@ -70,6 +73,7 @@ class UrlDataService:
         )''')
         c.execute('CREATE INDEX IF NOT EXISTS idx_date ON records(date_str)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_content ON records(content)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_content_nocase ON records(content COLLATE NOCASE)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_time ON records(record_time)')
         c.execute('CREATE INDEX IF NOT EXISTS idx_num3 ON records(num3)')
         try:
@@ -950,7 +954,7 @@ class UrlDataService:
     def _load_verification_from_influx(self, start_time, stop_time=None):
         return self._load_influx_records('bucket_verify', start_time, stop_time)
 
-    def _load_influx_records(self, bucket_key, start_time, stop_time=None):
+    def _load_influx_records(self, bucket_key, start_time, stop_time=None, qrcode=None, limit=None):
         bucket = self.influx_config[bucket_key]
         client = None
         try:
@@ -964,8 +968,22 @@ class UrlDataService:
             stop_clause = f', stop: {stop_time}' if stop_time else ''
             query = f'''from(bucket: "{bucket}")
               |> range(start: {start_time}{stop_clause})
-              |> filter(fn: (r) => r["_field"] == "code")
-              |> sort(columns: ["_time"])'''
+              |> filter(fn: (r) => r["_field"] == "code")'''
+            if qrcode is not None:
+                # 这里只定位二维码时间，编号仍由随后同一完整窗口的两路原始序列配对。
+                # Flux 字符串支持插值，用 UTF-8 字节转义同时保护引号、控制字符和 ${}。
+                literal = '"' + ''.join('\\x{:02x}'.format(byte)
+                                        for byte in qrcode.lower().encode('utf-8')) + '"'
+                query = 'import "strings"\n' + query + f'''
+                  |> filter(fn: (r) => strings.containsStr(
+                    v: strings.toLower(v: string(v: r["_value"])), substr: {literal}))'''
+            if limit is not None:
+                query += f'''
+                  |> group(columns: [])
+                  |> sort(columns: ["_time"], desc: true)
+                  |> limit(n: {int(limit)})'''
+            else:
+                query += '\n  |> sort(columns: ["_time"])'
             tables = client.query_api().query(query, org=self.influx_config['org'])
             records = []
             for table in tables:
@@ -1062,7 +1080,7 @@ class UrlDataService:
         self._reload_config()
         mins = self.config.get('编号下限列表', [])
         maxs = self.config.get('编号上限列表', [])
-        names = {1: '一号轮', 2: '二号轮', 3: '三号轮', 4: '四号轮',
+        names = {0: '输送盒模', 1: '一号轮', 2: '二号轮', 3: '三号轮', 4: '四号轮',
                  5: '五号轮', 6: '六号轮', 8: '八号轮'}
         wheels = []
         for wheel_id, name in names.items():
@@ -1076,13 +1094,36 @@ class UrlDataService:
             })
         return {'wheels': wheels}
 
-    def query_box_by_qrcode(self, qrcode, lookback_hours=24):
+    @staticmethod
+    def _box_pending_times(pending_times):
+        if pending_times is None:
+            return []
+        if not isinstance(pending_times, list) or len(pending_times) > 3:
+            raise ValueError('待确认时间最多为3条')
+        parsed = []
+        for value in pending_times:
+            if not isinstance(value, str) or len(value) > 64:
+                raise ValueError('待确认时间格式不正确')
+            date = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if date.tzinfo is None:
+                date = date.replace(tzinfo=timezone(timedelta(hours=8)))
+            parsed.append(date.astimezone(timezone.utc))
+        return sorted(set(parsed))
+
+    def query_box_by_qrcode(self, qrcode, lookback_hours=24, refresh=False, pending_times=None):
         if not isinstance(qrcode, str) or not qrcode.strip():
             return {'success': False, 'error': '请输入二维码'}
         qrcode = qrcode.strip()
         if type(lookback_hours) is not int or lookback_hours not in (2, 24, 168):
             return {'success': False, 'error': '请选择有效的远程查询时间范围'}
-        return self._query_box_records(qrcode=qrcode, lookback_hours=lookback_hours)
+        if type(refresh) is not bool:
+            return {'success': False, 'error': '刷新参数格式不正确'}
+        try:
+            pending = self._box_pending_times(pending_times)
+        except (ValueError, OverflowError):
+            return {'success': False, 'error': '待确认时间格式不正确，最多提供3条'}
+        return self._query_box_records(qrcode=qrcode, lookback_hours=lookback_hours,
+                                       refresh=refresh, pending_times=pending)
 
     def query_recent_boxes(self, lookback_minutes):
         if type(lookback_minutes) is not int or lookback_minutes not in (5, 30):
@@ -1142,7 +1183,7 @@ class UrlDataService:
         return numbers, inferred
 
     def _local_box_record(self, row, wheels):
-        numbers = {str(wheel['id']): self._box_number(row[f"num{wheel['id']}"])
+        numbers = {str(wheel['id']): self._box_number(row['transport' if wheel['id'] == 0 else f"num{wheel['id']}"])
                    for wheel in wheels}
         original = {}
         reference = next((wheel for wheel in wheels if wheel['id'] == 3), None)
@@ -1156,117 +1197,308 @@ class UrlDataService:
                         and value is not None and value > maximum):
                     original[key] = value
                     numbers[key] = (value - 1) % maximum + 1
+        for wheel in wheels:
+            key = str(wheel['id'])
+            value = numbers[key]
+            if (value is not None and (wheel['min'] is None or wheel['max'] is None
+                                      or not wheel['min'] <= value <= wheel['max'])):
+                numbers[key] = None
         result = {
             'index': row['id'], 'numbers': [numbers['3']], 'box_num': numbers['3'],
             'wheel_numbers': numbers, 'content': row['content'], 'time': row['record_time'],
+            'verification_value': row['verification'],
         }
         if original:
             result.update(normalized_wheels=[int(key) for key in original],
                           original_wheel_numbers=original)
         return result
 
-    def _query_box_records(self, qrcode=None, lookback_hours=24, lookback_minutes=None):
-        layout = self.get_box_layout()
-        recent = lookback_minutes is not None
-        # 固定查询截止时间，本地北京时间与两路远程 UTC 查询使用同一窗口。
-        stop = datetime.now(timezone.utc)
-        start = stop - (timedelta(minutes=lookback_minutes) if recent
-                        else timedelta(hours=lookback_hours))
-        limit = 500 if recent else 50
-        if recent:
-            where = 'record_time >= ? AND record_time <= ?'
-            params = (self._record_time_text(start), self._record_time_text(stop))
-        else:
-            # 二维码中的百分号和下划线是字面内容，不是 LIKE 通配符。
-            escaped_code = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-            where = "content LIKE ? ESCAPE '\\'"
-            params = (f'%{escaped_code}%',)
+    def _load_box_window(self, start, stop):
+        """两路并行读取同一个固定窗口，配对前保留完整原始序列。"""
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            raw = pool.submit(self._load_data_from_influx, start.isoformat(), stop.isoformat())
+            verification = pool.submit(self._load_verification_from_influx,
+                                       start.isoformat(), stop.isoformat())
+            records = raw.result()
+            try:
+                return records, verification.result(), None
+            except RuntimeError as exc:
+                return records, [], str(exc)
+
+    @staticmethod
+    def _box_context_windows(times, start, stop, include_live=None):
+        windows = [(max(start, date - timedelta(minutes=2)), min(stop, date + timedelta(minutes=2)))
+                   for date in times if start <= date <= stop]
+        if include_live is not None:
+            windows.append((include_live, stop))
+        merged = []
+        for left, right in sorted(windows):
+            if merged and left <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(right, merged[-1][1]))
+            else:
+                merged.append((left, right))
+        return merged
+
+    def _load_box_windows(self, windows):
+        # 刷新最多三个旧窗口与一个实时窗口，彼此独立，避免逐个等待。
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [pool.submit(self._load_box_window, left, right) for left, right in windows]
+            for future in futures:
+                yield future.result()
+
+    @staticmethod
+    def _box_record_key(record):
+        return record['time'], str(record['content'])
+
+    def _box_transport_numbers(self, records, box_numbers, adjacent_inferred, wheels):
+        """输送相位只来自同一条已落库记录；三号轮本身无法确定 40 格相位。"""
+        numbers, inferred = {}, set()
+        transport = next((wheel for wheel in wheels if wheel['id'] == 0), None)
+        reference = next((wheel for wheel in wheels if wheel['id'] == 3), None)
+        if (not records or not transport or transport['min'] != 1 or transport['max'] != 40
+                or not reference or reference['min'] != 1 or reference['max'] != 8):
+            return numbers, inferred
         conn = self._get_conn()
         try:
             rows = conn.execute(
-                f'SELECT * FROM records WHERE {where} '
-                'ORDER BY record_time DESC, id DESC LIMIT ?',
-                params + (limit,),
+                'SELECT * FROM records WHERE record_time >= ? AND record_time <= ?',
+                (self._record_time_text(records[0]['time']),
+                 self._record_time_text(records[-1]['time'])),
             ).fetchall()
-            total = conn.execute(
-                f'SELECT COUNT(*) FROM records WHERE {where}', params
-            ).fetchone()[0] if recent else len(rows)
         finally:
             conn.close()
+        local = {(row['record_time'], str(row['content'])): row for row in rows}
+        # 时间不递增或直接校验的步进变化时分段，禁止跨断点传递输送相位。
+        segments, segment, phase = [], [], None
+        for idx, record in enumerate(records):
+            number = box_numbers[idx]
+            current_phase = ((number - 1 - idx) % 8
+                             if number is not None and idx not in adjacent_inferred else None)
+            if segment and (record['time'] <= records[idx - 1]['time']
+                            or (phase is not None and current_phase is not None and phase != current_phase)):
+                segments.append(segment)
+                segment, phase = [], None
+            segment.append(idx)
+            if current_phase is not None:
+                phase = current_phase
+        if segment:
+            segments.append(segment)
+        for segment in segments:
+            anchors = {}
+            for idx in segment:
+                record = records[idx]
+                row = local.get((self._record_time_text(record['time']), str(record['value'])))
+                if row is None or idx in adjacent_inferred or box_numbers[idx] is None:
+                    continue
+                value = self._box_number(row['transport'])
+                if (value is not None and 1 <= value <= 40
+                        and self._box_number(row['num3']) == box_numbers[idx]
+                        and self._box_number(row['verification']) == box_numbers[idx]):
+                    anchors[idx] = value
+            phases = {(value - 1 - idx) % 40 for idx, value in anchors.items()}
+            # 多个已知输送位置必须一致；冲突时保留数据库值，不外推。
+            if len(anchors) < 2 or len(phases) != 1:
+                continue
+            left, right = min(anchors), max(anchors)
+            intervals = [(records[idx + 1]['time'] - records[idx]['time']).total_seconds()
+                         for idx in range(left, right)]
+            # 两侧相位一致仍不足以排除中途整圈漏采；样本少或明显停顿时不补号。
+            if len(intervals) < 3:
+                continue
+            typical = sorted(intervals)[(len(intervals) - 1) // 2]
+            if typical <= 0 or any(gap > min(2.0, typical * 3) for gap in intervals):
+                continue
+            transport_phase = phases.pop()
+            for idx in range(left, right + 1):
+                if box_numbers[idx] is not None:
+                    numbers[idx] = (transport_phase + idx) % 40 + 1
+                    if idx not in anchors:
+                        inferred.add(idx)
+        return numbers, inferred
 
-        if rows:
-            matched = [self._local_box_record(row, layout['wheels']) for row in rows]
-            result = {'success': True, 'total_records': total, 'matches': matched,
-                      'source': 'database', 'wheels': layout['wheels']}
-            if recent:
-                result.update(lookback_minutes=lookback_minutes, has_more=total > len(matched))
+    def _format_remote_boxes(self, records, verification, wheels, qrcode=None):
+        box_numbers, adjacent = self._resolve_remote_box_numbers(records, verification, wheels)
+        transport, transport_inferred = self._box_transport_numbers(records, box_numbers, adjacent, wheels)
+        matched = []
+        for idx, record in enumerate(records):
+            if qrcode is not None and qrcode.casefold() not in str(record['value']).casefold():
+                continue
+            box_num = box_numbers[idx]
+            value = verification[idx + 2]['value'] if idx + 2 < len(verification) else None
+            numbers, inferred = self._remote_wheel_numbers(wheels, box_num)
+            source = 'verification' if box_num is not None else 'unavailable'
+            if idx in adjacent:
+                source = 'adjacent_verification'
+                inferred = [wheel['id'] for wheel in wheels if numbers[str(wheel['id'])] is not None]
+            if idx in transport:
+                numbers['0'] = transport[idx]
+                if idx in transport_inferred:
+                    inferred.append(0)
+            matched.append({
+                'index': idx, 'numbers': [box_num], 'box_num': box_num,
+                'wheel_numbers': numbers, 'inferred_wheels': inferred,
+                'box_number_source': source,
+                'verification_value': str(value) if value is not None else None,
+                'verification_issue': (None if self._box_number(value) in range(1, 9)
+                                       else 'invalid_value' if idx + 2 < len(verification) else 'missing_record'),
+                'content': record['value'], 'time': self._record_time_text(record['time']),
+            })
+        return matched
+
+    def _merge_box_record(self, local, remote):
+        """查询只补全展示，不写回同步计数器或覆盖已知输送相位。"""
+        merged = dict(local)
+        numbers = dict(local['wheel_numbers'])
+        inferred = set(local.get('inferred_wheels', []))
+        repair = (self._box_number(local.get('verification_value')) not in range(1, 9)
+                  and remote.get('box_number_source') == 'verification')
+        for key, value in remote['wheel_numbers'].items():
+            if value is not None and (numbers.get(key) is None or (repair and key != '0')):
+                numbers[key] = value
+                if int(key) in remote.get('inferred_wheels', []):
+                    inferred.add(int(key))
+        merged.update(wheel_numbers=numbers, box_num=numbers['3'], numbers=[numbers['3']],
+                      inferred_wheels=sorted(inferred))
+        if repair or local.get('box_num') is None:
+            for key in ('verification_value', 'verification_issue', 'box_number_source'):
+                merged[key] = remote.get(key)
+        return merged
+
+    def _box_record_complete(self, record, wheels):
+        for wheel in wheels:
+            value = self._box_number(record['wheel_numbers'].get(str(wheel['id'])))
+            if (value is None or wheel['min'] is None or wheel['max'] is None
+                    or not wheel['min'] <= value <= wheel['max']):
+                return False
+        return self._box_number(record.get('verification_value')) in range(1, 9)
+
+    def _query_box_records(self, qrcode=None, lookback_hours=24, lookback_minutes=None,
+                           refresh=False, pending_times=None):
+        began = time.monotonic()
+        wheels = self.get_box_layout()['wheels']
+        recent = lookback_minutes is not None
+        stop = datetime.now(timezone.utc)
+        start = stop - (timedelta(minutes=lookback_minutes) if recent else timedelta(hours=lookback_hours))
+        live_start = stop - timedelta(minutes=lookback_minutes if recent else 5)
+        limit = 500 if recent else 50
+        observed = {'remote_checked': False, 'latest_qr_event_time': None,
+                    'latest_verification_event_time': None}
+
+        def observe(raw, verification):
+            for name, records in (('latest_qr_event_time', raw),
+                                  ('latest_verification_event_time', verification)):
+                if records:
+                    latest = max(self._record_time_text(record['time']) for record in records)
+                    observed[name] = max(observed[name] or latest, latest)
+
+        def finish(result):
+            matches = result.get('matches', [])
+            if not result['success']:
+                state = 'query_error'
+            elif not matches:
+                state = 'no_recent_records' if recent else 'qrcode_not_found'
+            elif any(record['box_num'] is None
+                     or self._box_number(record.get('verification_value')) not in range(1, 9)
+                     for record in matches):
+                state = 'verification_pending'
+            elif any(record['wheel_numbers'].get('0') is None for record in matches):
+                state = 'transport_pending'
+            elif any(not self._box_record_complete(record, wheels) for record in matches):
+                state = 'wheel_numbers_pending'
+            else:
+                state = 'complete'
+            # 源 _time 是事件时间，不是入库到达时间。保留实际查询窗口以便核对校时问题。
+            diagnostics = {
+                **observed, 'state': state,
+                'query_started_at': self._record_time_text(stop),
+                'query_finished_at': self._record_time_text(datetime.now(timezone.utc)),
+                'query_duration_ms': round((time.monotonic() - began) * 1000),
+                'live_window_start': self._record_time_text(live_start),
+                'live_window_stop': self._record_time_text(stop),
+                'latest_match_event_time': max((record['time'] for record in matches), default=None),
+            }
+            result['diagnostics'] = diagnostics
+            # 日志不写二维码原文；同码的短摘要便于关联“未找到→记录到达→校验到齐”。
+            code_key = hashlib.sha256(qrcode.encode('utf-8')).hexdigest()[:12] if qrcode else 'recent'
+            logging.info('盒模查询 code_key=%s source=%s diagnostics=%s', code_key,
+                         result.get('source', 'unavailable'), json.dumps(diagnostics, ensure_ascii=False))
             return result
 
-        # 两路数据使用同一个固定窗口，避免分别计算“现在”造成校验序号偏移。
-        start_time = start.isoformat()
-        stop_time = stop.isoformat()
+        conn = self._get_conn()
         try:
-            records = self._load_data_from_influx(start_time, stop_time)
-        except RuntimeError as exc:
-            return {'success': False, 'error': str(exc)}
-
-        matching_indices = [
-            idx for idx, record in enumerate(records)
-            if recent or qrcode.casefold() in str(record['value']).casefold()
-        ]
-        warning = None
-        verification_records = []
-        if matching_indices:
+            if recent:
+                # 保留范围内的键用于合并去重和准确总数，最后统一取最新 500 条。
+                rows = conn.execute('SELECT * FROM records WHERE record_time >= ? AND record_time <= ?',
+                                    (self._record_time_text(start), self._record_time_text(stop))).fetchall()
+            else:
+                # 扫码原始记录可能保留 CR/LF，页面输入会 strip()；同时查常见行尾格式。
+                # 仍走 content 索引，不能为了兼容行尾重新扫描全部历史记录。
+                variants = tuple(qrcode + ending for ending in ('', '\r\n', '\n', '\r'))
+                conditions = ' OR '.join('content = ? COLLATE NOCASE' for _ in variants)
+                rows = conn.execute('SELECT * FROM records WHERE (' + conditions + ') '
+                                    'ORDER BY record_time DESC, id DESC LIMIT ?', variants + (limit,)).fetchall()
+                if not rows and not qrcode.lower().startswith(('http://', 'https://')):
+                    escaped = qrcode.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+                    rows = conn.execute("SELECT * FROM records WHERE content LIKE ? ESCAPE '\\' "
+                                        'ORDER BY record_time DESC, id DESC LIMIT ?',
+                                        (f'%{escaped}%', limit)).fetchall()
+        finally:
+            conn.close()
+        local_matches = [self._local_box_record(row, wheels) for row in rows]
+        merged = {self._box_record_key(record): record for record in local_matches}
+        remote_matches, warnings, raw_count = [], [], 0
+        live_only = True
+        # 本地单码已完整时直接返回；范围查询仍读最新远程数据，避免被旧本地数据挡住。
+        complete_local = local_matches and all(self._box_record_complete(record, wheels) for record in local_matches)
+        if recent or not complete_local:
+            observed['remote_checked'] = True
             try:
-                verification_records = self._load_verification_from_influx(start_time, stop_time)
+                times = pending_times if refresh else []
+                windows = self._box_context_windows(times or [], start, stop, include_live=live_start)
+                live_only = len(windows) == 1 and windows[0][0] == live_start
+                for raw, verification, warning in self._load_box_windows(windows):
+                    observe(raw, verification)
+                    raw_count += len(raw)
+                    remote_matches.extend(self._format_remote_boxes(raw, verification, wheels, qrcode))
+                    if warning:
+                        warnings.append(warning)
+                if not recent and not remote_matches and not refresh:
+                    # 先在服务器筛出匹配时间，再读取周围完整序列，避免传回整天的所有码。
+                    located = self._load_influx_records('bucket_data', start.isoformat(), live_start.isoformat(),
+                                                       qrcode=qrcode, limit=limit)
+                    windows = self._box_context_windows([record['time'] for record in located], start, stop)
+                    for raw, verification, warning in self._load_box_windows(windows):
+                        observe(raw, verification)
+                        raw_count += len(raw)
+                        remote_matches.extend(self._format_remote_boxes(raw, verification, wheels, qrcode))
+                        if warning:
+                            warnings.append(warning)
+                    live_only = False
             except RuntimeError as exc:
-                warning = str(exc)
-        # 先核对完整原始序列，再筛二维码/截取最新 500 条，保留 +2 配对与邻近锚点。
-        box_numbers, adjacent_inferred = self._resolve_remote_box_numbers(
-            records, verification_records, layout['wheels'])
-        matched = []
-        selected_indices = matching_indices[-limit:] if recent else matching_indices
-        for idx in reversed(selected_indices):
-            record = records[idx]
-            box_num = box_numbers[idx]
-            verification_value = (verification_records[idx + 2]['value']
-                                  if idx + 2 < len(verification_records) else None)
-            verification_issue = (None if self._box_number(verification_value) in range(1, 9)
-                                  else 'invalid_value' if idx + 2 < len(verification_records)
-                                  else 'missing_record')
-            wheel_numbers, inferred_wheels = self._remote_wheel_numbers(layout['wheels'], box_num)
-            number_source = 'verification' if box_num is not None else 'unavailable'
-            if idx in adjacent_inferred:
-                number_source = 'adjacent_verification'
-                inferred_wheels = [wheel['id'] for wheel in layout['wheels']
-                                   if wheel_numbers[str(wheel['id'])] is not None]
-            matched.append({
-                'index': idx,
-                'numbers': [box_num],
-                'box_num': box_num,
-                'wheel_numbers': wheel_numbers,
-                'inferred_wheels': inferred_wheels,
-                'box_number_source': number_source,
-                'verification_value': str(verification_value) if verification_value is not None else None,
-                'verification_issue': verification_issue,
-                'content': record['value'],
-                'time': self._record_time_text(record['time'])
-            })
-        matched.sort(key=lambda item: item['time'], reverse=True)
-        result = {
-            'success': True, 'total_records': len(records), 'matches': matched,
-            'source': 'influxdb', 'wheels': layout['wheels'], 'lookback_hours': lookback_hours,
-        }
-        if warning:
-            result['warning'] = warning
-        unresolved_count = sum(record['box_num'] is None for record in matched)
-        if unresolved_count and not warning:
-            result['warning'] = '返回的记录中有 {} 条缺少可核对的三号轮校验编号，已保留待确认。'.format(unresolved_count)
+                if not local_matches and not remote_matches:
+                    return finish({'success': False, 'error': str(exc), 'refresh_pending': not recent,
+                                   'retry_after_ms': 3000})
+                warnings.append(str(exc))
+        for record in remote_matches:
+            key = self._box_record_key(record)
+            merged[key] = self._merge_box_record(merged[key], record) if key in merged else record
+        matched = sorted(merged.values(), key=lambda item: item['time'], reverse=True)[:limit]
+        source = 'mixed' if local_matches and remote_matches else 'database' if local_matches else 'influxdb'
+        pending = not matched or any(not self._box_record_complete(record, wheels) for record in matched)
+        result = {'success': True, 'total_records': len(merged) if recent else max(len(merged), raw_count),
+                  'matches': matched, 'source': source, 'wheels': wheels,
+                  'refresh_pending': bool(pending and not recent), 'retry_after_ms': 3000}
+        if not warnings and any(record['box_num'] is None for record in matched):
+            warnings.append('部分记录的校验数据尚未齐全，编号暂待确认。')
+        if warnings:
+            result['warning'] = '；'.join(dict.fromkeys(warnings))
         if recent:
-            result.pop('lookback_hours')
-            result.update(lookback_minutes=lookback_minutes,
-                          has_more=len(matching_indices) > len(matched))
-        return result
+            result.update(lookback_minutes=lookback_minutes, has_more=len(merged) > len(matched))
+        else:
+            result['lookback_hours'] = lookback_hours
+            if live_only and source != 'database':
+                result['recent_window_minutes'] = 5
+        return finish(result)
 
     def start_auto_sync(self):
         def _sync_loop():

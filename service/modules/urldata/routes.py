@@ -147,7 +147,16 @@ def box_query():
     lookback_hours = data.get('lookback_hours', 24)
     if type(lookback_hours) is not int or lookback_hours not in (2, 24, 168):
         return jsonify({'success': False, 'error': '请选择有效的远程查询时间范围'}), 400
-    result = urldata_service.query_box_by_qrcode(qrcode.strip(), lookback_hours)
+    refresh = data.get('refresh', False)
+    if type(refresh) is not bool:
+        return jsonify({'success': False, 'error': '刷新参数格式不正确'}), 400
+    pending_times = data.get('pending_times')
+    try:
+        urldata_service._box_pending_times(pending_times)
+    except (ValueError, OverflowError):
+        return jsonify({'success': False, 'error': '待确认时间格式不正确，最多提供3条'}), 400
+    result = urldata_service.query_box_by_qrcode(qrcode.strip(), lookback_hours,
+                                               refresh=refresh, pending_times=pending_times)
     return jsonify(result)
 
 

@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>轮模盒轨迹查询</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/trajectory-view.css') }}?v=20260910-linked">
-    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260911-recent">
+    <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260915-transport-refresh">
     <script defer src="{{ url_for('static', filename='boxquery/trajectory.js') }}?v=20260910-linked"></script>
     <script defer src="{{ url_for('static', filename='boxquery/trajectory-view.js') }}?v=20260910-linked"></script>
-    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260914-query-gaps"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260915-transport-wait5"></script>
 </head>
 <body class="compact-workbench">
     <header class="page-header">
@@ -63,22 +63,22 @@
             <div class="main-content">
                 <section class="trajectory-panel" aria-labelledby="trajectoryTitle">
                     <header class="trajectory-header"><div class="trajectory-brand"><span class="trajectory-icon" aria-hidden="true">◎</span><h2 id="trajectoryTitle">轮模盒 · 运动轨迹</h2></div><button type="button" class="button small" id="resetButton">重置高亮</button></header>
-                    <div class="selection-summary"><div><span class="summary-label">当前二维码</span><strong id="selectedCode">尚未选择</strong><span id="selectedTime" class="subtle"></span></div><span id="locationStatus" class="location-status" role="status" aria-live="polite">等待查询</span></div>
+                    <div class="selection-summary"><div><span class="summary-label">当前二维码</span><strong id="selectedCode">尚未选择</strong><span id="selectedTime" class="subtle"></span></div><span class="location-summary"><span id="transportStatus" class="transport-status" role="status" aria-live="polite">输送：等待查询</span><span id="locationStatus" class="location-status" role="status" aria-live="polite">等待查询</span></span></div>
                     <div class="diagram-scroll" role="region" aria-label="设备轮位图，小屏幕可横向滚动" tabindex="0">
-                        <svg id="wheelDiagram" class="wheel-diagram" viewBox="0 0 1000 430" role="img" aria-labelledby="diagramTitle diagramDescription">
+                        <svg id="wheelDiagram" class="wheel-diagram" viewBox="-255 0 1255 430" role="img" aria-labelledby="diagramTitle diagramDescription">
                             <title id="diagramTitle">模盒轮位轨迹</title>
-                            <desc id="diagramDescription">一号轮为左侧倾斜椭圆，二、三号轮在左下，四、五号轮在上方，六号轮在右下，八号轮在右上。点击查询记录后，高亮移动至各轮模盒编号对应位置。</desc>
+                            <desc id="diagramDescription">输送盒模位于一号轮前，以循环输送轨道显示当前编号和配置范围。一号轮为左侧倾斜椭圆，二、三号轮在左下，四、五号轮在上方，六号轮在右下，八号轮在右上。点击查询记录后，高亮移动至输送盒模及各轮编号对应位置。</desc>
                         </svg>
                     </div>
-                    <footer class="diagram-footer"><span class="legend">绿色模盒 · 当前定位</span><span>工位固定 · 高亮顺时针移动</span><span id="dataSource">编号范围读取现有配置</span></footer>
+                    <footer class="diagram-footer"><span class="legend">绿色模盒 · 当前定位</span><span>工位固定 · 按循环方向定位</span><span id="dataSource">编号范围读取现有配置</span></footer>
                 </section>
             </div>
             <section class="matches-panel" id="matchPanel" aria-labelledby="matchTitle">
                 <div class="section-heading"><h2 id="matchTitle">记录与轮位对照</h2><span class="subtle" id="matchCount">0 条 · 时间倒序</span></div>
-                <div class="table-scroll" role="region" aria-label="匹配记录与七轮模盒编号，小屏幕可横向滚动" tabindex="0">
+                <div class="table-scroll" role="region" aria-label="匹配记录、输送盒模与七轮编号，小屏幕可横向滚动" tabindex="0">
                     <table>
-                        <thead><tr><th scope="col">记录时间</th><th scope="col">二维码</th><th scope="col">一号轮</th><th scope="col">二号轮</th><th scope="col" class="inspection-column">三号轮</th><th scope="col">四号轮</th><th scope="col">五号轮</th><th scope="col">六号轮</th><th scope="col">八号轮</th><th scope="col">操作</th></tr></thead>
-                        <tbody id="matchBody"><tr><td colspan="10" class="table-empty">查询二维码或选择快捷时段后，在这里对照各轮模盒编号。</td></tr></tbody>
+                        <thead><tr><th scope="col">记录时间</th><th scope="col">二维码</th><th scope="col">输送盒模</th><th scope="col">一号轮</th><th scope="col">二号轮</th><th scope="col" class="inspection-column">三号轮</th><th scope="col">四号轮</th><th scope="col">五号轮</th><th scope="col">六号轮</th><th scope="col">八号轮</th><th scope="col">操作</th></tr></thead>
+                        <tbody id="matchBody"><tr><td colspan="11" class="table-empty">查询二维码或选择快捷时段后，在这里对照输送盒模与各轮编号。</td></tr></tbody>
                     </table>
                 </div>
                 <p class="table-note">“—” 表示暂无编号；点击二维码或“查看轨迹”可切换定位。</p>

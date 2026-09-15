@@ -95,13 +95,17 @@ h2 { font-size: 13px; }
 #selectedTime:empty { display: none; }
 .location-status { color: var(--accent); font-size: 11px; white-space: nowrap; }
 .location-status::before { content: ""; display: inline-block; width: 5px; height: 5px; margin: 0 5px 2px 0; background: currentColor; border-radius: 50%; }
+.location-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 12px; }
+.transport-status { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.transport-status[data-state="located"], .transport-status[data-state="moving"] { color: var(--accent); }
+.transport-status[data-state="out-of-range"], .transport-status[data-state="unconfigured"] { color: var(--warning); }
 .diagram-scroll { overflow-x: auto; overscroll-behavior-x: contain; padding: 0 8px; background: var(--canvas); }
 .diagram-footer { padding: 8px 14px 11px; display: flex; align-items: center; justify-content: space-between; gap: 6px 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted); background: var(--canvas); }
 .legend { display: flex; align-items: center; gap: 6px; }
 .legend::before { content: ""; width: 9px; height: 9px; background: var(--accent); border-radius: 2px; }
 .matches-panel { grid-column: 1 / -1; padding: 11px 14px; }
 .table-scroll { overflow: auto; max-height: 360px; scrollbar-width: thin; }
-table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 850px; font-size: 12px; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 930px; font-size: 12px; }
 th { position: sticky; top: 0; z-index: 1; background: var(--canvas); text-align: left; padding: 7px 8px; font-weight: 400; color: var(--muted); border-bottom: 1px solid var(--line); white-space: nowrap; }
 td { padding: 7px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 tbody tr:last-child td { border-bottom: 0; }
@@ -117,7 +121,24 @@ tbody tr:hover { background: #f0f7f3; }
 .table-note { margin-top: 8px; font-size: 11px; color: var(--muted); }
 
 /* This palette is scoped to the query page; the shared record view keeps its theme. */
-.compact-workbench .wheel-diagram { min-width: 780px; max-height: 340px; }
+.compact-workbench .wheel-diagram { min-width: 990px; max-height: 340px; }
+.compact-workbench .transport-side { fill: var(--edge); stroke: var(--track); }
+.compact-workbench .transport-body, .compact-workbench .transport-inner { fill: var(--surface); stroke: var(--line); }
+.compact-workbench .transport-track { fill: none; stroke: var(--track); stroke-width: 1.5; }
+.compact-workbench .transport-tick { stroke: #7d9e8d; stroke-width: 1; }
+.compact-workbench .transport-name { fill: var(--ink); font-size: 17px; font-weight: 500; text-anchor: middle; letter-spacing: 1px; }
+.compact-workbench .transport-caption, .compact-workbench .transport-range, .compact-workbench .transport-detail { fill: var(--muted); font-size: 11px; text-anchor: middle; }
+.compact-workbench .transport-detail { font-size: 9px; }
+.compact-workbench .transport-number { fill: var(--ink); font-size: 23px; font-weight: 500; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.compact-workbench .transport-group[data-state="located"] .transport-number,
+.compact-workbench .transport-group[data-state="moving"] .transport-number { fill: var(--accent); }
+.compact-workbench .transport-group[data-state="missing"] .transport-number { fill: var(--muted); }
+.compact-workbench .transport-group[data-state="unconfigured"] .transport-number,
+.compact-workbench .transport-group[data-state="out-of-range"] .transport-number { fill: var(--warning); }
+.compact-workbench .transport-link, .compact-workbench .transport-direction { fill: none; stroke: #7d9e8d; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.compact-workbench .transport-marker-side { fill: #72ac94; }
+.compact-workbench .transport-marker-face { fill: var(--accent); stroke: var(--accent); }
+.compact-workbench .transport-marker-label { fill: #fff; font-size: 12px; font-weight: 500; text-anchor: middle; font-variant-numeric: tabular-nums; }
 .compact-workbench .wheel-shadow { fill: #537361; opacity: .08; }
 .compact-workbench .wheel-side { fill: var(--edge); stroke: var(--track); }
 .compact-workbench .wheel-bottom-line { stroke: var(--line); }

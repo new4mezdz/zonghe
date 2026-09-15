@@ -2,7 +2,11 @@
     'use strict';
     const T=window.BoxTrajectory, byId=id=>document.getElementById(id);
     const view=window.BoxTrajectoryView.create({diagram:byId('wheelDiagram'),status:byId('locationStatus')});
+    const transport=createTransportView(byId('wheelDiagram'),byId('transportStatus'));
+    const stations=[{id:0,name:'输送盒模'},...T.WHEELS];
+    const REFRESH_WAIT_MINUTES=5,REFRESH_WAIT_MS=REFRESH_WAIT_MINUTES*60*1000;
     let querySequence=0, controller=null, activeEntry=null, selectedRecord=null;
+    let refreshTimer=0,refreshExpiry=0,refreshController=null;
     let history=[], historyId=0, roundCount=0, hitCounts=Array(8).fill(0), layoutVersion=0;
     function element(tag,cls,text,parent) {
         const el=document.createElement(tag);if(cls)el.className=cls;
@@ -17,6 +21,85 @@
     }
     function timeText(value) { return String(value||'时间未知').replace('T',' ').replace(/(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/,'').slice(0,23); }
     function clockText() { return new Date().toLocaleString('zh-CN',{hour12:false}); }
+    function createTransportView(diagram,statusElement) {
+        const ns='http://www.w3.org/2000/svg',motion=new T.WheelMotion();
+        const reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
+        let frame=0,selected=false,inferred=false;
+        function svg(tag,attrs,parent) {
+            const el=document.createElementNS(ns,tag);
+            Object.entries(attrs).forEach(([key,value])=>el.setAttribute(key,String(value)));
+            parent.appendChild(el);return el;
+        }
+        // A continuous conveyor scale keeps the 40-position loop readable.
+        const group=svg('g',{class:'transport-group','data-wheel':0},diagram);
+        const title=svg('title',{},group);
+        svg('path',{d:'M-190 240 H-87 A46 46 0 0 1 -87 332 H-190 A46 46 0 0 1 -190 240 Z',transform:'translate(0 8)',class:'transport-side'},group);
+        svg('path',{d:'M-190 237 H-87 A49 49 0 0 1 -87 335 H-190 A49 49 0 0 1 -190 237 Z',class:'transport-body'},group);
+        svg('path',{d:'M-190 243 H-87 A43 43 0 0 1 -87 329 H-190 A43 43 0 0 1 -190 243 Z',class:'transport-track'},group);
+        const ticks=svg('g',{'aria-hidden':'true'},group);
+        svg('path',{d:'M-190 256 H-87 A30 30 0 0 1 -87 316 H-190 A30 30 0 0 1 -190 256 Z',class:'transport-inner'},group);
+        svg('text',{x:-139,y:202,class:'transport-name'},group).textContent='输送盒模';
+        svg('text',{x:-139,y:220,class:'transport-caption'},group).textContent='一号轮前';
+        const value=svg('text',{x:-139,y:285,class:'transport-number'},group);
+        const detail=svg('text',{x:-139,y:304,class:'transport-detail'},group);
+        const range=svg('text',{x:-139,y:365,class:'transport-range'},group);
+        svg('path',{d:'M-23 285 H8 M2 280 L8 285 L2 290',class:'transport-link','aria-hidden':'true'},group);
+        svg('path',{d:'M-150 239 L-145 243 L-150 247 M-126 325 L-131 329 L-126 333',class:'transport-direction','aria-hidden':'true'},group);
+        const marker=svg('g',{class:'transport-marker',visibility:'hidden','aria-hidden':'true'},group);
+        svg('rect',{x:-17,y:-13,width:34,height:30,rx:5,class:'transport-marker-side'},marker);
+        svg('rect',{x:-17,y:-17,width:34,height:30,rx:5,class:'transport-marker-face'},marker);
+        const markerValue=svg('text',{x:0,y:3,class:'transport-marker-label'},marker);
+        function point(fraction,inset=0) {
+            const radius=43,straight=103,arc=Math.PI*radius;
+            let distance=((fraction%1)+1)%1*(2*straight+2*arc);
+            if(distance<=straight)return {x:-190+distance,y:243+inset};
+            distance-=straight;
+            if(distance<=arc) {
+                const angle=-Math.PI/2+distance/radius;
+                return {x:-87+(radius-inset)*Math.cos(angle),y:286+(radius-inset)*Math.sin(angle)};
+            }
+            distance-=arc;
+            if(distance<=straight)return {x:-87-distance,y:329-inset};
+            const angle=Math.PI/2+(distance-straight)/radius;
+            return {x:-190+(radius-inset)*Math.cos(angle),y:286+(radius-inset)*Math.sin(angle)};
+        }
+        function stop() {if(frame)cancelAnimationFrame(frame);frame=0;}
+        function draw() {
+            const state=motion.status,valid=['located','moving'].includes(state);
+            const description=state==='empty'?'等待查询':state==='missing'?'暂无编号':state==='unconfigured'?'范围未配置':state==='out-of-range'?'编号超出范围':state==='moving'?'目标模盒':'模盒编号';
+            group.dataset.state=state;
+            value.textContent=motion.target===null?'—':'M-'+String(motion.target).padStart(2,'0');
+            detail.textContent=valid && inferred?'依据前后输送记录核对推算':description;
+            range.textContent=motion.count?'循环 '+motion.min+'–'+motion.max+' · '+motion.count+' 个盒模':'循环范围待加载';
+            title.textContent='输送盒模：'+description+(motion.target!==null?' '+motion.target:'')+(motion.count?'，编号范围 '+motion.min+' 至 '+motion.max:'')+(valid && inferred?'，依据前后输送记录核对推算':'');
+            marker.setAttribute('visibility',valid?'visible':'hidden');
+            if(valid) {
+                const p=point(motion.cursor);marker.setAttribute('transform','translate('+p.x+' '+p.y+')');
+                markerValue.textContent=state==='moving'?'·':String(motion.target).padStart(2,'0');
+            }
+            statusElement.textContent=!selected?'输送：等待查询':state==='moving'?'输送：正在定位':state==='located'?'输送：'+motion.target+' 号':'输送：'+description;
+            statusElement.dataset.state=state;
+        }
+        function tick(now) {frame=0;motion.sample(now);draw();if(motion.animation)frame=requestAnimationFrame(tick);}
+        function select(record) {
+            stop();selected=Boolean(record);inferred=Array.isArray(record?.inferred_wheels) && record.inferred_wheels.includes(0);motion.select(T.wheelNumber(record,0),performance.now(),reduced.matches);
+            draw();if(motion.animation)frame=requestAnimationFrame(tick);
+        }
+        function setLayout(configs) {
+            const config=(Array.isArray(configs)?configs:[]).find(item=>T.number(item.id)===0);
+            stop();motion.configure(config?.min,config?.max);ticks.replaceChildren();
+            const count=Math.min(motion.count,80);
+            for(let i=0;i<count;i++) {
+                const slot=Math.floor(i*motion.count/count),fraction=slot/motion.count;
+                const p=point(fraction,-4),q=point(fraction,slot%5===0?6:2);
+                svg('line',{x1:p.x,y1:p.y,x2:q.x,y2:q.y,class:'transport-tick'},ticks);
+            }
+            draw();
+        }
+        reduced.addEventListener('change',event=>{if(event.matches){stop();motion.finish();draw();}});
+        draw();
+        return {setLayout,select,clear(){stop();selected=false;inferred=false;motion.clear();draw();}};
+    }
     function queryLoading(loading,minutes=null) {
         byId('queryForm').setAttribute('aria-busy',String(loading));
         byId('queryButton').disabled=loading;
@@ -28,19 +111,123 @@
     }
     function cancelQuery() {
         querySequence++;if(controller)controller.abort();controller=null;
+        stopRefresh();
         queryLoading(false);
     }
-    function setLayout(configs) {view.setLayout(configs);}
+    function stopRefresh() {
+        if(refreshTimer)clearTimeout(refreshTimer);if(refreshExpiry)clearTimeout(refreshExpiry);
+        refreshTimer=0;refreshExpiry=0;
+        if(refreshController)refreshController.abort();refreshController=null;
+    }
+    function recordKey(record) {return JSON.stringify([record.content??'',record.time??'']);}
+    function mergeRefreshMatches(previous,incoming) {
+        const records=new Map(previous.map(record=>[recordKey(record),record]));
+        for(const record of incoming) {
+            const key=recordKey(record),old=records.get(key);
+            if(!old){records.set(key,record);continue;}
+            const merged={...old,...record,wheel_numbers:{...old.wheel_numbers,...record.wheel_numbers}};
+            const sources=new Map();
+            for(const station of stations) {
+                const value=T.wheelNumber(record,station.id),known=T.wheelNumber(old,station.id);
+                const source=value===null && known!==null?old:record;
+                sources.set(station.id,source);
+                if(value!==null || known!==null)merged.wheel_numbers[String(station.id)]=value??known;
+            }
+            // Retained numbers keep their own inference/normalization provenance.
+            for(const field of ['inferred_wheels','normalized_wheels']) {
+                merged[field]=stations.filter(station=>Array.isArray(sources.get(station.id)[field]) && sources.get(station.id)[field].includes(station.id)).map(station=>station.id);
+            }
+            merged.original_wheel_numbers={};
+            for(const id of merged.normalized_wheels) {
+                const original=sources.get(id)?.original_wheel_numbers?.[String(id)];
+                if(original!==undefined)merged.original_wheel_numbers[String(id)]=original;
+            }
+            if(sources.get(3)===old) {
+                for(const field of ['box_number_source','verification_value','verification_issue']) {
+                    if(Object.prototype.hasOwnProperty.call(old,field))merged[field]=old[field];else delete merged[field];
+                }
+            }
+            merged.box_num=T.wheelNumber(merged,3);merged.numbers=[merged.box_num];
+            records.set(key,merged);
+        }
+        const matches=[...records.values()].sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));
+        return {matches:matches.slice(0,50),total:matches.length};
+    }
+    function startRefresh(entry) {
+        if(entry.lookbackMinutes || entry.refreshPending!==true)return;
+        const sequence=querySequence,deadline=Date.now()+REFRESH_WAIT_MS;
+        const current=()=>sequence===querySequence && activeEntry===entry;
+        const pendingStatus=()=>{
+            const record=selectedRecord||entry.matches[0];
+            const transportOnly=record && T.WHEELS.every(wheel=>T.wheelNumber(record,wheel.id)!==null) && T.wheelNumber(record,0)===null;
+            const waiting=transportOnly?'轮位已更新，输送盒模待确认':entry.matches.length?'部分编号尚待确认':'尚未收到对应记录';
+            status(inspectionCompletion(entry)+(entry.warning?entry.warning+' ':'')+waiting+'，正在自动刷新，最多等待'+REFRESH_WAIT_MINUTES+'分钟；可继续扫描其他二维码。','warning');
+        };
+        function schedule(delay) {
+            if(!current() || entry.refreshPending!==true || Date.now()>=deadline)return;
+            refreshTimer=setTimeout(refresh,Math.max(500,Math.min(10000,Number(delay)||3000)));
+        }
+        async function refresh() {
+            refreshTimer=0;
+            if(!current() || Date.now()>=deadline)return;
+            const requestController=new AbortController();refreshController=requestController;
+            try {
+                const pendingList=[...new Set(entry.matches.filter(record=>{
+                    const verification=T.number(record.verification_value);
+                    return verification===null || verification<1 || verification>8
+                        || stations.some(station=>T.wheelNumber(record,station.id)===null);
+                }).map(record=>record.time).filter(time=>typeof time==='string' && time.trim()))].slice(0,50);
+                const pendingCursor=(entry.pendingCursor||0)%Math.max(1,pendingList.length);
+                const pendingTimes=pendingList.slice(pendingCursor,pendingCursor+3);
+                entry.pendingCursor=pendingCursor+pendingTimes.length>=pendingList.length?0:pendingCursor+pendingTimes.length;
+                const response=await fetch('/api/urldata/box_query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({qrcode:entry.qrcode,lookback_hours:entry.lookbackHours,refresh:true,pending_times:pendingTimes}),signal:requestController.signal});
+                const data=await response.json();
+                if(!current() || Date.now()>=deadline)return;
+                if(!response.ok || !data.success)throw new Error(data.error||'查询失败');
+                if(!Array.isArray(data.matches) || data.matches.some(record=>!record || typeof record!=='object'))throw new Error('查询返回的数据格式不完整');
+                const previous=selectedRecord;
+                const merged=mergeRefreshMatches(entry.matches,data.matches);
+                const totalRecords=Math.max(merged.total,data.total_records||0,entry.hasMore?entry.totalRecords||0:0);
+                const hasMore=entry.hasMore || data.has_more===true || merged.total>merged.matches.length;
+                Object.assign(entry,{matches:merged.matches,wheels:data.wheels||entry.wheels,source:data.source,lookbackHours:data.lookback_hours??entry.lookbackHours,recentWindowMinutes:data.recent_window_minutes,totalRecords,hasMore,warning:data.warning,refreshPending:data.refresh_pending===true,retryAfterMs:data.retry_after_ms});
+                layoutVersion++;setLayout(entry.wheels);
+                const record=entry.matches.find(item=>previous && recordKey(item)===recordKey(previous))||previous||entry.matches[0];
+                if(record)applySelection(record);else {clearSelection();renderMatches();}
+                registerScan(entry);
+                renderHistory();
+                if(entry.refreshPending) {pendingStatus();schedule(entry.retryAfterMs);}
+                else {
+                    stopRefresh();
+                    status(inspectionCompletion(entry)+(entry.warning||(entry.matches.length?'记录已自动更新，可继续扫描或切换记录。':'本次自动更新未找到匹配记录，可重新查询。')),entry.warning||!entry.matches.length?'warning':'info');
+                }
+            } catch(error) {
+                if(!current() || Date.now()>=deadline || error.name==='AbortError')return;
+                status(inspectionCompletion(entry)+'自动更新暂未成功，正在重试；已有记录仍可查看。','warning');schedule(entry.retryAfterMs);
+            } finally {
+                if(refreshController===requestController)refreshController=null;
+            }
+        }
+        refreshExpiry=setTimeout(()=>{
+            if(!current())return;
+            stopRefresh();status(inspectionCompletion(entry)+'已等待'+REFRESH_WAIT_MINUTES+'分钟，自动更新已暂停；可重新查询获取最新记录。','warning');
+        },REFRESH_WAIT_MS);
+        pendingStatus();schedule(entry.retryAfterMs);
+    }
+    function setLayout(configs) {view.setLayout(configs);transport.setLayout(configs);}
     function selectRecord(record) {
-        cancelQuery();selectedRecord=record;
+        cancelQuery();applySelection(record);status('已切换记录，可继续扫描其他二维码。');
+    }
+    function applySelection(record) {
+        selectedRecord=record;
         byId('selectedCode').textContent=String(record.content||activeEntry.qrcode||'');
         byId('selectedTime').textContent='记录时间：'+timeText(record.time);
         view.select(record);
+        transport.select(record);
         renderDataSource();
         renderMatches();
     }
     function clearSelection() {
-        selectedRecord=null;view.clear();
+        selectedRecord=null;view.clear();transport.clear();
         byId('selectedCode').textContent='尚未选择';byId('selectedTime').textContent='';
         renderDataSource();
     }
@@ -48,14 +235,15 @@
         const entry=activeEntry;
         if(!entry){byId('dataSource').textContent='编号范围读取现有配置';return;}
         const recentLabel=entry.lookbackMinutes?'最近'+entry.lookbackMinutes+'分钟':'';
-        if(entry.source==='influxdb') {
-            const inferred=Array.isArray(selectedRecord?.inferred_wheels)?selectedRecord.inferred_wheels.length:0;
+        if(entry.source==='influxdb' || entry.source==='mixed') {
+            const inferred=Array.isArray(selectedRecord?.inferred_wheels)?selectedRecord.inferred_wheels.filter(id=>id!==0).length:0;
             const adjacent=selectedRecord?.box_number_source==='adjacent_verification';
             const unknown=selectedRecord && T.wheelNumber(selectedRecord,3)===null;
-            byId('dataSource').textContent='远程'+(recentLabel||'最近'+entry.lookbackHours+'小时')+(unknown?' · 校验不足，编号待确认':adjacent?' · 相邻校验推算 · '+inferred+'轮已推算':inferred?' · 三号轮校验 · '+inferred+'轮按校验推算':' · 仅三号轮可确认编号');
+            const remoteRange=recentLabel||(entry.recentWindowMinutes?'最近'+entry.recentWindowMinutes+'分钟':'最近'+entry.lookbackHours+'小时');
+            byId('dataSource').textContent=(entry.source==='mixed'?'本地与远程':'远程')+remoteRange+(unknown?' · 校验不足，编号待确认':adjacent?' · 相邻校验推算 · '+inferred+'轮已推算':inferred?' · 三号轮校验 · '+inferred+'轮按校验推算':entry.source==='mixed'?' · 编号读取采集与校验数据':' · 仅三号轮可确认编号');
         } else {
             const normalized=Array.isArray(selectedRecord?.normalized_wheels)?selectedRecord.normalized_wheels.length:0;
-            byId('dataSource').textContent='本地'+(recentLabel||'轨迹数据')+(normalized?' · '+normalized+'轮按配置换算 · 原编号见表格提示':' · 编号范围读取现有配置');
+            byId('dataSource').textContent='本地'+(recentLabel||'轨迹数据')+(normalized?' · '+normalized+'工位按配置换算 · 原编号见表格提示':' · 编号范围读取现有配置');
         }
     }
     function renderMatches() {
@@ -66,7 +254,7 @@
         byId('matchCount').textContent=prefix+count+' · 时间倒序';
         if(!matches.length) {
             const row=element('tr','',null,body);
-            element('td','table-empty',activeEntry?'本次查询没有匹配记录，请调整二维码或查询范围。':'查询二维码或选择快捷时段后，在这里对照各轮模盒编号。',row).colSpan=T.WHEELS.length+3;
+            element('td','table-empty',activeEntry?'本次查询没有匹配记录，请调整二维码或查询范围。':'查询二维码或选择快捷时段后，在这里对照输送盒模与各轮编号。',row).colSpan=stations.length+3;
             return;
         }
         matches.forEach(record=>{
@@ -75,14 +263,14 @@
             const codeCell=element('td','',null,row);
             const codeButton=button('record-code',record.content||activeEntry.qrcode,codeCell,()=>selectRecord(record));
             codeButton.title=String(record.content||'');codeButton.setAttribute('aria-label','定位此记录：'+String(record.content||''));
-            for(const wheel of T.WHEELS) {
+            for(const wheel of stations) {
                 const value=T.wheelNumber(record,wheel.id);
                 const cell=element('td','number-cell'+(wheel.id===3?' inspection-column':''),value??'—',row);
                 cell.dataset.wheel=wheel.id;
                 const inferred=Array.isArray(record.inferred_wheels) && record.inferred_wheels.includes(wheel.id);
                 const normalized=Array.isArray(record.normalized_wheels) && record.normalized_wheels.includes(wheel.id);
                 const adjacent=record.box_number_source==='adjacent_verification';
-                cell.title=wheel.name+'：'+(value===null?'暂无编号':value)+(normalized?'（原编号 '+record.original_wheel_numbers?.[String(wheel.id)]+'，按配置循环范围换算）':inferred?(adjacent?'（校验原值 '+(record.verification_value??'空')+'；前后校验一致，按循环推算）':'（按三号轮校验推算）'):'');
+                cell.title=wheel.name+'：'+(value===null?'暂无编号':value)+(normalized?'（原编号 '+record.original_wheel_numbers?.[String(wheel.id)]+'，按配置循环范围换算）':inferred?(wheel.id===0?'（依据前后输送记录核对推算）':adjacent?'（校验原值 '+(record.verification_value??'空')+'；前后校验一致，按循环推算）':'（按三号轮校验推算）'):'');
                 cell.setAttribute('aria-label',cell.title);
             }
             button('select-record',record===selectedRecord?'已选中':'查看轨迹',element('td','',null,row),()=>selectRecord(record));
@@ -99,7 +287,8 @@
             else if(entry.warning)status(entry.warning,'warning');
         } else {
             clearSelection();renderMatches();
-            status(recentLabel?'本地及远程'+recentLabel+'内未找到记录，可稍后重试或扩大时段。':entry.source==='influxdb'?'本地历史记录及远程最近'+entry.lookbackHours+'小时内未找到匹配的二维码，请确认输入或扩大远程查询范围。':'未找到匹配的二维码，请确认输入内容。','warning');
+            const remoteRange=entry.recentWindowMinutes?'最近'+entry.recentWindowMinutes+'分钟':'最近'+entry.lookbackHours+'小时';
+            status(recentLabel?'本地及远程'+recentLabel+'内未找到记录，可稍后重试或扩大时段。':['influxdb','mixed'].includes(entry.source)?'本地历史记录及远程'+remoteRange+'内未找到匹配的二维码，请确认输入或扩大远程查询范围。':'未找到匹配的二维码，请确认输入内容。','warning');
         }
         renderHistory();
     }
@@ -133,12 +322,15 @@
         byId('inspectionMeter').value=hitCounts.filter(Boolean).length;
         byId('roundStatus').textContent='第 '+(roundCount+1)+' 轮检验'+(roundCount?' · 已完成 '+roundCount+' 轮':'');
     }
+    function inspectionCompletion(entry) {return entry.completedRound?'已完成第 '+entry.completedRound+' 轮八盒检验。':'';}
     function registerScan(entry) {
-        if(entry.matches[0]?.box_number_source==='adjacent_verification')return false;
-        const value=entry.matches.length?T.wheelNumber(entry.matches[0],3):null;
-        if(value!==null && value>=1 && value<=8)hitCounts[value-1]++;
+        if(entry!==activeEntry || entry.lookbackMinutes || entry.scanRegistered)return false;
+        const record=entry.matches[0],value=T.wheelNumber(record,3);
+        if(!record || value===null || value<1 || value>8 || ['adjacent_verification','unavailable'].includes(record.box_number_source)
+            || (Array.isArray(record.inferred_wheels) && record.inferred_wheels.includes(3)))return false;
+        entry.scanRegistered=true;entry.round=roundCount+1;hitCounts[value-1]++;
         let completed=false;
-        if(hitCounts.every(Boolean)){roundCount++;hitCounts=Array(8).fill(0);completed=true;}
+        if(hitCounts.every(Boolean)){roundCount++;entry.completedRound=roundCount;hitCounts=Array(8).fill(0);completed=true;}
         renderInspection();return completed;
     }
     async function doQuery(event,recentMinutes=null) {
@@ -158,18 +350,19 @@
             if(!Array.isArray(data.matches) || data.matches.some(m=>!m || typeof m!=='object'))throw new Error('查询返回的数据格式不完整');
             layoutVersion++;
             // Backend returns newest first, including the real-time fallback.
-            const entry={id:++historyId,qrcode:recent?'最近'+recentMinutes+'分钟':qrcode,matches:data.matches,wheels:data.wheels||[],source:data.source,lookbackHours:data.lookback_hours??lookbackHours,lookbackMinutes:recentMinutes,totalRecords:data.total_records,hasMore:data.has_more===true,warning:data.warning,queriedAt:clockText(),round:roundCount+1};
+            const entry={id:++historyId,qrcode:recent?'最近'+recentMinutes+'分钟':qrcode,matches:data.matches,wheels:data.wheels||[],source:data.source,lookbackHours:data.lookback_hours??lookbackHours,lookbackMinutes:recentMinutes,recentWindowMinutes:data.recent_window_minutes,totalRecords:data.total_records,hasMore:data.has_more===true,warning:data.warning,refreshPending:data.refresh_pending===true,retryAfterMs:data.retry_after_ms,queriedAt:clockText(),round:roundCount+1};
             let completed=false;
             if(!recent) {
                 history.unshift(entry);history=history.slice(0,200);
-                completed=registerScan(entry);
             }
             chooseEntry(entry);
-            if(completed)status('已完成第 '+roundCount+' 轮八盒检验。当前二维码已定位，继续扫码开始下一轮。');
+            if(!recent)completed=registerScan(entry);
+            if(completed){renderHistory();status(inspectionCompletion(entry)+'当前二维码已定位，继续扫码开始下一轮。');}
             if(!recent) {
                 if(entry.matches[0]?.box_number_source==='adjacent_verification')status(byId('queryStatus').textContent+' 按相邻校验推算，未计入八盒检验。','warning');
                 if(byId('qrcodeInput').value.trim()===qrcode)byId('qrcodeInput').value='';
                 byId('qrcodeInput').focus();
+                startRefresh(entry);
             }
         } catch(error) {
             if(sequence!==querySequence || error.name==='AbortError')return;
@@ -193,11 +386,12 @@
     }
     byId('queryForm').addEventListener('submit',doQuery);
     for(const minutes of [5,30])byId('recent'+minutes+'Button').addEventListener('click',event=>doQuery(event,minutes));
-    byId('clearInputButton').addEventListener('click',()=>{byId('qrcodeInput').value='';byId('qrcodeInput').focus();});
+    byId('clearInputButton').addEventListener('click',()=>{cancelQuery();byId('qrcodeInput').value='';byId('qrcodeInput').focus();status('输入已清空，可扫描其他二维码。');});
     byId('resetButton').addEventListener('click',()=>{cancelQuery();activeEntry=null;clearSelection();renderMatches();renderHistory();status('高亮已重置，可点击查询记录重新定位。');});
     byId('clearHistoryButton').addEventListener('click',()=>{
         cancelQuery();history=[];activeEntry=null;roundCount=0;hitCounts=Array(8).fill(0);
         clearSelection();renderHistory();renderMatches();renderInspection();status('查询记录与检验进度已清空。');
     });
+    window.addEventListener('pagehide',cancelQuery);
     renderHistory();renderInspection();loadLayout();
 })();
