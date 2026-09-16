@@ -52,7 +52,6 @@
         svg('path',{d:'M-190 243 H-87 A43 43 0 0 1 -87 329 H-190 A43 43 0 0 1 -190 243 Z',class:'transport-track'},group);
         const ticks=svg('g',{'aria-hidden':'true'},group);
         svg('path',{d:'M-190 256 H-87 A30 30 0 0 1 -87 316 H-190 A30 30 0 0 1 -190 256 Z',class:'transport-inner'},group);
-        svg('text',{x:-139,y:202,class:'transport-name'},group).textContent='输送盒模';
         svg('text',{x:-139,y:220,class:'transport-caption'},group).textContent='一号轮前';
         const value=svg('text',{x:-139,y:285,class:'transport-number'},group);
         const detail=svg('text',{x:-139,y:304,class:'transport-detail'},group);

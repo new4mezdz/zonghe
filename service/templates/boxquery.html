@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='boxquery/boxquery.css') }}?v=20260915-transport-refresh">
     <script defer src="{{ url_for('static', filename='boxquery/trajectory.js') }}?v=20260910-linked"></script>
     <script defer src="{{ url_for('static', filename='boxquery/trajectory-view.js') }}?v=20260910-linked"></script>
-    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260915-transport-continuity"></script>
+    <script defer src="{{ url_for('static', filename='boxquery/boxquery.js') }}?v=20260916-trajectory-labels"></script>
 </head>
 <body class="compact-workbench">
     <header class="page-header">
@@ -60,7 +60,7 @@
             </aside>
             <div class="main-content">
                 <section class="trajectory-panel" aria-labelledby="trajectoryTitle">
-                    <header class="trajectory-header"><div class="trajectory-brand"><span class="trajectory-icon" aria-hidden="true">◎</span><h2 id="trajectoryTitle">轮模盒 · 运动轨迹</h2></div><button type="button" class="button small" id="resetButton">重置高亮</button></header>
+                    <header class="trajectory-header"><div class="trajectory-brand"><span class="trajectory-icon" aria-hidden="true">◎</span><h2 id="trajectoryTitle">烟包 · 运动轨迹</h2></div><button type="button" class="button small" id="resetButton">重置高亮</button></header>
                     <div class="selection-summary"><div><span class="summary-label">当前二维码</span><strong id="selectedCode">尚未选择</strong><span id="selectedTime" class="subtle"></span></div><span class="location-summary"><span id="transportStatus" class="transport-status" role="status" aria-live="polite">输送：等待查询</span><span id="locationStatus" class="location-status" role="status" aria-live="polite">等待查询</span></span></div>
                     <div class="diagram-scroll" role="region" aria-label="设备轮位图，小屏幕可横向滚动" tabindex="0">
                         <svg id="wheelDiagram" class="wheel-diagram" viewBox="-255 0 1255 430" role="img" aria-labelledby="diagramTitle diagramDescription">
