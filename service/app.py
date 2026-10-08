@@ -25,6 +25,7 @@ from modules.fucheng.routes import fucheng_bp
 from modules.material_transfer.routes import material_transfer_bp
 from modules.light_control.routes import light_control_bp
 from modules.pending_records.routes import pending_records_bp
+from modules.pda_report.routes import pda_report_bp
 
 app.register_blueprint(monitor_bp)
 app.register_blueprint(schedule_bp)
@@ -36,6 +37,7 @@ app.register_blueprint(fucheng_bp)
 app.register_blueprint(material_transfer_bp)
 app.register_blueprint(light_control_bp)
 app.register_blueprint(pending_records_bp)
+app.register_blueprint(pda_report_bp)
 from modules.labelimg.routes import labelimg_bp
 app.register_blueprint(labelimg_bp)
 

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>仓储扫码报表 · 综合数据管理系统</title>
+  <link rel="stylesheet" href="{{ url_for('pda_report.static', filename='dashboard.css') }}">
+  <script src="{{ url_for('pda_report.static', filename='dashboard.js') }}" defer></script>
+</head>
+<body>
+  <main>
+    <nav class="page-nav" aria-label="页面导航"><a class="home-link" href="/">← 综合服务首页</a><span>仓储管理 / 扫码报表</span></nav>
+    <header class="topbar">
+      <div><div class="eyebrow">WAREHOUSE / SCAN REPORT</div><h1>仓储扫码报表</h1><p>读码器与 PDA 统一记录 · 北京时间 UTC+08:00</p></div>
+      <div class="live" role="status" aria-live="polite"><div><span id="indicator" class="dot"></span><span id="connection">正在连接服务</span></div><small id="updated">尚未读取报表</small><small>每 10 秒自动刷新</small><button id="refresh" type="button" class="secondary">立即刷新</button></div>
+    </header>
+    <section id="auth-panel" class="panel auth-panel" hidden aria-label="访问密钥">
+      <form id="auth-form"><label for="api-key">服务访问密钥</label><input id="api-key" type="password" autocomplete="off" maxlength="256" placeholder="与 PDA / 读码器端保持一致"><button type="submit">连接服务</button></form>
+      <p>密钥仅保存在本浏览器标签页会话中。</p>
+    </section>
+    <div id="message" class="message" role="status" hidden></div>
+    <section class="panel filters" aria-label="记录筛选">
+      <form id="filters">
+        <label>开始日期<input id="start-date" type="date" name="start_date"></label>
+        <label>结束日期<input id="end-date" type="date" name="end_date"></label>
+        <label>扫码来源<select name="source"><option value="">全部来源</option><option value="reader">读码器</option><option value="pda">PDA</option></select></label>
+        <label>操作类型<select name="operation"><option value="">全部操作</option><option value="inbound">入库</option><option value="return">返回</option></select></label>
+        <label class="search-field">条码搜索<input name="keyword" type="search" placeholder="输入条码关键词" maxlength="4096"></label>
+        <button type="submit">查询</button><button id="today" type="button" class="secondary">今天</button><button id="all-dates" type="button" class="secondary">全部日期</button>
+      </form>
+    </section>
+    <div id="report-state" class="report-state" hidden><span id="scope-summary"></span><strong id="stale-label" hidden>上次读取的数据</strong></div>
+    <div id="report-content" aria-busy="true">
+    <section class="metrics" aria-label="扫码汇总">
+      <article class="metric primary"><span>扫码总次数</span><strong id="total">—</strong><small>当前筛选范围</small></article>
+      <article class="metric"><span>入库次数</span><strong id="inbound">—</strong><small>读码器 + PDA</small></article>
+      <article class="metric"><span>返回次数</span><strong id="returned">—</strong><small>按扫描事件计数</small></article>
+      <article class="metric"><span>不同条码数</span><strong id="unique-barcodes">—</strong><small id="devices">— 台扫码设备</small></article>
+    </section>
+    <section class="overview">
+      <article class="panel trend-panel"><div class="section-heading"><h2>每日扫码趋势</h2><span>最近 31 个有记录日期</span></div><div class="legend"><span><i class="inbound-key"></i>入库</span><span><i class="return-key"></i>返回</span></div><div id="trend" class="trend" aria-label="每日入库和返回次数"></div></article>
+      <article class="panel sources"><h2>来源分布</h2><div><span>读码器</span><strong id="reader">—</strong></div><progress id="reader-bar" max="1" value="0" aria-label="读码器占比"></progress><div><span>PDA 手动扫码</span><strong id="pda">—</strong></div><progress id="pda-bar" max="1" value="0" aria-label="PDA占比"></progress><p>每次有效扫描都保留记录。相同条码再次扫描会增加次数；网络重试不会重复计数。</p></article>
+    </section>
+    <section class="panel records"><div class="section-heading"><div><h2>扫码明细</h2><p>按实际扫码时间倒序 · 统计的是扫码事件，不代表实时库存</p></div><button id="export" type="button" class="secondary" disabled>导出 CSV</button></div>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="扫码明细，可横向滚动"><table><colgroup><col class="time-column"><col class="barcode-column"><col class="operation-column"><col class="source-column"><col class="device-column"><col class="reader-column"></colgroup><thead><tr><th scope="col">扫码时间</th><th scope="col">条码</th><th scope="col">操作</th><th scope="col">来源</th><th scope="col">设备编号</th><th scope="col">读码器</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="empty">正在加载扫码记录…</td></tr></tbody></table></div>
+      <div class="pagination"><span id="page-info">—</span><div><button id="previous" class="secondary" type="button" disabled>上一页</button><button id="next" class="secondary" type="button" disabled>下一页</button></div></div>
+    </section>
+    </div>
+    <footer>综合数据管理系统 · 仓储扫码报表<br>返回扫码单独统计，不自动冲减库存。日期与时间均按北京时间统计，设备需保持时间准确。</footer>
+  </main>
+</body>
+</html>
