@@ -15,8 +15,49 @@
       <div class="live" role="status" aria-live="polite"><div><span id="indicator" class="dot"></span><span id="connection">正在连接服务</span></div><small id="updated">尚未读取报表</small><small>每 10 秒自动刷新</small><button id="refresh" type="button" class="secondary">立即刷新</button></div>
     </header>
     <section id="auth-panel" class="panel auth-panel" hidden aria-label="访问密钥">
-      <form id="auth-form"><label for="api-key">服务访问密钥</label><input id="api-key" type="password" autocomplete="off" maxlength="256" placeholder="与 PDA / 读码器端保持一致"><button type="submit">连接服务</button></form>
+      <form id="auth-form"><label for="api-key">服务访问密钥</label><input id="api-key" type="password" autocomplete="off" maxlength="256" placeholder="与 PDA 使用的服务密钥一致"><button type="submit">连接服务</button></form>
       <p>密钥仅保存在本浏览器标签页会话中。</p>
+    </section>
+    <section id="reader-panel" class="panel reader-panel" aria-labelledby="reader-heading">
+      <div class="section-heading reader-heading">
+        <div><h2 id="reader-heading">读码器自动采集</h2><p>综合服务直接接收读码器数据，自动保存为入库扫码记录。</p></div>
+        <span id="reader-state" class="reader-state unknown" role="status">状态未知</span>
+      </div>
+      <div class="reader-connection">
+        <div class="reader-address-block"><span>读码器地址</span><strong id="reader-endpoint">正在读取配置…</strong><p id="reader-status-message">正在读取采集状态</p></div>
+        <div class="reader-actions"><button id="reader-start" type="button" disabled>连接采集</button><button id="reader-stop" type="button" class="secondary" disabled>停止采集</button><button id="reader-refresh" type="button" class="secondary">刷新状态</button></div>
+      </div>
+      <p id="reader-enabled-note" class="reader-enabled-note">首次使用需连接采集；启用状态会保存，服务重启后自动恢复采集。</p>
+      <div id="reader-feedback" class="reader-feedback" role="status" hidden></div>
+      <dl class="reader-counters" aria-label="本次采集统计">
+        <div><dt>本次收到</dt><dd id="reader-received">—</dd></div><div><dt>已保存</dt><dd id="reader-saved">—</dd></div><div><dt>重复过滤</dt><dd id="reader-filtered">—</dd></div><div><dt>拒绝记录</dt><dd id="reader-rejected">—</dd></div>
+      </dl>
+      <p class="reader-counter-note">以上为本次采集计数，每次点击“连接采集”开始新一轮时重新计数。</p>
+      <p id="reader-pending-note" class="reader-pending-note" role="status" hidden></p>
+      <div class="reader-last-scan"><div><span>最近收码</span><time id="reader-last-time">尚未收到条码</time></div><code id="reader-last-barcode">—</code></div>
+      <p id="reader-last-error" class="reader-last-error" hidden></p>
+      <details id="reader-settings" class="reader-settings">
+        <summary>连接配置 <span id="reader-dirty" hidden>有未保存修改</span></summary>
+        <p id="reader-config-note">请先等待采集状态读取完成。</p>
+        <form id="reader-config-form">
+          <fieldset id="reader-config-fields" disabled>
+            <legend class="visually-hidden">读码器连接和数据格式</legend>
+            <div class="reader-config-grid">
+              <label>读码器 IP<input id="reader-host" name="host" type="text" required maxlength="45" spellcheck="false" autocomplete="off" placeholder="192.168.30.180"></label>
+              <label>读码器端口<input id="reader-port" name="port" type="number" required min="1" max="65535" step="1" placeholder="51236"></label>
+              <label>分包方式<select id="reader-framing" name="framing"><option value="auto">自动兼容</option><option value="line">回车 / 换行</option><option value="stx_etx">STX / ETX</option><option value="fixed">固定字节长度</option></select></label>
+              <label>字符编码<input id="reader-encoding" name="encoding" type="text" required maxlength="64" spellcheck="false" autocomplete="off" placeholder="utf-8"></label>
+              <label>空闲分包间隔（毫秒）<input id="reader-idle" name="idle_ms" type="number" required min="50" max="10000" step="1"></label>
+              <label>固定长度（字节）<input id="reader-fixed" name="fixed_length" type="number" required min="0" max="65536" step="1"></label>
+              <label>断线重连间隔（秒）<input id="reader-reconnect" name="reconnect_seconds" type="number" required min="0.2" max="300" step="0.1"></label>
+              <label>重复码过滤窗口（秒）<input id="reader-dedupe" name="dedupe_seconds" type="number" required min="0" max="3600" step="0.1"></label>
+            </div>
+            <p class="reader-config-help">固定长度仅在“固定字节长度”模式下生效。重复码过滤设为 0 时保留每次扫码；其余数值表示过滤该时间内的相同条码。</p>
+            <div class="reader-config-actions"><button id="reader-save" type="submit" disabled>保存配置</button><button id="reader-reset" type="button" class="secondary" disabled>恢复已保存配置</button></div>
+          </fieldset>
+        </form>
+      </details>
+      <p class="reader-note">关闭网页仍会继续采集，连接断开后会自动重连。断网期间未收到的条码无法自动补拉。</p>
     </section>
     <div id="message" class="message" role="status" hidden></div>
     <section class="panel filters" aria-label="记录筛选">
@@ -39,7 +80,7 @@
     </section>
     <section class="overview">
       <article class="panel trend-panel"><div class="section-heading"><h2>每日扫码趋势</h2><span>最近 31 个有记录日期</span></div><div class="legend"><span><i class="inbound-key"></i>入库</span><span><i class="return-key"></i>返回</span></div><div id="trend" class="trend" aria-label="每日入库和返回次数"></div></article>
-      <article class="panel sources"><h2>来源分布</h2><div><span>读码器</span><strong id="reader">—</strong></div><progress id="reader-bar" max="1" value="0" aria-label="读码器占比"></progress><div><span>PDA 手动扫码</span><strong id="pda">—</strong></div><progress id="pda-bar" max="1" value="0" aria-label="PDA占比"></progress><p>每次有效扫描都保留记录。相同条码再次扫描会增加次数；网络重试不会重复计数。</p></article>
+      <article class="panel sources"><h2>来源分布</h2><div><span>读码器</span><strong id="reader">—</strong></div><progress id="reader-bar" max="1" value="0" aria-label="读码器占比"></progress><div><span>PDA 手动扫码</span><strong id="pda">—</strong></div><progress id="pda-bar" max="1" value="0" aria-label="PDA占比"></progress><p>按已保存的扫码事件统计。再次扫码会增加次数；读码器启用重复过滤时，窗口内的相同条码不重复保存。网络重试不会重复计数。</p></article>
     </section>
     <section class="panel records"><div class="section-heading"><div><h2>扫码明细</h2><p>按实际扫码时间倒序 · 统计的是扫码事件，不代表实时库存</p></div><button id="export" type="button" class="secondary" disabled>导出 CSV</button></div>
       <div class="table-scroll" tabindex="0" role="region" aria-label="扫码明细，可横向滚动"><table><colgroup><col class="time-column"><col class="barcode-column"><col class="operation-column"><col class="source-column"><col class="device-column"><col class="reader-column"></colgroup><thead><tr><th scope="col">扫码时间</th><th scope="col">条码</th><th scope="col">操作</th><th scope="col">来源</th><th scope="col">设备编号</th><th scope="col">读码器</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="empty">正在加载扫码记录…</td></tr></tbody></table></div>

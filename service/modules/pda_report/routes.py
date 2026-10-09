@@ -12,6 +12,8 @@ from urllib.parse import parse_qs
 from flask import Blueprint, Response, current_app, jsonify, render_template, request
 from werkzeug.exceptions import BadRequest, RequestEntityTooLarge
 
+from .reader import ReaderBusyError, ReaderStorageError, get_reader
+
 from .services import (
     EventConflict,
     ServiceConfigurationError,
@@ -23,6 +25,7 @@ from .services import (
 
 
 MAX_BODY_BYTES = 2 * 1024 * 1024
+MAX_READER_CONFIG_BYTES = 16 * 1024
 pda_report_bp = Blueprint(
     "pda_report", __name__, static_folder="static", static_url_path="/pda_report/static"
 )
@@ -63,6 +66,16 @@ def request_too_large(_error_value):
 @pda_report_bp.errorhandler(BadRequest)
 def invalid_request(_error_value):
     return _error("请求正文不完整或请求格式无效", 400)
+
+
+@pda_report_bp.errorhandler(ReaderBusyError)
+def reader_busy(error):
+    return _error(error, 409)
+
+
+@pda_report_bp.errorhandler(ReaderStorageError)
+def reader_storage_error(error):
+    return _error(error, 503)
 
 
 def _require_api_key():
@@ -113,6 +126,62 @@ def health():
         "ok": True, "service": "warehouse-scan", "api_version": 1,
         "auth_required": bool(configured_api_key()), "report_timezone": "Asia/Shanghai",
     })
+
+
+@pda_report_bp.route("/api/reader/status")
+def reader_status():
+    auth_error = _require_api_key()
+    if auth_error is not None:
+        return auth_error
+    return jsonify(get_reader().snapshot())
+
+
+def _reader_command(action):
+    auth_error = _require_api_key()
+    if auth_error is not None:
+        return auth_error
+    if request.headers.get("Sec-Fetch-Site") == "cross-site":
+        return _error("请在综合服务页面操作读码器", 403)
+    if request.mimetype != "application/json":
+        return _error("请使用 application/json", 415)
+    if request.headers.get("Content-Encoding", "identity").lower() != "identity":
+        return _error("不支持压缩请求正文", 415)
+    if request.content_length is not None and request.content_length > MAX_READER_CONFIG_BYTES:
+        return _error("读码器设置正文超过 16 KiB", 413)
+    try:
+        raw = request.stream.read(MAX_READER_CONFIG_BYTES + 1)
+        if len(raw) > MAX_READER_CONFIG_BYTES:
+            return _error("读码器设置正文超过 16 KiB", 413)
+        try:
+            payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_unique_json)
+        except (UnicodeError, json.JSONDecodeError, RecursionError) as exc:
+            raise ValueError("请求正文不是有效的 UTF-8 JSON") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("请求正文必须是 JSON 对象")
+        if action == "configure":
+            if "enabled" in payload:
+                raise ValueError("请使用连接采集或停止采集按钮修改启停状态")
+        elif payload:
+            raise ValueError("启停请求正文应为一个空 JSON 对象")
+        return jsonify(getattr(get_reader(), action)(payload) if action == "configure"
+                       else getattr(get_reader(), action)())
+    except ValueError as exc:
+        return _error(exc, 400)
+
+
+@pda_report_bp.route("/api/reader/config", methods=["POST"])
+def reader_config():
+    return _reader_command("configure")
+
+
+@pda_report_bp.route("/api/reader/start", methods=["POST"])
+def reader_start():
+    return _reader_command("start")
+
+
+@pda_report_bp.route("/api/reader/stop", methods=["POST"])
+def reader_stop():
+    return _reader_command("stop")
 
 
 @pda_report_bp.route("/api/scans", methods=["POST"])

@@ -26,6 +26,7 @@ from modules.material_transfer.routes import material_transfer_bp
 from modules.light_control.routes import light_control_bp
 from modules.pending_records.routes import pending_records_bp
 from modules.pda_report.routes import pda_report_bp
+from modules.pda_report.reader import start_reader_service
 
 app.register_blueprint(monitor_bp)
 app.register_blueprint(schedule_bp)
@@ -49,6 +50,9 @@ register_socket_handlers(socketio)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+# Restore the saved reader connection without requiring an open browser page.
+start_reader_service(app)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)

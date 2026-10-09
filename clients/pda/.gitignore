@@ -1,0 +1,12 @@
+# Generated packages, signing material, and local configuration.
+/release/
+*.apk
+*.idsig
+*.jks
+*.keystore
+*.db
+*.db-shm
+*.db-wal
+android/.gradle/
+android/build/
+android/local.properties
